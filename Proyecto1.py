@@ -1,32 +1,35 @@
 from Particle import *
 
 PARAMETERS : List[Particle] = [
-	# position, velocity, restitution, radius, mass
-	Particle(QPointF(0, 140), QPointF(0, 0), 0.9, 20, 1 ),
-	Particle(QPointF(0, 125), QPointF(0, 0), 0.8, 40, 2 ),
-	Particle(QPointF(0, 100), QPointF(0, 0), 0.7, 60, 4 )
+	# center, velocity, restitution, radius, mass
+	Particle(QPointF(0, 180), QPointF(0, 0), 0.9, 10, 1 ),
+	Particle(QPointF(0, 150), QPointF(0, 0), 0.8, 20, 2 ),
+	Particle(QPointF(0, 100), QPointF(0, 0), 0.7, 30, 4 )
 ]
 
-BB = QRectF(-200, 0, 400, 600)
+BOUNDING_BOX = QRectF(-200, 0, 400, 600)
 
 class ParticleSimulation(QGraphicsScene):
 	def __init__(self, parent: QMainWindow):
 		super().__init__(parent)
 		self.particles: List[Particle] = []
-		self.BB = BB
-		self.addRect(self.BB)
+		self.bounding_box = BOUNDING_BOX
+		self.addRect(self.bounding_box)
+		self.addLine(-400, 0, 400, 0)
 		self.setup_particles()
-		self.setSceneRect(BB)
+		self.setSceneRect(BOUNDING_BOX)
 	
 	def setup_particles(self):
 		for particle in PARAMETERS:
 			self.addItem(particle)
-			particle.setPos(particle.position)
 			self.particles.append(particle)
 	
 	def update_particles(self, delta_time):
-		for particle in self.particles:
-			particle.tick(delta_time, self.sceneRect())
+		for i, particle_a in enumerate(self.particles):
+			particle_a.tick(delta_time, BOUNDING_BOX)
+			for j, particle_b in enumerate(self.particles):
+				if i < j:
+					particle_a.handle_particle_collision(particle_b)
 	
 	def advance(self, delta_time):
 		self.update_particles(delta_time)
