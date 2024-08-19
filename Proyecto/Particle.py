@@ -2,16 +2,14 @@ from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 from typing import *
-import numpy as np
-from scipy.integrate import solve_ivp
-import random
 import math
 import sys
+import os
 
 TIME_SCALE = 5
 GRAVITY = QPointF(0, -9.81)
-SLIDING_FRICTION_COEFFICIENT = 0.1
-ROLLING_FRICTION_COEFFICIENT = 0.025
+SLIDING_FRICTION_COEFFICIENT = 0.3
+ROLLING_FRICTION_COEFFICIENT = 0.15
 
 def length(point: QPointF):
 	return math.sqrt(point.x()**2 + point.y()**2)
@@ -27,27 +25,36 @@ def dot_product(p1: QPointF, p2: QPointF):
 	return p1.x() * p2.x() + p1.y() * p2.y()
 
 class Particle(QGraphicsEllipseItem):
+	name: str
 	center: QPointF
 	velocity: QPointF
+	acceleration: QPointF
 	restitution: float
 	radius: float
 	mass: float
 	inertia: float
 	angular_velocity: float
-	rolling: bool
 	colliding: bool
-	def __init__(self, center: QPointF, velocity: QPointF, restitution: float, radius: float, mass: float):
+	positions: List[Tuple[float,float]]
+	velocities: List[Tuple[float,float]]
+	accelerations: List[Tuple[float,float]]
+	def __init__(self, name: str, center: QPointF, velocity: QPointF, restitution: float, radius: float, mass: float):
 		super().__init__(center.x() - radius, center.y() - radius, 2*radius, 2*radius)
 		self.setBrush(QBrush(QColor("blue")))
 		self.setPen(QPen(QColor("black"), 1))
+		self.name = name
 		self.center = center
 		self.velocity = velocity
+		self.acceleration = QPointF(0,0)
 		self.restitution = restitution
 		self.radius = radius
 		self.mass = mass
 		self.inertia = (2 / 5) * mass * radius ** 2
 		self.angular_velocity = 0.0
 		self.colliding = False
+		self.positions = []
+		self.velocities = []
+		self.accelerations = []
 
 	def tick(self, delta_time: float, bounding_box: QRectF):
 		self.apply_friction(delta_time * TIME_SCALE)
@@ -55,22 +62,28 @@ class Particle(QGraphicsEllipseItem):
 		self.handle_border_collision(bounding_box)
 		self.setRect(QRectF(self.center.x() - self.radius, self.center.y() - self.radius, self.radius*2, self.radius*2))
 
+		self.positions.append((self.center.x(), self.center.y()))
+		self.velocities.append((self.velocity.x(), self.velocity.y()))
+		self.accelerations.append((self.acceleration.x(), self.acceleration.y()))
+
 	def apply_friction(self, delta_time):
+		self.acceleration = QPointF(0,0)
 		if self.colliding:
 			if abs(self.velocity.x()) < abs(self.angular_velocity * self.radius):
 				angular_friction = ROLLING_FRICTION_COEFFICIENT * self.angular_velocity
 				self.angular_velocity -= angular_friction * delta_time
 				linear_friction = angular_friction * self.radius
-				self.velocity.setX(self.velocity.x() - linear_friction * delta_time)
+				self.acceleration.setX(linear_friction * delta_time)
 			else:
 				friction_force = SLIDING_FRICTION_COEFFICIENT * self.mass * (-GRAVITY.y())
 				friction_acceleration = friction_force / self.mass
 				friction_vector = QPointF(-self.velocity.x(), -self.velocity.y())
 				friction_vector = friction_vector * (friction_acceleration / self.velocity.manhattanLength())
-				self.velocity += friction_vector * delta_time
+				self.acceleration = friction_vector * delta_time
 
 	def update_position(self, delta_time):
-		self.velocity += (GRAVITY * self.mass) * delta_time
+		self.acceleration += (GRAVITY * math.sqrt(self.mass)) * delta_time
+		self.velocity += self.acceleration
 		self.center += self.velocity * delta_time
 
 	def handle_border_collision(self, bounding_box: QRectF):
