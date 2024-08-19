@@ -2,7 +2,7 @@ from Particle import *
 
 PARAMETERS : List[Particle] = [
 	# center, velocity, restitution, radius, mass
-	Particle(QPointF(0.5, 180), QPointF(0, 0), 0.9, 5,  2  ),
+	Particle(QPointF(0.5, 180), QPointF(0, 0), 0.8, 5,  2  ),
 	Particle(QPointF(0.5, 170), QPointF(0, 0), 0.8, 10, 10 ),
 	Particle(QPointF(0.5, 130), QPointF(0, 0), 0.8, 20, 25 ),
 	Particle(QPointF(0, 80)   , QPointF(0, 0), 0.7, 30, 40 )

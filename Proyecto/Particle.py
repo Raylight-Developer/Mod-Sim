@@ -8,8 +8,10 @@ import random
 import math
 import sys
 
-TIME_SCALE = 10
+TIME_SCALE = 5
 GRAVITY = QPointF(0, -9.81)
+SLIDING_FRICTION_COEFFICIENT = 0.1
+ROLLING_FRICTION_COEFFICIENT = 0.025
 
 def length(point: QPointF):
 	return math.sqrt(point.x()**2 + point.y()**2)
@@ -30,38 +32,68 @@ class Particle(QGraphicsEllipseItem):
 	restitution: float
 	radius: float
 	mass: float
+	inertia: float
+	angular_velocity: float
+	rolling: bool
+	colliding: bool
 	def __init__(self, center: QPointF, velocity: QPointF, restitution: float, radius: float, mass: float):
+		super().__init__(center.x() - radius, center.y() - radius, 2*radius, 2*radius)
+		self.setBrush(QBrush(QColor("blue")))
+		self.setPen(QPen(QColor("black"), 1))
 		self.center = center
 		self.velocity = velocity
 		self.restitution = restitution
 		self.radius = radius
 		self.mass = mass
-		super().__init__(center.x() - radius, center.y() - radius, 2*radius, 2*radius)
-		self.setBrush(QBrush(QColor("blue")))
-		self.setPen(QPen(QColor("black"), 1))
+		self.inertia = (2 / 5) * mass * radius ** 2
+		self.angular_velocity = 0.0
+		self.colliding = False
 
 	def tick(self, delta_time: float, bounding_box: QRectF):
-		self.update_position(delta_time)
+		self.apply_friction(delta_time * TIME_SCALE)
+		self.update_position(delta_time * TIME_SCALE)
 		self.handle_border_collision(bounding_box)
 		self.setRect(QRectF(self.center.x() - self.radius, self.center.y() - self.radius, self.radius*2, self.radius*2))
 
+	def apply_friction(self, delta_time):
+		if self.colliding:
+			if abs(self.velocity.x()) < abs(self.angular_velocity * self.radius):
+				angular_friction = ROLLING_FRICTION_COEFFICIENT * self.angular_velocity
+				self.angular_velocity -= angular_friction * delta_time
+				linear_friction = angular_friction * self.radius
+				self.velocity.setX(self.velocity.x() - linear_friction * delta_time)
+			else:
+				friction_force = SLIDING_FRICTION_COEFFICIENT * self.mass * (-GRAVITY.y())
+				friction_acceleration = friction_force / self.mass
+				friction_vector = QPointF(-self.velocity.x(), -self.velocity.y())
+				friction_vector = friction_vector * (friction_acceleration / self.velocity.manhattanLength())
+				self.velocity += friction_vector * delta_time
+
 	def update_position(self, delta_time):
-		self.velocity += (GRAVITY * math.sqrt(self.mass)) * delta_time * TIME_SCALE
+		self.velocity += (GRAVITY * self.mass) * delta_time
 		self.center += self.velocity * delta_time
 
 	def handle_border_collision(self, bounding_box: QRectF):
 		if self.center.x() - self.radius < bounding_box.left():
 			self.center.setX(bounding_box.left() + self.radius)
 			self.velocity.setX(-self.velocity.x() * self.restitution)
+			self.colliding = True
 		elif self.center.x() + self.radius > bounding_box.right():
 			self.center.setX(bounding_box.right() - self.radius)
 			self.velocity.setX(-self.velocity.x() * self.restitution)
+			self.colliding = True
+		else:
+			self.colliding = False
 		if self.center.y() - self.radius < bounding_box.top():
 			self.center.setY(bounding_box.top() + self.radius)
 			self.velocity.setY(-self.velocity.y() * self.restitution)
+			self.colliding = True
 		elif self.center.y() + self.radius > bounding_box.bottom():
 			self.center.setY(bounding_box.bottom() - self.radius)
 			self.velocity.setY(-self.velocity.y() * self.restitution)
+			self.colliding = True
+		else:
+			self.colliding = False
 
 	def detect_collision(self, other: 'Particle'):
 		distance = length(self.center - other.center)
@@ -83,6 +115,7 @@ class Particle(QGraphicsEllipseItem):
 
 	def handle_particle_collision(self, other: 'Particle'):
 		if self.detect_collision(other):
+			self.colliding = True
 			self.resolve_overlap(other)
 
 			collision_normal = other.center - self.center
@@ -103,3 +136,5 @@ class Particle(QGraphicsEllipseItem):
 			impulse = impulse_scalar * collision_normal
 			self.velocity -= (1 / self.mass) * impulse
 			other.velocity += (1 / other.mass) * impulse
+		else:
+			self.colliding = False
