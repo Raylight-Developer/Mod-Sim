@@ -2,10 +2,13 @@ from PySide6.QtWidgets import *
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 from typing import *
+import numpy as np
+from scipy.integrate import solve_ivp
 import random
 import math
 import sys
 
+TIME_SCALE = 10
 GRAVITY = QPointF(0, -9.81)
 
 def length(point: QPointF):
@@ -43,7 +46,7 @@ class Particle(QGraphicsEllipseItem):
 		self.setRect(QRectF(self.center.x() - self.radius, self.center.y() - self.radius, self.radius*2, self.radius*2))
 
 	def update_position(self, delta_time):
-		self.velocity += GRAVITY * self.mass * delta_time
+		self.velocity += (GRAVITY * math.sqrt(self.mass)) * delta_time * TIME_SCALE
 		self.center += self.velocity * delta_time
 
 	def handle_border_collision(self, bounding_box: QRectF):
@@ -63,7 +66,6 @@ class Particle(QGraphicsEllipseItem):
 	def detect_collision(self, other: 'Particle'):
 		distance = length(self.center - other.center)
 		return distance < (self.radius + other.radius)
-
 
 	def resolve_overlap(self, other: 'Particle'):
 		distance_vector = other.center - self.center

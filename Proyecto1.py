@@ -2,9 +2,10 @@ from Particle import *
 
 PARAMETERS : List[Particle] = [
 	# center, velocity, restitution, radius, mass
-	Particle(QPointF(0, 180), QPointF(0, 0), 0.9, 10, 1 ),
-	Particle(QPointF(0, 150), QPointF(0, 0), 0.8, 20, 2 ),
-	Particle(QPointF(0, 100), QPointF(0, 0), 0.7, 30, 4 )
+	Particle(QPointF(0.5, 180), QPointF(0, 0), 0.9, 5,  2  ),
+	Particle(QPointF(0.5, 170), QPointF(0, 0), 0.8, 10, 10 ),
+	Particle(QPointF(0.5, 130), QPointF(0, 0), 0.8, 20, 25 ),
+	Particle(QPointF(0, 80)   , QPointF(0, 0), 0.7, 30, 40 )
 ]
 
 BOUNDING_BOX = QRectF(-200, 0, 400, 600)
