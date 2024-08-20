@@ -4,23 +4,23 @@ from Particle import *
 PARAMETERS : List[Particle] = [
 	# name, center, velocity, restitution, radius, mass
 	Particle("0", QPointF(0.5, 180), QPointF(0, 0), 0.8, 5,  2  ),
-	Particle("1", QPointF(0.5, 170), QPointF(0, 0), 0.8, 10, 10 ),
+	Particle("1", QPointF(0.5, 165), QPointF(500, 20), 0.8, 10, 10 ),
 	Particle("2", QPointF(0.5, 130), QPointF(0, 0), 0.8, 20, 25 ),
 	Particle("3", QPointF(0  , 80 ), QPointF(0, 0), 0.7, 30, 40 )
 ]
 
-SIM_TIME = 7.5
+SIM_TIME = 10
 BOUNDING_BOX = QRectF(-200, 0, 400, 600)
 
 class ParticleSimulation(QGraphicsScene):
-	deltas: List[float]
+	time_stamps: List[float]
 	particles: List[Particle]
 	bounding_box: QRectF
 	time = 0
 
 	def __init__(self, parent: QMainWindow):
 		super().__init__(parent)
-		self.deltas = []
+		self.time_stamps = []
 		self.particles = []
 		self.bounding_box = BOUNDING_BOX
 		self.addRect(self.bounding_box)
@@ -43,21 +43,23 @@ class ParticleSimulation(QGraphicsScene):
 	def advance(self, delta_time):
 		self.update_particles(delta_time)
 		self.time += delta_time
-		self.deltas.append(self.time)
+		self.time_stamps.append(self.time)
 
 class MainWindow(QMainWindow):
 	def __init__(self):
 		super().__init__()
 		self.showMaximized()
+		QTimer.singleShot(1000, self.init)
+
 		self.view = QGraphicsView(self)
 		self.simulation = ParticleSimulation(self)
 		self.view.setScene(self.simulation)
 		self.setCentralWidget(self.view)
-
 		transform = QTransform().scale(1.5, -1.5)
 		self.view.translate(0, -self.view.height())
 		self.view.setTransform(transform)
-
+	
+	def init(self):
 		self.timer = QTimer()
 		self.timer.timeout.connect(self.update_scene)
 		self.timer.start(0)
@@ -98,8 +100,8 @@ class MainWindow(QMainWindow):
 				values_x = [val[0] for val in particle.velocities]
 				values_y = [val[1] for val in particle.velocities]
 
-				plt.plot(self.simulation.deltas, values_x, label='X')
-				plt.plot(self.simulation.deltas, values_y, label='Y')
+				plt.plot(self.simulation.time_stamps, values_x, label='X')
+				plt.plot(self.simulation.time_stamps, values_y, label='Y')
 
 				plt.xlabel('Time')
 				plt.ylabel('Velocity')
@@ -111,8 +113,8 @@ class MainWindow(QMainWindow):
 				values_x = [val[0] for val in particle.accelerations]
 				values_y = [val[1] for val in particle.accelerations]
 
-				plt.plot(self.simulation.deltas, values_x, label='X')
-				plt.plot(self.simulation.deltas, values_y, label='Y')
+				plt.plot(self.simulation.time_stamps, values_x, label='X')
+				plt.plot(self.simulation.time_stamps, values_y, label='Y')
 
 				plt.xlabel('Time')
 				plt.ylabel('Acceleration')
@@ -124,8 +126,8 @@ class MainWindow(QMainWindow):
 				values_x = [val[0] for val in particle.positions]
 				values_y = [val[1] for val in particle.positions]
 
-				plt.plot(self.simulation.deltas, values_x, label='X')
-				plt.plot(self.simulation.deltas, values_y, label='Y')
+				plt.plot(self.simulation.time_stamps, values_x, label='X')
+				plt.plot(self.simulation.time_stamps, values_y, label='Y')
 
 				plt.xlabel('Time')
 				plt.ylabel('Position')
@@ -146,4 +148,4 @@ if __name__ == "__main__":
 	if not os.path.exists("./outputs"): os.makedirs("outputs")
 	app = QApplication(sys.argv)
 	window = MainWindow()
-	sys.exit(app.exec())
+	app.exec()
