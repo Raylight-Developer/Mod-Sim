@@ -3,16 +3,16 @@
 #include "Include.hpp"
 #include "Particle.hpp"
 
-
-#define SAMPLES 3ULL
+#define SAMPLES 10
+#define SHIFT 1e-8
 #define SIM_TIME 50.0
 #define BOUNDING_BOX QRectF(-200, 0, 400, 800)
 
 const vector<Particle_Params> PARAMETERS = {
-	Particle_Params("0", "-1", vec2(0, 185), vec2(0, 0), 0.8, 5.0 , 2.0 ),
-	Particle_Params("1", "-1", vec2(0, 165), vec2(0, 0), 0.8, 10.0, 10.0),
-	Particle_Params("2", "-1", vec2(0, 130), vec2(0, 0), 0.8, 20.0, 25.0),
-	Particle_Params("3", "-1", vec2(0, 80 ), vec2(0, 0), 0.7, 30.0, 40.0)
+	Particle_Params("0", "-1", dvec2(0, 185), dvec2(0, 0), 0.8, 5.0 , 2.0 ),
+	Particle_Params("1", "-1", dvec2(0, 165), dvec2(0, 0), 0.8, 10.0, 10.0),
+	Particle_Params("2", "-1", dvec2(0, 130), dvec2(0, 0), 0.8, 20.0, 25.0),
+	Particle_Params("3", "-1", dvec2(0, 80 ), dvec2(0, 0), 0.7, 30.0, 40.0)
 };
 
 struct ParticleSimulation : QGraphicsScene {
@@ -38,13 +38,13 @@ struct ParticleSimulation : QGraphicsScene {
 				auto particle = new Particle(param);
 				params.push_back(particle);
 			}
-			params[0]->setCenter(params[0]->params.center + vec2(5 * i, 0));
+			params[3]->setCenter(params[3]->params.center + dvec2(SHIFT * ul_to_f(i), 0));
 			systems.push_back(params);
 		}
 
 		for (uint64 i = 0; i < systems.size(); ++i) {
 			QColor color;
-			color.setHsv((i / static_cast<double>(SAMPLES)) * 360, 150, 255);
+			color.setHsv(d_to_i((i / ul_to_d(SAMPLES)) * 360.0), 150, 255);
 
 			for (uint64 j = 0; j < systems[i].size(); ++j) {
 				const auto& particle = systems[i][j];
@@ -94,7 +94,7 @@ struct MainWindow : QMainWindow {
 	void init() {
 		timer = new QTimer(this);
 		connect(timer, &QTimer::timeout, this, &MainWindow::update_scene);
-		timer->start(20);
+		timer->start(0);
 
 		fps_timer = new QTimer(this);
 		connect(fps_timer, &QTimer::timeout, this, &MainWindow::print_fps);
@@ -136,7 +136,7 @@ private:
 	QTimer* fps_timer;
 	QTimer* sim_timer;
 	QElapsedTimer elapsed_timer;
-	int frame_count;
+	uint64 frame_count;
 };
 
 
