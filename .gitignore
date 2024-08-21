@@ -160,3 +160,6 @@ cython_debug/
 #.idea/
 /Proyecto/output
 /Proyecto/README.md
+/Proyecto 1/.vs
+/Proyecto 1/x64
+*.user
