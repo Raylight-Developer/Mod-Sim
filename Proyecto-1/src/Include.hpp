@@ -43,3 +43,32 @@
 #include <QtGui>
 
 using namespace std;
+
+
+struct Particle_Params {
+	string name;
+	string system_id;
+	dvec2 center;
+	dvec2 velocity;
+	dvec2 acceleration;
+	dvec1 restitution;
+	dvec1 radius;
+	dvec1 mass;
+	dvec1 inertia;
+	dvec1 angular_velocity;
+	bool  colliding;
+
+	Particle_Params(const string& name, const string& system_id, const dvec2& center, const dvec2& velocity, dvec1 restitution, dvec1 radius, dvec1 mass) :
+		name(name),
+		system_id(system_id),
+		center(center),
+		velocity(velocity), 
+		restitution(restitution),
+		radius(radius),
+		mass(mass),
+		acceleration(dvec2(0.0, 0.0)),
+		inertia((2.0 / 5.0) * mass * radius * radius),
+		angular_velocity(0.0), 
+		colliding(false)
+	{}
+};

@@ -163,3 +163,15 @@ cython_debug/
 /Proyecto 1/.vs
 /Proyecto 1/x64
 *.user
+*.vsidx
+*.ipch
+*.pro
+*.cbt
+*.idx
+*.props
+*.natvis
+*.pdb
+*.tlog
+*.ilk
+/Proyecto-1/x64
+/Proyecto-1/.vs

@@ -20,6 +20,7 @@
     <ClInclude Include="src\Glm.hpp" />
     <ClInclude Include="src\Include.hpp" />
     <ClInclude Include="src\Macros.hpp" />
+    <ClInclude Include="src\Params.hpp" />
     <ClInclude Include="src\Particle.hpp" />
     <ClInclude Include="src\String.hpp" />
     <ClInclude Include="src\Types.hpp" />
