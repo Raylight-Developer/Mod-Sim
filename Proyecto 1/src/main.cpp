@@ -56,7 +56,7 @@ struct ParticleSimulation : QGraphicsScene {
 		}
 	}
 
-	void update_particles(double delta_time) {
+	void update_particles(const dvec1& delta_time) {
 		for (uint64 i = 0; i < systems.size(); ++i) {
 			for (uint64 j = 0; j < systems[i].size(); ++j) {
 				auto& particle_a = systems[i][j];
@@ -70,7 +70,7 @@ struct ParticleSimulation : QGraphicsScene {
 		}
 	}
 
-	void advance(double delta_time) {
+	void advance(const dvec1& delta_time) {
 		update_particles(delta_time);
 	}
 };
@@ -86,7 +86,7 @@ struct MainWindow : QMainWindow {
 		setCentralWidget(view);
 
 		QTransform transform;
-		transform.scale(1.5, -1.5);
+		transform.scale(1.2, -1.2);
 		view->translate(0, -view->height());
 		view->setTransform(transform);
 	}
@@ -109,7 +109,7 @@ struct MainWindow : QMainWindow {
 	}
 
 	void update_scene() {
-		double delta_time = elapsed_timer.elapsed() / 1000.0;
+		dvec1 delta_time = elapsed_timer.elapsed() / 1000.0;
 		elapsed_timer.restart();
 
 		simulation->advance(delta_time);
