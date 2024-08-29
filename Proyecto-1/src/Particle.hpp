@@ -7,6 +7,11 @@
 struct Particle : QGraphicsEllipseItem {
 	Particle_Params params;
 
+	dvec1 TIME_SCALE;
+	dvec2 GRAVITY;
+	dvec1 SLIDING_FRICTION_COEFFICIENT;
+	dvec1 ROLLING_FRICTION_COEFFICIENT;
+
 	Particle(const Particle_Params& params) :
 		QGraphicsEllipseItem(params.center.x - params.radius, params.center.y - params.radius, 2.0*params.radius, 2.0*params.radius),
 		params(params)
