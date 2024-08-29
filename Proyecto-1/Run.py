@@ -13,7 +13,7 @@ ROLLING_FRICTION_COEFFICIENT = "0.15"
 process = subprocess.run(["./x64/Release/Proyecto-1.exe",
 	"--system-count", str(SYSTEM_COUNT),
 	"--system-output-start", str(SYSTEM_START),
-	"--system-output-end", str(SYSTEM_STOP),
+	"--system-output-end", str(SYSTEM_STOP + 1),
 	"--x-shift", SHIFT,
 	"--duration", DURATION,
 	"--gravity", GRAVITY.split()[0], GRAVITY.split()[1],
@@ -30,8 +30,8 @@ with open("Outputs.md", "w", encoding="utf-8") as file:
 		file.write(f"# System {system}\n")
 		file.write("| Label | " + " | ".join([f"Particle {i}" for i in range(PARTICLE_START, PARTICLE_STOP)]) + " |\n")
 		file.write("| -- | " + " | ".join([":--:" for _ in range(PARTICLE_START, PARTICLE_STOP)]) + " |\n")
-		file.write(f"| Positions| " + " | ".join([f"![img](x64/Release/Outputs/Position_{system}_{i}.png)" for i in range(PARTICLE_START, PARTICLE_STOP)]) + " |\n")
-		file.write(f"| Velocities | " + " | ".join([f"![img](x64/Release/Outputs/Velocity_{system}_{i}.png)" for i in range(PARTICLE_START, PARTICLE_STOP)]) + " |\n")
-		file.write(f"| Angular Velocities | " + " | ".join([f"![img](x64/Release/Outputs/Angular_Velocity_{system}_{i}.png)" for i in range(PARTICLE_START, PARTICLE_STOP)]) + " |\n")
-		file.write(f"| Accelerations | " + " | ".join([f"![img](x64/Release/Outputs/Acceleration_{system}_{i}.png)" for i in range(PARTICLE_START, PARTICLE_STOP)]) + " |\n")
+		file.write(f"| Positions| " + " | ".join([f"![img](./Outputs/Position_{system}_{i}.png)" for i in range(PARTICLE_START, PARTICLE_STOP)]) + " |\n")
+		file.write(f"| Velocities | " + " | ".join([f"![img](./Outputs/Velocity_{system}_{i}.png)" for i in range(PARTICLE_START, PARTICLE_STOP)]) + " |\n")
+		file.write(f"| Angular Velocities | " + " | ".join([f"![img](./Outputs/Angular_Velocity_{system}_{i}.png)" for i in range(PARTICLE_START, PARTICLE_STOP)]) + " |\n")
+		file.write(f"| Accelerations | " + " | ".join([f"![img](./Outputs/Acceleration_{system}_{i}.png)" for i in range(PARTICLE_START, PARTICLE_STOP)]) + " |\n")
 		file.write("\n")
