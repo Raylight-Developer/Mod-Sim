@@ -44,6 +44,9 @@
     <ClInclude Include="src\Params.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\matplotlibcpp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
