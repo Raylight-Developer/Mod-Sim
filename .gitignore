@@ -173,9 +173,3 @@ cython_debug/
 *.pdb
 *.tlog
 *.ilk
-/Proyecto-1/x64
-/Proyecto-1/.vs
-/Proyecto-1/Outputs
-/Proyecto-1/Proyecto 1/x64
-/Proyecto-1/Proyecto-1
-Proyecto-1/Outputs.md
