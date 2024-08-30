@@ -2,7 +2,76 @@
 
 #include "Include.hpp"
 
-#include "Params.hpp";
+inline string readFile(const string& filePath) {
+	ifstream file(filePath);
+	if (!file.is_open()) {
+		cerr << "Could not open the file!" << endl;
+		return "";
+	}
+
+	stringstream buffer;
+	buffer << file.rdbuf();
+
+	return buffer.str();
+}
+
+struct Particle_Params {
+	dvec2 center;
+	dvec2 velocity;
+	dvec2 acceleration;
+	dvec1 restitution;
+	dvec1 radius;
+	dvec1 mass;
+	dvec1 inertia;
+	dvec1 angular_velocity;
+	bool  colliding;
+
+	Particle_Params(const dvec2& center, const dvec2& velocity, dvec1 restitution, dvec1 radius, dvec1 mass) :
+		center(center),
+		velocity(velocity), 
+		restitution(restitution),
+		radius(radius),
+		mass(mass),
+		acceleration(dvec2(0.0, 0.0)),
+		inertia((2.0 / 5.0) * mass * radius * radius),
+		angular_velocity(0.0), 
+		colliding(false)
+	{}
+
+	static vector<Particle_Params> parseParticleParams(const string& input) {
+		vector<Particle_Params> params;
+		istringstream iss(input);
+		string line;
+
+		while (getline(iss, line)) {
+			line.erase(0, line.find_first_not_of("\t\n\v\f\r "));
+			line.erase(line.find_last_not_of("\t\n\v\f\r ") + 1);
+
+			if (line.empty()) continue;
+
+			for (char& ch : line) {
+				if (ch == ',' || ch == '(' || ch == ')') {
+					ch = ' ';
+				}
+			}
+
+			istringstream linestream(line);
+			double pos_x, pos_y, vel_x, vel_y, restitution, mass, inertia;
+
+			linestream >> pos_x >> pos_y >> vel_x >> vel_y >> restitution >> mass >> inertia;
+
+			params.emplace_back(
+				dvec2(pos_x, pos_y),
+				dvec2(vel_x, vel_y),
+				restitution,
+				mass,
+				inertia
+			);
+		}
+
+		return params;
+	}
+};
 
 struct Particle : QGraphicsEllipseItem {
 	Particle_Params params;
@@ -17,7 +86,7 @@ struct Particle : QGraphicsEllipseItem {
 		params(params)
 	{
 		setBrush(QBrush(QColor("blue")));
-		setPen(QPen(QColor("black"), 1.0));
+		setPen(QPen(QColor("black"), 1.5));
 	}
 
 	void setCenter(const dvec2& new_center) {

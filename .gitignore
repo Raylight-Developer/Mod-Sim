@@ -173,3 +173,4 @@ cython_debug/
 *.pdb
 *.tlog
 *.ilk
+/Proyecto-1/Outputs

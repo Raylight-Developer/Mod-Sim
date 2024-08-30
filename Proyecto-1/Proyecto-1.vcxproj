@@ -21,7 +21,6 @@
     <ClInclude Include="src\Include.hpp" />
     <ClInclude Include="src\Macros.hpp" />
     <ClInclude Include="src\matplotlibcpp.h" />
-    <ClInclude Include="src\Params.hpp" />
     <ClInclude Include="src\Particle.hpp" />
     <ClInclude Include="src\String.hpp" />
     <ClInclude Include="src\Types.hpp" />
@@ -33,6 +32,9 @@
       <DynamicSource Condition="'$(Configuration)|$(Platform)'=='Release|x64'">input</DynamicSource>
       <QtMocFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).moc</QtMocFileName>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Params.txt" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{AE812416-D28C-450C-A116-3ACB55FF0FAB}</ProjectGuid>
