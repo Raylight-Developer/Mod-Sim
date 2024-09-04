@@ -4,17 +4,17 @@ RUN = True
 WRITE_LOG = False
 WRITE_PARAMS = False
 
-SYSTEM_COUNT                 = 8
+SYSTEM_COUNT                 = 64
 SYSTEM_START                 = 0
 SYSTEM_STOP                  = 4
 
 SHIFT_INDEX                  = 1
-SHIFT                        = ["1e-8", "0"]
-DURATION                     = 5.0
+SHIFT                        = ["1e-13", "0"]
+DURATION                     = 25.0
 GRAVITY                      = [0, -9.81]
 SLIDING_FRICTION_COEFFICIENT = 0.3
 ROLLING_FRICTION_COEFFICIENT = 0.15
-TIME_SCALE                   = 100.0
+TIME_SCALE                   = 5.0
 PARTICLE_OPACITY             = 0.35
 SIMULATION_BOUNDS            = [400, 800]
 
@@ -25,12 +25,13 @@ PARAMETERS = [
 "((0, 80 ), (0, 0), 0.7, 30.0, 40.0)"
 ]
 
-
 if SHIFT_INDEX > len(PARAMETERS) or SHIFT_INDEX < 0:
 	print("Shift Index Out of Range")
 	exit()
+
 if WRITE_PARAMS:
 	open("./Params.txt", "w", -1, "utf-8").write("\n".join(PARAMETERS))
+
 if RUN:
 	process = subprocess.run(["./x64/Release/Proyecto-1.exe",
 		"--system-count", str(SYSTEM_COUNT),

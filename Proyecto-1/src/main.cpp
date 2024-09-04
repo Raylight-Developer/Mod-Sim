@@ -11,75 +11,130 @@ namespace plt = matplotlibcpp;
 
 struct ParticleSimulation : QGraphicsScene {
 	map<string, dvec1> args;
-	map<uint64, map<Particle*, tuple<vector<uint64>, vector<dvec2>, vector<dvec2>, vector<dvec1>, vector<dvec2>>>> system_data;
-	vector<vector<Particle*>> systems;
+	map<uint64, map<Particle<vec1, vec2>*, tuple<vector<uint64>, vector<dvec2>, vector<dvec2>, vector<dvec1>, vector<dvec2>>>> f_system_data;
+	map<uint64, map<Particle<dvec1, dvec2>*, tuple<vector<uint64>, vector<dvec2>, vector<dvec2>, vector<dvec1>, vector<dvec2>>>> d_system_data;
+	vector<vector<Particle<vec1,vec2>*>> f_systems;
+	vector<vector<Particle<dvec1,dvec2>*>> d_systems;
 	QRectF bounding_box;
 	QElapsedTimer timer;
+	QGraphicsRectItem* f_rect_item;
+	QGraphicsRectItem* d_rect_item;
 	QGraphicsRectItem* rect_item;
 
 	ParticleSimulation(const map<string, dvec1>& args, QMainWindow* parent = nullptr) :
 		args(args),
 		QGraphicsScene(parent)
 	{
-		systems.reserve(d_to_ul(args.at("System Count")));
-		bounding_box = QRectF(-args.at("Bounds Width") / 2.0, 0, args.at("Bounds Width"), args.at("Bounds Height"));
-		rect_item = new QGraphicsRectItem(bounding_box);
-		rect_item->setBrush(QBrush(QColor("transparent")));
-		rect_item->setPen(QPen(QColor("black"), 2.0));
+		f_systems.reserve(d_to_ul(args.at("System Count")));
+		d_systems.reserve(d_to_ul(args.at("System Count")));
+		bounding_box = QRectF(-args.at("Bounds Width") * 0.5, 0, args.at("Bounds Width"), args.at("Bounds Height"));
 
+		auto scene_rect = QRectF(-args.at("Bounds Width") * 1.1 - 50, -50, args.at("Bounds Width") * 2.2 + 100, args.at("Bounds Height") + 100);
+		rect_item = new QGraphicsRectItem(scene_rect);
+		rect_item->setBrush(QBrush(QColor("transparent")));
+		rect_item->setPen(QPen(QColor("red"), 2.0));
+
+		f_rect_item = new QGraphicsRectItem(bounding_box.translated(QPointF(-args.at("Bounds Width") * 0.6, 0)));
+		f_rect_item->setBrush(QBrush(QColor("transparent")));
+		f_rect_item->setPen(QPen(QColor("black"), 2.0));
+
+		d_rect_item = new QGraphicsRectItem(bounding_box.translated(QPointF(args.at("Bounds Width") * 0.6, 0)));
+		d_rect_item->setBrush(QBrush(QColor("transparent")));
+		d_rect_item->setPen(QPen(QColor("black"), 2.0));
+
+		addItem(f_rect_item);
+		addItem(d_rect_item);
 		addItem(rect_item);
-		addLine(-400, 0, 400, 0);
+		addLine(scene_rect.x(), 0, scene_rect.x() + scene_rect.width(), 0);
+		auto item_a = addText("32 bits");
+		auto item_b = addText("64 bits");
+		auto transform = QTransform();
+		transform.scale(1.4, -1.4);
+		item_a->setPos(bounding_box.translated(QPointF(-args.at("Bounds Width") * 0.6, 0)).bottomLeft());
+		item_b->setPos(bounding_box.translated(QPointF(args.at("Bounds Width") * 0.6, 0)).bottomLeft());
+		item_a->setTransform(transform);
+		item_b->setTransform(transform);
 		setup_particles();
-		setSceneRect(bounding_box);
+		setSceneRect(scene_rect);
 	}
 
 	void setup_particles() {
-		auto PARAMETERS = Particle_Params::parseParticleParams(readFile("./Params.txt"));
+		auto F_PARAMETERS = Particle_Params<vec1, vec2>::parseParticleParams(readFile("./Params.txt"));
+		auto D_PARAMETERS = Particle_Params<dvec1, dvec2>::parseParticleParams(readFile("./Params.txt"));
 		for (uint64 i = 0; i < d_to_ul(args.at("System Count")); ++i) {
-			system_data[i] = {};
-			vector<Particle*> params;
-			for (auto param : PARAMETERS) {
-				auto particle = new Particle(param);
-				particle->TIME_SCALE = args.at("Time Scale");
-				particle->GRAVITY = dvec2(args.at("Gravity X"), args.at("Gravity Y"));
-				particle->SLIDING_FRICTION_COEFFICIENT = args.at("Sliding Friction");
-				particle->ROLLING_FRICTION_COEFFICIENT = args.at("Rolling Friction");
-				params.push_back(particle);
-				system_data[i][particle] = tuple<vector<uint64>, vector<dvec2>, vector<dvec2>, vector<dvec1>, vector<dvec2>>({}, {}, {}, {}, {});
+			f_system_data[i] = {};
+			d_system_data[i] = {};
+			vector<Particle<vec1, vec2>*> f_params;
+			vector<Particle<dvec1, dvec2>*> d_params;
+			for (uint64 j = 0; j < F_PARAMETERS.size(); j++) {
+				auto f_particle = new Particle<vec1, vec2>(F_PARAMETERS[j], -bounding_box.width() * 0.6);
+				auto d_particle = new Particle<dvec1, dvec2>(D_PARAMETERS[j], bounding_box.width() * 0.6);
+				f_particle->TIME_SCALE = args.at("Time Scale");
+				d_particle->TIME_SCALE = args.at("Time Scale");
+				f_particle->GRAVITY = dvec2(args.at("Gravity X"), args.at("Gravity Y"));
+				d_particle->GRAVITY = dvec2(args.at("Gravity X"), args.at("Gravity Y"));
+				f_particle->SLIDING_FRICTION_COEFFICIENT = args.at("Sliding Friction");
+				d_particle->SLIDING_FRICTION_COEFFICIENT = args.at("Sliding Friction");
+				f_particle->ROLLING_FRICTION_COEFFICIENT = args.at("Rolling Friction");
+				d_particle->ROLLING_FRICTION_COEFFICIENT = args.at("Rolling Friction");
+
+				f_params.push_back(f_particle);
+				d_params.push_back(d_particle);
+				f_system_data[i][f_particle] = tuple<vector<uint64>, vector<dvec2>, vector<dvec2>, vector<dvec1>, vector<dvec2>>({}, {}, {}, {}, {});
+				d_system_data[i][d_particle] = tuple<vector<uint64>, vector<dvec2>, vector<dvec2>, vector<dvec1>, vector<dvec2>>({}, {}, {}, {}, {});
 			}
-			params[d_to_ul(args.at("Shifter"))]->setCenter(params[d_to_ul(args.at("Shifter"))]->params.center + dvec2(args.at("Shift X"), args.at("Shift Y")) * ul_to_d(i));
-			systems.push_back(params);
+			f_params[d_to_ul(args.at("Shifter"))]->setCenter(f_params[d_to_ul(args.at("Shifter"))]->params.center + vec2(args.at("Shift X"), args.at("Shift Y")) * ul_to_f(i));
+			d_params[d_to_ul(args.at("Shifter"))]->setCenter(d_params[d_to_ul(args.at("Shifter"))]->params.center + dvec2(args.at("Shift X"), args.at("Shift Y")) * ul_to_d(i));
+			f_systems.push_back(f_params);
+			d_systems.push_back(d_params);
 		}
 
-		for (uint64 i = 0; i < systems.size(); ++i) {
+		for (uint64 i = 0; i < f_systems.size(); ++i) {
 			QColor color;
 			color.setHsv(d_to_i((i / args.at("System Count")) * 360.0), 150, 255, d_to_i(args.at("Opacity") * 255.0));
 
-			for (uint64 j = 0; j < systems[i].size(); ++j) {
-				const auto& particle = systems[i][j];
+			for (uint64 j = 0; j < f_systems[i].size(); ++j) {
+				const auto& f_particle = f_systems[i][j];
+				const auto& d_particle = d_systems[i][j];
 				
-				particle->setBrush(color);
-				particle->setZValue((i + 1) * (j + 1));
-				addItem(particle);
+				f_particle->setBrush(color);
+				f_particle->setZValue((i + 1) * (j + 1));
+				d_particle->setBrush(color);
+				d_particle->setZValue((i + 1) * (j + 1));
+				addItem(f_particle);
+				addItem(d_particle);
 			}
 		}
 	}
 
 	void update_particles(const dvec1& delta_time) {
-		for (uint64 i = 0; i < systems.size(); ++i) {
-			for (uint64 j = 0; j < systems[i].size(); ++j) {
-				auto& particle_a = systems[i][j];
-				particle_a->tick(delta_time, bounding_box);
+		for (uint64 i = 0; i < f_systems.size(); ++i) {
+			for (uint64 j = 0; j < f_systems[i].size(); ++j) {
+				auto& f_particle_a = f_systems[i][j];
+				f_particle_a->tick(delta_time, bounding_box, -bounding_box.width() * 0.6);
 
-				for (uint64 k = j + 1; k < systems[i].size(); ++k) {
-					auto& particle_b = systems[i][k];
-					particle_a->handle_particle_collision(particle_b);
+				for (uint64 k = j + 1; k < f_systems[i].size(); ++k) {
+					auto& f_particle_b = f_systems[i][k];
+					f_particle_a->handle_particle_collision(f_particle_b);
 				}
-				get<0>(system_data[i][particle_a]).push_back(timer.elapsed());
-				get<1>(system_data[i][particle_a]).push_back(particle_a->params.center);
-				get<2>(system_data[i][particle_a]).push_back(particle_a->params.velocity);
-				get<3>(system_data[i][particle_a]).push_back(particle_a->params.angular_velocity);
-				get<4>(system_data[i][particle_a]).push_back(particle_a->params.acceleration);
+				get<0>(f_system_data[i][f_particle_a]).push_back(timer.elapsed());
+				get<1>(f_system_data[i][f_particle_a]).push_back(f_particle_a->params.center);
+				get<2>(f_system_data[i][f_particle_a]).push_back(f_particle_a->params.velocity);
+				get<3>(f_system_data[i][f_particle_a]).push_back(f_particle_a->params.angular_velocity);
+				get<4>(f_system_data[i][f_particle_a]).push_back(f_particle_a->params.acceleration);
+
+				auto& d_particle_a = d_systems[i][j];
+				d_particle_a->tick(delta_time, bounding_box, bounding_box.width() * 0.6);
+
+				for (uint64 k = j + 1; k < d_systems[i].size(); ++k) {
+					auto& d_particle_b = d_systems[i][k];
+					d_particle_a->handle_particle_collision(d_particle_b);
+				}
+				get<0>(d_system_data[i][d_particle_a]).push_back(timer.elapsed());
+				get<1>(d_system_data[i][d_particle_a]).push_back(d_particle_a->params.center);
+				get<2>(d_system_data[i][d_particle_a]).push_back(d_particle_a->params.velocity);
+				get<3>(d_system_data[i][d_particle_a]).push_back(d_particle_a->params.angular_velocity);
+				get<4>(d_system_data[i][d_particle_a]).push_back(d_particle_a->params.acceleration);
 			}
 		}
 	}
@@ -101,7 +156,7 @@ struct MainWindow : QMainWindow {
 		view->setScene(simulation);
 		setCentralWidget(view);
 
-		view->fitInView(simulation->rect_item, Qt::AspectRatioMode::KeepAspectRatio);
+		view->fitInView(simulation->f_rect_item, Qt::AspectRatioMode::KeepAspectRatio);
 		QTransform transform;
 		transform.scale(1, -1);
 		view->translate(0, -view->height());
@@ -150,7 +205,7 @@ struct MainWindow : QMainWindow {
 		fps_timer->stop();
 
 		if (d_to_i(args.at("Generate Graphics")) == 1) {
-			for (const auto& [system_id, system] : simulation->system_data) {
+			for (const auto& [system_id, system] : simulation->f_system_data) {
 				if (system_id >= d_to_ul(args.at("Output Start")) and system_id <= d_to_ul(args.at("Output End"))) {
 					uint64 i = 0;
 					for (const auto& [particle, data] : system) {
