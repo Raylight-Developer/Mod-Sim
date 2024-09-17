@@ -188,9 +188,11 @@ struct MainWindow : QMainWindow {
 		connect(fps_timer, &QTimer::timeout, this, &MainWindow::print_fps);
 		fps_timer->start(1000);
 
-		sim_timer = new QTimer(this);
-		connect(sim_timer, &QTimer::timeout, this, &MainWindow::finish);
-		sim_timer->start(args.at("Duration") * 1000.0);
+		if (args["Realtime"] >= 0.5) {
+			sim_timer = new QTimer(this);
+			connect(sim_timer, &QTimer::timeout, this, &MainWindow::finish);
+			sim_timer->start(args.at("Duration") * 1000.0);
+		}
 
 		elapsed_timer.start();
 		frame_count = 0;
@@ -199,18 +201,23 @@ struct MainWindow : QMainWindow {
 
 	void update_scene() {
 		dvec1 delta_time;
-		if (args["Realtime"] == 1) {
+		if (args["Realtime"] >= 0.5) {
 			delta_time = elapsed_timer.elapsed() / 1000.0;
 		}
 		else {
 			delta_time = args["Delta"];
+			if (exec_count >= d_to_ul(args.at("Duration Steps"))) {
+				finish();
+			}
 		}
+
 
 		elapsed_timer.restart();
 
 		simulation->advance(delta_time);
 		view->viewport()->update();
-		++frame_count;
+		frame_count++;
+		exec_count++;
 	}
 
 	void print_fps() {
@@ -287,7 +294,7 @@ struct MainWindow : QMainWindow {
 
 			{
 				auto [x, y] = calculate_delta(f_sys_sum_position, d_sys_sum_position);
-				plt::bar(x, y);
+				plt::bar(x, y, {});
 				plt::xticks(x);
 				plt::xlabel("Steps");
 				plt::ylabel("Delta");
@@ -298,7 +305,7 @@ struct MainWindow : QMainWindow {
 			}
 			{
 				auto [x, y] = calculate_delta(f_sys_sum_velocity, d_sys_sum_velocity);
-				plt::bar(x, y);
+				plt::bar(x, y, {});
 				plt::xticks(x);
 				plt::xlabel("Steps");
 				plt::ylabel("Velocity");
@@ -309,7 +316,7 @@ struct MainWindow : QMainWindow {
 			}
 			{
 				auto [x, y] = calculate_delta(f_sys_sum_acceleration, d_sys_sum_acceleration);
-				plt::bar(x, y);
+				plt::bar(x, y, {});
 				plt::xticks(x);
 				plt::xlabel("Steps");
 				plt::ylabel("Acceleration");
@@ -321,7 +328,7 @@ struct MainWindow : QMainWindow {
 
 			{
 				auto [x, y] = calculate_delta(f_part_sum_position, d_part_sum_position);
-				plt::bar(x, y);
+				plt::bar(x, y, {});
 				plt::xticks(x);
 				plt::xlabel("Steps");
 				plt::ylabel("Delta");
@@ -332,7 +339,7 @@ struct MainWindow : QMainWindow {
 			}
 			{
 				auto [x, y] = calculate_delta(f_part_sum_velocity, d_part_sum_velocity);
-				plt::bar(x, y);
+				plt::bar(x, y, {});
 				plt::xticks(x);
 				plt::xlabel("Steps");
 				plt::ylabel("Velocity");
@@ -343,7 +350,7 @@ struct MainWindow : QMainWindow {
 			}
 			{
 				auto [x, y] = calculate_delta(f_part_sum_acceleration, d_part_sum_acceleration);
-				plt::bar(x, y);
+				plt::bar(x, y, {});
 				plt::xticks(x);
 				plt::xlabel("Steps");
 				plt::ylabel("Acceleration");
@@ -381,16 +388,17 @@ int main(int argc, char* argv[]) {
 	args["Shifter"] = 1;
 	args["Shift X"] = 1e-8;
 	args["Shift Y"] = 0;
-	args["Duration"] = 5.0;
 	args["Gravity X"] = 0.0;
 	args["Gravity Y"] = -9.81;
 	args["Sliding Friction"] = 0.3;
 	args["Rolling Friction"] = 0.15;
-	args["Time Scale"] = 5.0;
 	args["Opacity"] = 0.35;
 	args["Bounds Width"] = 400;
 	args["Bounds Height"] = 800;
 	args["Generate Graphics"] = 1;
+	args["Duration"] = 5.0;
+	args["Duration Steps"] = 500;
+	args["Time Scale"] = 5.0;
 	args["Delta"] = 0.01;
 	args["Realtime"] = 0;
 
@@ -422,6 +430,8 @@ int main(int argc, char* argv[]) {
 			args["Generate Graphics"] = str_to_d(argv[++i]);
 		} else if (strcmp(argv[i], "--delta-step") == 0 && i + 1 < argc) {
 			args["Delta"] = str_to_d(argv[++i]);
+		} else if (strcmp(argv[i], "--duration-steps") == 0 && i + 1 < argc) {
+			args["Duration Steps"] = str_to_d(argv[++i]);
 		} else if (strcmp(argv[i], "--realtime") == 0 && i + 1 < argc) {
 			args["Realtime"] = str_to_d(argv[++i]);
 		} else {
