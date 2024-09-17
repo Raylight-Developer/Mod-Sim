@@ -2,6 +2,7 @@
 
 #include "Include.hpp"
 #include "Particle.hpp"
+#include "Viewport.hpp"
 
 #undef slots
 
@@ -179,7 +180,7 @@ struct MainWindow : QMainWindow {
 		QMainWindow()
 	{
 
-		view = new QGraphicsView(this);
+		view = new Graphics_View(this);
 		simulation = new ParticleSimulation(args, this);
 		view->setScene(simulation);
 		setCentralWidget(view);
@@ -649,7 +650,7 @@ struct MainWindow : QMainWindow {
 	}
 
 private:
-	QGraphicsView* view;
+	Graphics_View* view;
 	ParticleSimulation* simulation;
 	QTimer* timer;
 	QTimer* fps_timer;
@@ -664,7 +665,6 @@ int main(int argc, char* argv[]) {
 	SetConsoleOutputCP(65001);
 	QApplication::setAttribute(Qt::ApplicationAttribute::AA_NativeWindows);
 	QApplication::setAttribute(Qt::ApplicationAttribute::AA_UseDesktopOpenGL);
-
 
 	QApplication* application = new QApplication(argc, argv);
 

@@ -24,6 +24,7 @@
     <ClInclude Include="src\Particle.hpp" />
     <ClInclude Include="src\String.hpp" />
     <ClInclude Include="src\Types.hpp" />
+    <ClInclude Include="src\Viewport.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -32,6 +33,7 @@
       <DynamicSource Condition="'$(Configuration)|$(Platform)'=='Release|x64'">input</DynamicSource>
       <QtMocFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).moc</QtMocFileName>
     </ClCompile>
+    <ClCompile Include="src\Viewport.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Params.txt" />
