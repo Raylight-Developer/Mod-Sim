@@ -26,7 +26,7 @@ struct Particle_Params {
 	Vec1 inertia;
 	Vec1 angular_velocity;
 	Vec1 kinetic_energy;
-	bool  colliding;
+	bool colliding;
 
 	Particle_Params(const Vec2& center, const Vec2& velocity, Vec1 restitution, Vec1 radius, Vec1 mass) :
 		center(center),
@@ -35,9 +35,9 @@ struct Particle_Params {
 		radius(radius),
 		mass(mass),
 		acceleration(Vec2(0.0, 0.0)),
-		inertia((2.0 / 5.0) * mass * radius * radius),
-		angular_velocity(0.0),
-		kinetic_energy(0.0),
+		inertia(Vec1((2.0 / 5.0) * mass * radius * radius)),
+		angular_velocity(Vec1(0.0)),
+		kinetic_energy(Vec1(0.0)),
 		colliding(false)
 	{}
 

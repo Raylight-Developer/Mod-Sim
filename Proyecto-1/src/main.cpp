@@ -130,7 +130,7 @@ struct ParticleSimulation : QGraphicsScene {
 		for (uint64 i = 0; i < f_systems.size(); ++i) {
 			for (uint64 j = 0; j < f_systems[i].size(); ++j) {
 				auto& f_particle_a = f_systems[i][j];
-				f_particle_a->tick(delta_time, bounding_box, -bounding_box.width() * 0.6);
+				f_particle_a->tick(d_to_f(delta_time), bounding_box, d_to_f(- bounding_box.width() * 0.6));
 
 				for (uint64 k = j + 1; k < f_systems[i].size(); ++k) {
 					auto& f_particle_b = f_systems[i][k];
@@ -465,6 +465,24 @@ struct MainWindow : QMainWindow {
 				plt::save("./Outputs/Particle_Delta_Kinetic_Energy.png");
 				plt::clf();
 			}
+
+			vector<dvec1> fd_part_sum_KE;
+			for (auto val : f_part_sum_KE) {
+				fd_part_sum_KE.push_back(f_to_d(val));
+			}
+			{
+				auto [x, y] = calculate_delta(f_part_sum_KE, d_part_sum_KE);
+				plt::plot(x, y,              { {"label", "delta"} , {"linewidth", "5.0"} });
+				plt::plot(x, fd_part_sum_KE, { {"label", "fp32" } , {"linewidth", "2.0"} , {"linestyle", "--" } });
+				plt::plot(x, d_part_sum_KE , { {"label", "fp64" } , {"linewidth", "2.0"} , {"linestyle", "--" } });
+				plt::legend();
+				plt::xlabel("Particle_ID");
+				plt::ylabel("Kinetic Energy");
+				plt::title("Kinetic Energies");
+				plt::grid(true);
+				plt::save("./Outputs/Delta_Kinetic_Energy.png");
+				plt::clf();
+			}
 		}
 
 		if (d_to_i(args.at("Generate Tick Graphics")) == 1) {
@@ -628,7 +646,6 @@ struct MainWindow : QMainWindow {
 				plt::clf();
 			}
 		}
-		QApplication::quit();
 	}
 
 private:
