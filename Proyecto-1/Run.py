@@ -8,13 +8,16 @@ SYSTEM_COUNT                 = 12
 
 SHIFT_INDEX                  = 1
 SHIFT                        = ["1e-12", "0"]
-DURATION                     = 15.0
 GRAVITY                      = [0, -9.81]
 SLIDING_FRICTION_COEFFICIENT = 0.3
 ROLLING_FRICTION_COEFFICIENT = 0.15
-TIME_SCALE                   = 5.0
 PARTICLE_OPACITY             = 0.35
 SIMULATION_BOUNDS            = [400, 800]
+
+DURATION                     = 15.0
+TIME_SCALE                   = 5.0
+DELTA_TIME                   = 0.05
+ON_FRAME_READY               = True
 
 PARAMETERS = [
 "((0, 745), (0, 0), 0.8, 5.0 , 5.0 )",
@@ -53,5 +56,7 @@ if RUN:
 		"--time-scale", str(TIME_SCALE),
 		"--particle-opacity", str(PARTICLE_OPACITY),
 		"--bounds", str(SIMULATION_BOUNDS[0]), str(SIMULATION_BOUNDS[1]),
-		"--generate-graphics", str(int(GENERATE_GRAPHICS))
+		"--generate-graphics", str(int(GENERATE_GRAPHICS)),
+		"--delta-step", str(DELTA_TIME),
+		"--realtime", str(int(ON_FRAME_READY))
 	])

@@ -194,10 +194,18 @@ struct MainWindow : QMainWindow {
 
 		elapsed_timer.start();
 		frame_count = 0;
+		exec_count = 0;
 	}
 
 	void update_scene() {
-		dvec1 delta_time = elapsed_timer.elapsed() / 1000.0;
+		dvec1 delta_time;
+		if (args["Realtime"] == 1) {
+			delta_time = elapsed_timer.elapsed() / 1000.0;
+		}
+		else {
+			delta_time = args["Delta"];
+		}
+
 		elapsed_timer.restart();
 
 		simulation->advance(delta_time);
@@ -356,6 +364,7 @@ private:
 	QTimer* sim_timer;
 	QElapsedTimer elapsed_timer;
 	uint64 frame_count;
+	uint64 exec_count;
 };
 
 
@@ -382,6 +391,8 @@ int main(int argc, char* argv[]) {
 	args["Bounds Width"] = 400;
 	args["Bounds Height"] = 800;
 	args["Generate Graphics"] = 1;
+	args["Delta"] = 0.01;
+	args["Realtime"] = 0;
 
 	for (int i = 1; i < argc; ++i) {
 		if (strcmp(argv[i], "--system-count") == 0 && i + 1 < argc) {
@@ -409,6 +420,10 @@ int main(int argc, char* argv[]) {
 			args["Bounds Height"] = str_to_d(argv[++i]);
 		} else if (strcmp(argv[i], "--generate-graphics") == 0 && i + 1 < argc) {
 			args["Generate Graphics"] = str_to_d(argv[++i]);
+		} else if (strcmp(argv[i], "--delta-step") == 0 && i + 1 < argc) {
+			args["Delta"] = str_to_d(argv[++i]);
+		} else if (strcmp(argv[i], "--realtime") == 0 && i + 1 < argc) {
+			args["Realtime"] = str_to_d(argv[++i]);
 		} else {
 			cerr << "Unknown or incomplete argument: " << argv[i] << endl;
 		}
