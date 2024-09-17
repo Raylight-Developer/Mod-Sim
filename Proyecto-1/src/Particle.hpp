@@ -25,6 +25,7 @@ struct Particle_Params {
 	Vec1 mass;
 	Vec1 inertia;
 	Vec1 angular_velocity;
+	Vec1 kinetic_energy;
 	bool  colliding;
 
 	Particle_Params(const Vec2& center, const Vec2& velocity, Vec1 restitution, Vec1 radius, Vec1 mass) :
@@ -35,7 +36,8 @@ struct Particle_Params {
 		mass(mass),
 		acceleration(Vec2(0.0, 0.0)),
 		inertia((2.0 / 5.0) * mass * radius * radius),
-		angular_velocity(0.0), 
+		angular_velocity(0.0),
+		kinetic_energy(0.0),
 		colliding(false)
 	{}
 
@@ -97,9 +99,19 @@ struct Particle : QGraphicsEllipseItem {
 
 	void tick(const Vec1& delta_time, const QRectF& bounding_box, const Vec1& display_offset) {
 		apply_friction(delta_time * TIME_SCALE);
-		update_position(delta_time * TIME_SCALE);
+
+		params.acceleration += (GRAVITY * sqrt(params.mass)) * delta_time * TIME_SCALE;
+		params.velocity += params.acceleration;
+		params.center += params.velocity * delta_time * TIME_SCALE;
+
 		handle_border_collision(bounding_box);
 		setRect(QRectF(params.center.x - params.radius + display_offset, params.center.y - params.radius, params.radius * 2.0, params.radius * 2.0));
+
+		const Vec1 Translation_Energy = Vec1(0.5) * params.mass * length(params.velocity) * length(params.velocity);
+		const Vec1 Rotational_Energy = Vec1(0.5) * params.inertia * length(params.velocity) * length(params.velocity);
+		const Vec1 Potential_Energy = length(GRAVITY) * params.mass * params.center.y;
+
+		params.kinetic_energy = Translation_Energy + Rotational_Energy + Potential_Energy;
 	}
 
 	void apply_friction(const Vec1& delta_time) {
@@ -119,12 +131,6 @@ struct Particle : QGraphicsEllipseItem {
 				params.acceleration = friction_vector * delta_time;
 			}
 		}
-	}
-
-	void update_position(const Vec1& delta_time) {
-		params.acceleration += (GRAVITY * sqrt(params.mass)) * delta_time;
-		params.velocity += params.acceleration;
-		params.center += params.velocity * delta_time;
 	}
 
 	void handle_border_collision(const QRectF& bounding_box) {

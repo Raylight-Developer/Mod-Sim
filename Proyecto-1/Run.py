@@ -1,10 +1,11 @@
 import subprocess
 
 RUN = True
+WRITE_LOG = True
 WRITE_PARAMS = True
 GENERATE_GRAPHICS = True
 
-SYSTEM_COUNT                 = 16
+SYSTEM_COUNT                 = 8
 
 SHIFT_INDEX                  = 1
 SHIFT                        = ["1e-12", "0"]
@@ -20,14 +21,14 @@ DURATION_STEPS               = 1500
 DELTA_TIME                   = 0.005
 ON_FRAME_READY               = False
 
-PARAMETERS = [
+"""PARAMETERS = [
 "((0, 185), (0, 0), 0.8, 5.0 , 2.0 )",
 "((0, 165), (0, 0), 0.8, 10.0, 10.0)",
 "((0, 130), (0, 0), 0.8, 20.0, 25.0)",
 "((0, 80 ), (0, 0), 0.7, 30.0, 40.0)"
-]
+]"""
 
-"""SHIFT                        = ["1e-1", "0"]
+SHIFT                        = ["1e-1", "0"]
 PARAMETERS = [
 "((0, 745), (-50, 25), 0.8, 5.0 , 5.0 )",
 "((0, 710), (0, 0), 0.8, 15.0, 15.0)",
@@ -35,7 +36,7 @@ PARAMETERS = [
 "((0, 580), (5, -10), 0.7, 35.0, 35.0)",
 "((0, 485), (50, 10), 0.7, 45.0, 45.0)",
 "((0, 370), (0, 0), 0.7, 55.0, 55.0)",
-]"""
+]
 
 """PARAMETERS = [
 "((0, 745), (0, 0), 0.8, 5.0 , 5.0 )",
@@ -69,6 +70,7 @@ if RUN:
 		"--particle-opacity", str(PARTICLE_OPACITY),
 		"--bounds", str(SIMULATION_BOUNDS[0]), str(SIMULATION_BOUNDS[1]),
 		"--generate-graphics", str(int(GENERATE_GRAPHICS)),
+		"--generate-tick-graphics", str(int(GENERATE_GRAPHICS)),
 		"--delta-step", str(DELTA_TIME),
 		"--duration-steps", str(int(DURATION_STEPS)),
 		"--realtime", str(int(ON_FRAME_READY))

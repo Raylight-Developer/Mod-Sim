@@ -22,15 +22,19 @@ tuple<vector<dvec1>, vector<dvec1>> calculate_delta(const vector<vec1>& vec1, co
 
 struct ParticleSimulation : QGraphicsScene {
 	map<string, dvec1> args;
-	map<uint64, map<Particle<vec1, vec2>*, tuple<vector<uint64>, vector<vec2>, vector<vec2>, vector<vec1>, vector<vec2>>>> f_system_data;
-	map<uint64, map<Particle<dvec1, dvec2>*, tuple<vector<uint64>, vector<dvec2>, vector<dvec2>, vector<dvec1>, vector<dvec2>>>> d_system_data;
+	// Position<0>, Velocity<1>, Acceleration<2>, Angular_Velocity<3>, Kinetic Energy<4>
+	map<uint64, map<Particle<vec1, vec2>*, tuple<vector<vec2>, vector<vec2>, vector<vec2>, vector<vec1>, vector<vec1>>>> f_system_data;
+	map<uint64, map<Particle<dvec1, dvec2>*, tuple<vector<dvec2>, vector<dvec2>, vector<dvec2>, vector<dvec1>, vector<dvec1>>>> d_system_data;
 	vector<vector<Particle<vec1,vec2>*>> f_systems;
 	vector<vector<Particle<dvec1,dvec2>*>> d_systems;
+	vector<uint64> time_stamps;
 	QRectF bounding_box;
 	QElapsedTimer timer;
 	QGraphicsRectItem* f_rect_item;
 	QGraphicsRectItem* d_rect_item;
 	QGraphicsRectItem* rect_item;
+
+	uint64 frame_count;
 
 	ParticleSimulation(const map<string, dvec1>& args, QMainWindow* parent = nullptr) :
 		args(args),
@@ -67,6 +71,7 @@ struct ParticleSimulation : QGraphicsScene {
 		item_b->setTransform(transform);
 		setup_particles();
 		setSceneRect(scene_rect);
+		frame_count = 0;
 	}
 
 	void setup_particles() {
@@ -91,8 +96,8 @@ struct ParticleSimulation : QGraphicsScene {
 
 				f_params.push_back(f_particle);
 				d_params.push_back(d_particle);
-				f_system_data[i][f_particle] = tuple<vector<uint64>, vector<vec2>, vector<vec2>, vector<vec1>, vector<vec2>>({}, {}, {}, {}, {});
-				d_system_data[i][d_particle] = tuple<vector<uint64>, vector<dvec2>, vector<dvec2>, vector<dvec1>, vector<dvec2>>({}, {}, {}, {}, {});
+				f_system_data[i][f_particle] = tuple<vector<vec2>, vector<vec2>, vector<vec2>, vector<vec1>, vector<vec1>>({});
+				d_system_data[i][d_particle] = tuple<vector<dvec2>, vector<dvec2>, vector<dvec2>, vector<dvec1>, vector<dvec1>>({});
 			}
 			f_params[d_to_ul(args.at("Shifter"))]->setCenter(f_params[d_to_ul(args.at("Shifter"))]->params.center + vec2(args.at("Shift X"), args.at("Shift Y")) * ul_to_f(i));
 			d_params[d_to_ul(args.at("Shifter"))]->setCenter(d_params[d_to_ul(args.at("Shifter"))]->params.center + dvec2(args.at("Shift X"), args.at("Shift Y")) * ul_to_d(i));
@@ -100,6 +105,7 @@ struct ParticleSimulation : QGraphicsScene {
 			d_systems.push_back(d_params);
 		}
 
+		QPen pen = QPen(QColor(0, 0, 0, 100), 0.8);
 		for (uint64 i = 0; i < f_systems.size(); ++i) {
 			QColor color;
 			color.setHsv(d_to_i((i / args.at("System Count")) * 360.0), 150, 255, d_to_i(args.at("Opacity") * 255.0));
@@ -109,8 +115,10 @@ struct ParticleSimulation : QGraphicsScene {
 				const auto& d_particle = d_systems[i][j];
 				
 				f_particle->setBrush(color);
+				f_particle->setPen(pen);
 				f_particle->setZValue((i + 1) * (j + 1));
 				d_particle->setBrush(color);
+				d_particle->setPen(pen);
 				d_particle->setZValue((i + 1) * (j + 1));
 				addItem(f_particle);
 				addItem(d_particle);
@@ -128,11 +136,11 @@ struct ParticleSimulation : QGraphicsScene {
 					auto& f_particle_b = f_systems[i][k];
 					f_particle_a->handle_particle_collision(f_particle_b);
 				}
-				get<0>(f_system_data[i][f_particle_a]).push_back(timer.elapsed());
-				get<1>(f_system_data[i][f_particle_a]).push_back(f_particle_a->params.center);
-				get<2>(f_system_data[i][f_particle_a]).push_back(f_particle_a->params.velocity);
+				get<0>(f_system_data[i][f_particle_a]).push_back(f_particle_a->params.center);
+				get<1>(f_system_data[i][f_particle_a]).push_back(f_particle_a->params.velocity);
+				get<2>(f_system_data[i][f_particle_a]).push_back(f_particle_a->params.acceleration);
 				get<3>(f_system_data[i][f_particle_a]).push_back(f_particle_a->params.angular_velocity);
-				get<4>(f_system_data[i][f_particle_a]).push_back(f_particle_a->params.acceleration);
+				get<4>(f_system_data[i][f_particle_a]).push_back(f_particle_a->params.kinetic_energy);
 
 				auto& d_particle_a = d_systems[i][j];
 				d_particle_a->tick(delta_time, bounding_box, bounding_box.width() * 0.6);
@@ -141,17 +149,26 @@ struct ParticleSimulation : QGraphicsScene {
 					auto& d_particle_b = d_systems[i][k];
 					d_particle_a->handle_particle_collision(d_particle_b);
 				}
-				get<0>(d_system_data[i][d_particle_a]).push_back(timer.elapsed());
-				get<1>(d_system_data[i][d_particle_a]).push_back(d_particle_a->params.center);
-				get<2>(d_system_data[i][d_particle_a]).push_back(d_particle_a->params.velocity);
+				get<0>(d_system_data[i][d_particle_a]).push_back(d_particle_a->params.center);
+				get<1>(d_system_data[i][d_particle_a]).push_back(d_particle_a->params.velocity);
+				get<2>(d_system_data[i][d_particle_a]).push_back(d_particle_a->params.acceleration);
 				get<3>(d_system_data[i][d_particle_a]).push_back(d_particle_a->params.angular_velocity);
-				get<4>(d_system_data[i][d_particle_a]).push_back(d_particle_a->params.acceleration);
+				get<4>(d_system_data[i][d_particle_a]).push_back(d_particle_a->params.kinetic_energy);
+
+
 			}
+		}
+		if (args["Realtime"] >= 0.5) {
+			time_stamps.push_back(timer.elapsed());
+		}
+		else {
+			time_stamps.push_back(d_to_ul(ul_to_d(frame_count) * delta_time * 1000.0));
 		}
 	}
 
 	void advance(const dvec1& delta_time) {
 		update_particles(delta_time);
+		frame_count++;
 	}
 };
 
@@ -231,41 +248,56 @@ struct MainWindow : QMainWindow {
 		fps_timer->stop();
 
 		if (d_to_i(args.at("Generate Graphics")) == 1) {
-			vector<vec1>  f_sys_sum_position;
-			vector<dvec1> d_sys_sum_position;
-
-			vector<vec1>  f_sys_sum_velocity;
-			vector<dvec1> d_sys_sum_velocity;
-
-			vector<vec1>  f_sys_sum_acceleration;
-			vector<dvec1> d_sys_sum_acceleration;
-
 			const uint particle_count = simulation->f_system_data[0].size();
-			cout << particle_count << endl;
+			const uint system_count = simulation->f_system_data.size();
 
-			vector<vec1>  f_part_sum_position = vector(particle_count, 0.0f);
-			vector<dvec1> d_part_sum_position = vector(particle_count, 0.0);
+			vector<vec1>  f_sys_sum_position_x = vector(system_count, 0.0f);
+			vector<vec1>  f_sys_sum_position_y = vector(system_count, 0.0f);
+			vector<dvec1> d_sys_sum_position_x = vector(system_count, 0.0);
+			vector<dvec1> d_sys_sum_position_y = vector(system_count, 0.0);
 
-			vector<vec1>  f_part_sum_velocity = vector(particle_count, 0.0f);
-			vector<dvec1> d_part_sum_velocity = vector(particle_count, 0.0);
+			vector<vec1>  f_sys_sum_velocity_x = vector(system_count, 0.0f);
+			vector<vec1>  f_sys_sum_velocity_y = vector(system_count, 0.0f);
+			vector<dvec1> d_sys_sum_velocity_x = vector(system_count, 0.0);
+			vector<dvec1> d_sys_sum_velocity_y = vector(system_count, 0.0);
 
-			vector<vec1>  f_part_sum_acceleration = vector(particle_count, 0.0f);
-			vector<dvec1> d_part_sum_acceleration = vector(particle_count, 0.0);
+			vector<vec1>  f_sys_sum_acceleration_x = vector(system_count, 0.0f);
+			vector<vec1>  f_sys_sum_acceleration_y = vector(system_count, 0.0f);
+			vector<dvec1> d_sys_sum_acceleration_x = vector(system_count, 0.0);
+			vector<dvec1> d_sys_sum_acceleration_y = vector(system_count, 0.0);
 
-			for (uint64 i = 0; i < simulation->f_system_data.size(); i++) { // System Count
+			vector<vec1>  f_sys_sum_angvelocity = vector(system_count, 0.0f);
+			vector<dvec1> d_sys_sum_angvelocity = vector(system_count, 0.0);
+
+			vector<vec1>  f_sys_sum_KE = vector(system_count, 0.0f);
+			vector<dvec1> d_sys_sum_KE = vector(system_count, 0.0);
+
+			vector<vec1>  f_part_sum_position_x = vector(particle_count, 0.0f);
+			vector<vec1>  f_part_sum_position_y = vector(particle_count, 0.0f);
+			vector<dvec1> d_part_sum_position_x = vector(particle_count, 0.0);
+			vector<dvec1> d_part_sum_position_y = vector(particle_count, 0.0);
+
+			vector<vec1>  f_part_sum_velocity_x = vector(particle_count, 0.0f);
+			vector<vec1>  f_part_sum_velocity_y = vector(particle_count, 0.0f);
+			vector<dvec1> d_part_sum_velocity_x = vector(particle_count, 0.0);
+			vector<dvec1> d_part_sum_velocity_y = vector(particle_count, 0.0);
+
+			vector<vec1>  f_part_sum_acceleration_x = vector(particle_count, 0.0f);
+			vector<vec1>  f_part_sum_acceleration_y = vector(particle_count, 0.0f);
+			vector<dvec1> d_part_sum_acceleration_x = vector(particle_count, 0.0);
+			vector<dvec1> d_part_sum_acceleration_y = vector(particle_count, 0.0);
+
+			vector<vec1>  f_part_sum_angvelocity = vector(particle_count, 0.0f);
+			vector<dvec1> d_part_sum_angvelocity = vector(particle_count, 0.0);
+
+			vector<vec1>  f_part_sum_KE = vector(particle_count, 0.0f);
+			vector<dvec1> d_part_sum_KE = vector(particle_count, 0.0);
+
+			for (uint64 i = 0; i < system_count; i++) { // System Count
 				const auto f_system = simulation->f_system_data[i];
 				const auto d_system = simulation->d_system_data[i];
 
-				f_sys_sum_position.push_back(0.0f);
-				d_sys_sum_position.push_back(0.0);
-
-				f_sys_sum_velocity.push_back(0.0f);
-				d_sys_sum_velocity.push_back(0.0);
-
-				f_sys_sum_acceleration.push_back(0.0f);
-				d_sys_sum_acceleration.push_back(0.0);
-
-				for (uint64 j = 0; j < f_system.size(); j++) { // Particle Count
+				for (uint64 j = 0; j < particle_count; j++) { // Particle Count
 
 					auto f_it = f_system.begin();
 					auto d_it = d_system.begin();
@@ -273,90 +305,326 @@ struct MainWindow : QMainWindow {
 					std::advance(d_it, j);
 
 					for (uint64 k = 0; k < particle_count; k++) {
-						f_sys_sum_position[i] += length(get<1>((*f_it).second)[k]);
-						f_sys_sum_velocity[i] += length(get<2>((*f_it).second)[k]);
-						f_sys_sum_acceleration[i] += length(get<4>((*f_it).second)[k]);
+						f_sys_sum_position_x[i]     += get<0>((*f_it).second)[k].x;
+						f_sys_sum_position_y[i]     += get<0>((*f_it).second)[k].y;
+						f_sys_sum_velocity_x[i]     += get<1>((*f_it).second)[k].x;
+						f_sys_sum_velocity_y[i]     += get<1>((*f_it).second)[k].y;
+						f_sys_sum_acceleration_x[i] += get<2>((*f_it).second)[k].x;
+						f_sys_sum_acceleration_y[i] += get<2>((*f_it).second)[k].y;
+						f_sys_sum_angvelocity[i]    += get<3>((*f_it).second)[k];
+						f_sys_sum_KE[i]             += get<4>((*f_it).second)[k];
 
-						d_sys_sum_position[i] += length(get<1>((*d_it).second)[k]);
-						d_sys_sum_velocity[i] += length(get<2>((*d_it).second)[k]);
-						d_sys_sum_acceleration[i] += length(get<4>((*d_it).second)[k]);
+						d_sys_sum_position_x[i]     += get<0>((*d_it).second)[k].x;
+						d_sys_sum_position_y[i]     += get<0>((*d_it).second)[k].y;
+						d_sys_sum_velocity_x[i]     += get<1>((*d_it).second)[k].x;
+						d_sys_sum_velocity_y[i]     += get<1>((*d_it).second)[k].y;
+						d_sys_sum_acceleration_x[i] += get<2>((*d_it).second)[k].x;
+						d_sys_sum_acceleration_y[i] += get<2>((*d_it).second)[k].y;
+						d_sys_sum_angvelocity[i]    += get<3>((*d_it).second)[k];
+						d_sys_sum_KE[i]             += get<4>((*d_it).second)[k];
 
-						f_part_sum_position[k] += length(get<1>((*f_it).second)[k]);
-						f_part_sum_velocity[k] += length(get<2>((*f_it).second)[k]);
-						f_part_sum_acceleration[k] += length(get<4>((*f_it).second)[k]);
+						f_part_sum_position_x[k]     += get<0>((*f_it).second)[k].x;
+						f_part_sum_position_y[k]     += get<0>((*f_it).second)[k].y;
+						f_part_sum_velocity_x[k]     += get<1>((*f_it).second)[k].x;
+						f_part_sum_velocity_y[k]     += get<1>((*f_it).second)[k].y;
+						f_part_sum_acceleration_x[k] += get<2>((*f_it).second)[k].x;
+						f_part_sum_acceleration_y[k] += get<2>((*f_it).second)[k].y;
+						f_part_sum_angvelocity[k]    += get<3>((*f_it).second)[k];
+						f_part_sum_KE[k]             += get<4>((*f_it).second)[k];
 
-						d_part_sum_position[k] += length(get<1>((*d_it).second)[k]);
-						d_part_sum_velocity[k] += length(get<2>((*d_it).second)[k]);
-						d_part_sum_acceleration[k] += length(get<4>((*d_it).second)[k]);
+						d_part_sum_position_x[k]     += get<0>((*d_it).second)[k].x;
+						d_part_sum_position_y[k]     += get<0>((*d_it).second)[k].y;
+						d_part_sum_velocity_x[k]     += get<1>((*d_it).second)[k].x;
+						d_part_sum_velocity_y[k]     += get<1>((*d_it).second)[k].y;
+						d_part_sum_acceleration_x[k] += get<2>((*d_it).second)[k].x;
+						d_part_sum_acceleration_y[k] += get<2>((*d_it).second)[k].y;
+						d_part_sum_angvelocity[k]    += get<3>((*d_it).second)[k];
+						f_part_sum_KE[k]             += get<4>((*d_it).second)[k];
 					}
 				}
 			}
 
 			{
-				auto [x, y] = calculate_delta(f_sys_sum_position, d_sys_sum_position);
-				plt::bar(x, y, {});
-				plt::xticks(x);
-				plt::xlabel("Steps");
-				plt::ylabel("Delta");
+				auto [xx, yx] = calculate_delta(f_sys_sum_position_x, d_sys_sum_position_x);
+				auto [xy, yy] = calculate_delta(f_sys_sum_position_y, d_sys_sum_position_y);
+				plt::plot(xx, yx, { {"label", "x"} });
+				plt::plot(xy, yy, { {"label", "y"} });
 				plt::legend();
+				plt::xlabel("System_ID");
+				plt::ylabel("Position");
 				plt::title("Positions");
+				plt::grid(true);
 				plt::save("./Outputs/System_Delta_Positions.png");
 				plt::clf();
 			}
 			{
-				auto [x, y] = calculate_delta(f_sys_sum_velocity, d_sys_sum_velocity);
-				plt::bar(x, y, {});
-				plt::xticks(x);
-				plt::xlabel("Steps");
-				plt::ylabel("Velocity");
+				auto [xx, yx] = calculate_delta(f_sys_sum_velocity_x, d_sys_sum_velocity_x);
+				auto [xy, yy] = calculate_delta(f_sys_sum_velocity_y, d_sys_sum_velocity_y);
+				plt::plot(xx, yx, { {"label", "x"} });
+				plt::plot(xy, yy, { {"label", "y"} });
 				plt::legend();
+				plt::xlabel("System_ID");
+				plt::ylabel("Velocity");
 				plt::title("Velocities");
+				plt::grid(true);
 				plt::save("./Outputs/System_Delta_Velocities.png");
 				plt::clf();
 			}
 			{
-				auto [x, y] = calculate_delta(f_sys_sum_acceleration, d_sys_sum_acceleration);
-				plt::bar(x, y, {});
-				plt::xticks(x);
-				plt::xlabel("Steps");
-				plt::ylabel("Acceleration");
+				auto [xx, yx] = calculate_delta(f_sys_sum_acceleration_x, d_sys_sum_acceleration_x);
+				auto [xy, yy] = calculate_delta(f_sys_sum_acceleration_y, d_sys_sum_acceleration_y);
+				plt::plot(xx, yx, { {"label", "x"} });
+				plt::plot(xy, yy, { {"label", "y"} });
 				plt::legend();
+				plt::xlabel("System_ID");
+				plt::ylabel("Acceleration");
 				plt::title("Accelerations");
+				plt::grid(true);
 				plt::save("./Outputs/System_Delta_Accelerations.png");
+				plt::clf();
+			}
+			{
+				auto [x, y] = calculate_delta(f_sys_sum_angvelocity, d_sys_sum_angvelocity);
+				plt::plot(x, y);
+				plt::xlabel("System_ID");
+				plt::ylabel("Angular Velocity");
+				plt::title("Angular Velocities");
+				plt::grid(true);
+				plt::save("./Outputs/System_Delta_Angular_Velocities.png");
+				plt::clf();
+			}
+			
+			{
+				auto [x, y] = calculate_delta(f_sys_sum_KE, d_sys_sum_KE);
+				plt::plot(x, y);
+				plt::xlabel("System_ID");
+				plt::ylabel("Kinetic Energy");
+				plt::title("Kinetic Energies");
+				plt::grid(true);
+				plt::save("./Outputs/System_Delta_Kinetic_Energy.png");
 				plt::clf();
 			}
 
 			{
-				auto [x, y] = calculate_delta(f_part_sum_position, d_part_sum_position);
-				plt::bar(x, y, {});
-				plt::xticks(x);
-				plt::xlabel("Steps");
-				plt::ylabel("Delta");
+				auto [xx, yx] = calculate_delta(f_part_sum_position_x, d_part_sum_position_x);
+				auto [xy, yy] = calculate_delta(f_part_sum_position_y, d_part_sum_position_y);
+				plt::plot(xx, yx, { {"label", "x"} });
+				plt::plot(xy, yy, { {"label", "y"} });
 				plt::legend();
+				plt::xlabel("Particle_ID");
+				plt::ylabel("Position");
 				plt::title("Positions");
+				plt::grid(true);
 				plt::save("./Outputs/Particle_Delta_Positions.png");
 				plt::clf();
 			}
 			{
-				auto [x, y] = calculate_delta(f_part_sum_velocity, d_part_sum_velocity);
-				plt::bar(x, y, {});
-				plt::xticks(x);
-				plt::xlabel("Steps");
-				plt::ylabel("Velocity");
+				auto [xx, yx] = calculate_delta(f_part_sum_velocity_x, d_part_sum_velocity_x);
+				auto [xy, yy] = calculate_delta(f_part_sum_velocity_y, d_part_sum_velocity_y);
+				plt::plot(xx, yx, { {"label", "x"} });
+				plt::plot(xy, yy, { {"label", "y"} });
 				plt::legend();
+				plt::xlabel("Particle_ID");
+				plt::ylabel("Velocity");
 				plt::title("Velocities");
+				plt::grid(true);
 				plt::save("./Outputs/Particle_Delta_Velocities.png");
 				plt::clf();
 			}
 			{
-				auto [x, y] = calculate_delta(f_part_sum_acceleration, d_part_sum_acceleration);
-				plt::bar(x, y, {});
-				plt::xticks(x);
-				plt::xlabel("Steps");
-				plt::ylabel("Acceleration");
+				auto [xx, yx] = calculate_delta(f_part_sum_acceleration_x, d_part_sum_acceleration_x);
+				auto [xy, yy] = calculate_delta(f_part_sum_acceleration_y, d_part_sum_acceleration_y);
+				plt::plot(xx, yx, { {"label", "x"} });
+				plt::plot(xy, yy, { {"label", "y"} });
 				plt::legend();
+				plt::xlabel("Particle_ID");
+				plt::ylabel("Acceleration");
 				plt::title("Accelerations");
+				plt::grid(true);
 				plt::save("./Outputs/Particle_Delta_Accelerations.png");
+				plt::clf();
+			}
+			{
+				auto [x, y] = calculate_delta(f_part_sum_angvelocity, d_part_sum_angvelocity);
+				plt::plot(x, y);
+				plt::xlabel("Particle_ID");
+				plt::ylabel("Angular Velocity");
+				plt::title("Angular Velocities");
+				plt::grid(true);
+				plt::save("./Outputs/Particle_Delta_Angular_Velocities.png");
+				plt::clf();
+			}
+			
+			{
+				auto [x, y] = calculate_delta(f_part_sum_KE, d_part_sum_KE);
+				plt::plot(x, y);
+				plt::xlabel("Particle_ID");
+				plt::ylabel("Kinetic Energy");
+				plt::title("Kinetic Energies");
+				plt::grid(true);
+				plt::save("./Outputs/Particle_Delta_Kinetic_Energy.png");
+				plt::clf();
+			}
+		}
+
+		if (d_to_i(args.at("Generate Tick Graphics")) == 1) {
+			const uint particle_count = simulation->f_system_data[0].size();
+			const uint system_count = simulation->f_system_data.size();
+
+			vector<vec1>  f_sum_position_x;
+			vector<vec1>  f_sum_position_y;
+			vector<dvec1> d_sum_position_x;
+			vector<dvec1> d_sum_position_y;
+
+			vector<vec1>  f_sum_velocity_x;
+			vector<vec1>  f_sum_velocity_y;
+			vector<dvec1> d_sum_velocity_x;
+			vector<dvec1> d_sum_velocity_y;
+
+			vector<vec1>  f_sum_acceleration_x;
+			vector<vec1>  f_sum_acceleration_y;
+			vector<dvec1> d_sum_acceleration_x;
+			vector<dvec1> d_sum_acceleration_y;
+
+			vector<vec1>  f_sum_angvelocity;
+			vector<dvec1> d_sum_angvelocity;
+
+			vector<vec1>  f_sum_KE;
+			vector<dvec1> d_sum_KE;
+
+			for (uint64 s = 0; s < simulation->frame_count; s++) {
+				vec1 ft_sum_position_x       = 0.0;
+				vec1 ft_sum_position_y       = 0.0;
+				vec1 ft_sum_velocity_x       = 0.0;
+				vec1 ft_sum_velocity_y       = 0.0;
+				vec1 ft_sum_acceleration_x   = 0.0;
+				vec1 ft_sum_acceleration_y   = 0.0;
+				vec1 ft_sum_angvelocity      = 0.0;
+				vec1 ft_sum_KE               = 0.0;
+				
+				dvec1 dt_sum_position_x      = 0.0;
+				dvec1 dt_sum_position_y      = 0.0;
+				dvec1 dt_sum_velocity_x      = 0.0;
+				dvec1 dt_sum_velocity_y      = 0.0;
+				dvec1 dt_sum_acceleration_x  = 0.0;
+				dvec1 dt_sum_acceleration_y  = 0.0;
+				dvec1 dt_sum_angvelocity     = 0.0;
+				dvec1 dt_sum_KE              = 0.0;
+				for (uint64 i = 0; i < system_count; i++) { // System Count
+					const auto f_system = simulation->f_system_data[i];
+					const auto d_system = simulation->d_system_data[i];
+
+					for (uint64 j = 0; j < particle_count; j++) { // Particle Count
+
+						auto f_it = f_system.begin();
+						auto d_it = d_system.begin();
+						std::advance(f_it, j);
+						std::advance(d_it, j);
+
+						for (uint64 k = 0; k < particle_count; k++) {
+
+							ft_sum_position_x     += get<0>((*f_it).second)[k].x;
+							ft_sum_position_y     += get<0>((*f_it).second)[k].y;
+							ft_sum_velocity_x     += get<1>((*f_it).second)[k].x;
+							ft_sum_velocity_y     += get<1>((*f_it).second)[k].y;
+							ft_sum_acceleration_x += get<2>((*f_it).second)[k].x;
+							ft_sum_acceleration_y += get<2>((*f_it).second)[k].y;
+							ft_sum_angvelocity    += get<3>((*f_it).second)[k];
+							ft_sum_KE             += get<4>((*f_it).second)[k];
+
+							dt_sum_position_x     += get<0>((*d_it).second)[k].x;
+							dt_sum_position_y     += get<0>((*d_it).second)[k].y;
+							dt_sum_velocity_x     += get<1>((*d_it).second)[k].x;
+							dt_sum_velocity_y     += get<1>((*d_it).second)[k].y;
+							dt_sum_acceleration_x += get<2>((*d_it).second)[k].x;
+							dt_sum_acceleration_y += get<2>((*d_it).second)[k].y;
+							dt_sum_angvelocity    += get<3>((*d_it).second)[k];
+							dt_sum_KE             += get<4>((*d_it).second)[k];
+						}
+					}
+				}
+				f_sum_position_x    .push_back(ft_sum_position_x     );
+				f_sum_position_y    .push_back(ft_sum_position_y     );
+				f_sum_velocity_x    .push_back(ft_sum_velocity_x     );
+				f_sum_velocity_y    .push_back(ft_sum_velocity_y     );
+				f_sum_acceleration_x.push_back(ft_sum_acceleration_x );
+				f_sum_acceleration_y.push_back(ft_sum_acceleration_y );
+				f_sum_angvelocity   .push_back(ft_sum_angvelocity    );
+				f_sum_KE            .push_back(ft_sum_KE             );
+
+				d_sum_position_x    .push_back(dt_sum_position_x     );
+				d_sum_position_y    .push_back(dt_sum_position_y     );
+				d_sum_velocity_x    .push_back(dt_sum_velocity_x     );
+				d_sum_velocity_y    .push_back(dt_sum_velocity_y     );
+				d_sum_acceleration_x.push_back(dt_sum_acceleration_x );
+				d_sum_acceleration_y.push_back(dt_sum_acceleration_y );
+				d_sum_angvelocity   .push_back(dt_sum_angvelocity    );
+				d_sum_KE            .push_back(dt_sum_KE             );
+			}
+
+			vector<dvec1> time_stamps;
+			for (auto val : simulation->time_stamps) {
+				time_stamps.push_back(val);
+			}
+
+			{
+				auto [xx, yx] = calculate_delta(f_sum_position_x, d_sum_position_x);
+				auto [xy, yy] = calculate_delta(f_sum_position_y, d_sum_position_y);
+				plt::plot(time_stamps, yx, { {"label", "x"} });
+				plt::plot(time_stamps, yy, { {"label", "y"} });
+				plt::legend();
+				plt::xlabel("Time (ms)");
+				plt::ylabel("Position");
+				plt::title("Positions");
+				plt::grid(true);
+				plt::save("./Outputs/Tick_Delta_Positions.png");
+				plt::clf();
+			}
+			{
+				auto [xx, yx] = calculate_delta(f_sum_velocity_x, d_sum_velocity_x);
+				auto [xy, yy] = calculate_delta(f_sum_velocity_y, d_sum_velocity_y);
+				plt::plot(time_stamps, yx, { {"label", "x"} });
+				plt::plot(time_stamps, yy, { {"label", "y"} });
+				plt::legend();
+				plt::xlabel("Time (ms)");
+				plt::ylabel("Velocity");
+				plt::title("Velocities");
+				plt::grid(true);
+				plt::save("./Outputs/Tick_Delta_Velocities.png");
+				plt::clf();
+			}
+			{
+				auto [xx, yx] = calculate_delta(f_sum_acceleration_x, d_sum_acceleration_x);
+				auto [xy, yy] = calculate_delta(f_sum_acceleration_y, d_sum_acceleration_y);
+				plt::plot(time_stamps, yx, { {"label", "x"} });
+				plt::plot(time_stamps, yy, { {"label", "y"} });
+				plt::legend();
+				plt::xlabel("Time (ms)");
+				plt::ylabel("Acceleration");
+				plt::title("Accelerations");
+				plt::grid(true);
+				plt::save("./Outputs/Tick_Delta_Accelerations.png");
+				plt::clf();
+			}
+			{
+				auto [x, y] = calculate_delta(f_sum_angvelocity, d_sum_angvelocity);
+				plt::plot(time_stamps, y);
+				plt::xlabel("Time (ms)");
+				plt::ylabel("Angular Velocity");
+				plt::title("Angular Velocities");
+				plt::grid(true);
+				plt::save("./Outputs/Tick_Delta_Angular_Velocities.png");
+				plt::clf();
+			}
+
+			{
+				auto [x, y] = calculate_delta(f_sum_KE, d_sum_KE);
+				plt::plot(time_stamps, y);
+				plt::xlabel("Time (ms)");
+				plt::ylabel("Kinetic Energy");
+				plt::title("Kinetic Energies");
+				plt::grid(true);
+				plt::save("./Outputs/Tick_Delta_Kinetic_Energy.png");
 				plt::clf();
 			}
 		}
@@ -396,6 +664,7 @@ int main(int argc, char* argv[]) {
 	args["Bounds Width"] = 400;
 	args["Bounds Height"] = 800;
 	args["Generate Graphics"] = 1;
+	args["Generate Tick Graphics"] = 1;
 	args["Duration"] = 5.0;
 	args["Duration Steps"] = 500;
 	args["Time Scale"] = 5.0;
@@ -428,6 +697,8 @@ int main(int argc, char* argv[]) {
 			args["Bounds Height"] = str_to_d(argv[++i]);
 		} else if (strcmp(argv[i], "--generate-graphics") == 0 && i + 1 < argc) {
 			args["Generate Graphics"] = str_to_d(argv[++i]);
+		} else if (strcmp(argv[i], "--generate-tick-graphics") == 0 && i + 1 < argc) {
+			args["Generate Tick Graphics"] = str_to_d(argv[++i]);
 		} else if (strcmp(argv[i], "--delta-step") == 0 && i + 1 < argc) {
 			args["Delta"] = str_to_d(argv[++i]);
 		} else if (strcmp(argv[i], "--duration-steps") == 0 && i + 1 < argc) {
