@@ -12,7 +12,7 @@ SHIFT                        = ["1e-12", "0"]
 GRAVITY                      = [0, -9.81]
 SLIDING_FRICTION_COEFFICIENT = 0.3
 ROLLING_FRICTION_COEFFICIENT = 0.15
-PARTICLE_OPACITY             = 0.35
+PARTICLE_OPACITY             = 0.2
 SIMULATION_BOUNDS            = [400, 800]
 
 DURATION                     = 15.0
