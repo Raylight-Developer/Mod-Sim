@@ -1,0 +1,46 @@
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+#version 460
+#include "Globals.comp"
+#include "Inputs.comp"
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+
+bool f_raySphereIntersection(in Ray ray, in vec3 sphere, out float t) {
+	vec3 CO = ray.origin - sphere;
+	float a = dot(ray.direction, ray.direction);
+	float b = 2.0*dot(ray.direction, CO);
+	float c = dot(CO, CO) - sphere_display_radius*sphere_display_radius;
+	float delta = b*b - 4.0*a*c;
+	if(delta < 0.0) {
+		return false;
+	}
+	t = (-b-sqrt(delta)) / (2.0*a);
+	return true;
+}
+
+Ray f_cameraRay(vec2 uv) {
+	return Ray(camera_pos, normalize(camera_p_uv + (camera_p_u * uv.x) + (camera_p_v * uv.y) - camera_pos));
+}
+
+void main() {
+	ivec2 pixel_id = ivec2(gl_GlobalInvocationID.xy);
+	vec2 uv = (pixel_id - 1 - vec2(resolution) / 2.0) / float(max(resolution.x, resolution.y));
+
+	Ray ray = f_cameraRay(uv);
+
+	float t_length = MAX_DIST;
+	float t_dist = MAX_DIST;
+	vec4 color = vec4(0,0,0,1);
+
+	for (uint i = 0; i < point_cloud.length(); i++) {
+		if (f_raySphereIntersection(ray, point_cloud[i].pos.xyz, t_dist)) {
+			if (t_dist < t_length && t_dist > EPSILON) {
+				t_length = t_dist;
+				color = point_cloud[i].col;
+			}
+		}
+	}
+
+	imageStore(raw_render_layer, pixel_id, color);
+}

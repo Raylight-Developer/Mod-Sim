@@ -22,10 +22,10 @@ tuple<vector<dvec1>, vector<dvec1>> calculate_delta(const vector<vec1>& vec1, co
 }
 
 struct ParticleSimulation : QGraphicsScene {
-	map<string, dvec1> args;
+	unordered_map<string, dvec1> args;
 	// Position<0>, Velocity<1>, Acceleration<2>, Angular_Velocity<3>, Kinetic Energy<4>
-	map<uint64, map<Particle<vec1, vec2>*, tuple<vector<vec2>, vector<vec2>, vector<vec2>, vector<vec1>, vector<vec1>>>> f_system_data;
-	map<uint64, map<Particle<dvec1, dvec2>*, tuple<vector<dvec2>, vector<dvec2>, vector<dvec2>, vector<dvec1>, vector<dvec1>>>> d_system_data;
+	unordered_map<uint64, unordered_map<Particle<vec1, vec2>*, tuple<vector<vec2>, vector<vec2>, vector<vec2>, vector<vec1>, vector<vec1>>>> f_system_data;
+	unordered_map<uint64, unordered_map<Particle<dvec1, dvec2>*, tuple<vector<dvec2>, vector<dvec2>, vector<dvec2>, vector<dvec1>, vector<dvec1>>>> d_system_data;
 	vector<vector<Particle<vec1,vec2>*>> f_systems;
 	vector<vector<Particle<dvec1,dvec2>*>> d_systems;
 	vector<uint64> time_stamps;
@@ -37,7 +37,7 @@ struct ParticleSimulation : QGraphicsScene {
 
 	uint64 frame_count;
 
-	ParticleSimulation(const map<string, dvec1>& args, QMainWindow* parent = nullptr) :
+	ParticleSimulation(const unordered_map<string, dvec1>& args, QMainWindow* parent = nullptr) :
 		args(args),
 		QGraphicsScene(parent)
 	{
@@ -100,8 +100,12 @@ struct ParticleSimulation : QGraphicsScene {
 				f_system_data[i][f_particle] = tuple<vector<vec2>, vector<vec2>, vector<vec2>, vector<vec1>, vector<vec1>>({});
 				d_system_data[i][d_particle] = tuple<vector<dvec2>, vector<dvec2>, vector<dvec2>, vector<dvec1>, vector<dvec1>>({});
 			}
-			f_params[d_to_ul(args.at("Shifter"))]->setCenter(f_params[d_to_ul(args.at("Shifter"))]->params.center + vec2(args.at("Shift X"), args.at("Shift Y")) * ul_to_f(i));
-			d_params[d_to_ul(args.at("Shifter"))]->setCenter(d_params[d_to_ul(args.at("Shifter"))]->params.center + dvec2(args.at("Shift X"), args.at("Shift Y")) * ul_to_d(i));
+			f_params[d_to_ul(args.at("Shifter"))]->setCenter(f_params[d_to_ul(args.at("Shifter"))]->params.center + vec2(args.at("Shift Pos X"), args.at("Shift Pos Y")) * ul_to_f(i));
+			d_params[d_to_ul(args.at("Shifter"))]->setCenter(d_params[d_to_ul(args.at("Shifter"))]->params.center + dvec2(args.at("Shift Pos X"), args.at("Shift Pos Y")) * ul_to_d(i));
+
+			f_params[d_to_ul(args.at("Shifter"))]->params.velocity += (vec2(args.at("Shift Vel X"), args.at("Shift Vel Y")) * ul_to_f(i));
+			d_params[d_to_ul(args.at("Shifter"))]->params.velocity += (dvec2(args.at("Shift Vel X"), args.at("Shift Vel Y")) * ul_to_d(i));
+
 			f_systems.push_back(f_params);
 			d_systems.push_back(d_params);
 		}
@@ -128,12 +132,15 @@ struct ParticleSimulation : QGraphicsScene {
 	}
 
 	void update_particles(const dvec1& delta_time) {
-		for (uint64 i = 0; i < f_systems.size(); ++i) {
-			for (uint64 j = 0; j < f_systems[i].size(); ++j) {
+		const uint system_count = f_system_data.size();
+		const uint particle_count = f_system_data[0].size();
+
+		for (uint i = 0; i < system_count; ++i) {
+			for (uint j = 0; j < particle_count; ++j) {
 				auto& f_particle_a = f_systems[i][j];
 				f_particle_a->tick(d_to_f(delta_time), bounding_box, d_to_f(- bounding_box.width() * 0.6));
 
-				for (uint64 k = j + 1; k < f_systems[i].size(); ++k) {
+				for (uint k = j + 1; k < particle_count; ++k) {
 					auto& f_particle_b = f_systems[i][k];
 					f_particle_a->handle_particle_collision(f_particle_b);
 				}
@@ -146,7 +153,7 @@ struct ParticleSimulation : QGraphicsScene {
 				auto& d_particle_a = d_systems[i][j];
 				d_particle_a->tick(delta_time, bounding_box, bounding_box.width() * 0.6);
 
-				for (uint64 k = j + 1; k < d_systems[i].size(); ++k) {
+				for (uint k = j + 1; k < particle_count; ++k) {
 					auto& d_particle_b = d_systems[i][k];
 					d_particle_a->handle_particle_collision(d_particle_b);
 				}
@@ -174,8 +181,8 @@ struct ParticleSimulation : QGraphicsScene {
 };
 
 struct MainWindow : QMainWindow {
-	map<string, dvec1> args;
-	MainWindow(const map<string, dvec1>& args) :
+	unordered_map<string, dvec1> args;
+	MainWindow(const unordered_map<string, dvec1>& args) :
 		args(args),
 		QMainWindow()
 	{
@@ -192,7 +199,7 @@ struct MainWindow : QMainWindow {
 		view->setTransform(transform);
 		showMaximized();
 
-		QTimer::singleShot(1000, this, &MainWindow::init);
+		QTimer::singleShot(d_to_ul(this->args["Delay"] * 1000.0), this, &MainWindow::init);
 		QTimer::singleShot(100, this, [this]() { view->fitInView(simulation->rect_item, Qt::AspectRatioMode::KeepAspectRatio); });
 	}
 
@@ -664,15 +671,16 @@ private:
 int main(int argc, char* argv[]) {
 	SetConsoleOutputCP(65001);
 	QApplication::setAttribute(Qt::ApplicationAttribute::AA_NativeWindows);
-	QApplication::setAttribute(Qt::ApplicationAttribute::AA_UseDesktopOpenGL);
 
 	QApplication* application = new QApplication(argc, argv);
 
-	map<string, dvec1> args = {};
+	unordered_map<string, dvec1> args = {};
 	args["System Count"] = 4;
 	args["Shifter"] = 1;
-	args["Shift X"] = 1e-8;
-	args["Shift Y"] = 0;
+	args["Shift Pos X"] = 1e-8;
+	args["Shift Pos Y"] = 0;
+	args["Shift Vel X"] = 0;
+	args["Shift Vel Y"] = 0;
 	args["Gravity X"] = 0.0;
 	args["Gravity Y"] = -9.81;
 	args["Sliding Friction"] = 0.3;
@@ -687,15 +695,19 @@ int main(int argc, char* argv[]) {
 	args["Time Scale"] = 5.0;
 	args["Delta"] = 0.01;
 	args["Realtime"] = 0;
+	args["Delay"] = 1.5;
 
 	for (int i = 1; i < argc; ++i) {
 		if (strcmp(argv[i], "--system-count") == 0 && i + 1 < argc) {
 			args["System Count"] = str_to_d(argv[++i]);
 		} else if (strcmp(argv[i], "--shift-index") == 0 && i + 2 < argc) {
 			args["Shifter"] = str_to_d(argv[++i]);
-		} else if (strcmp(argv[i], "--shift") == 0 && i + 1 < argc) {
-			args["Shift X"] = str_to_d(argv[++i]);
-			args["Shift Y"] = str_to_d(argv[++i]);
+		} else if (strcmp(argv[i], "--shift-pos") == 0 && i + 1 < argc) {
+			args["Shift Pos X"] = str_to_d(argv[++i]);
+			args["Shift Pos Y"] = str_to_d(argv[++i]);
+		} else if (strcmp(argv[i], "--shift-vel") == 0 && i + 1 < argc) {
+			args["Shift Vel X"] = str_to_d(argv[++i]);
+			args["Shift Vel Y"] = str_to_d(argv[++i]);
 		} else if (strcmp(argv[i], "--duration") == 0 && i + 1 < argc) {
 			args["Duration"] = str_to_d(argv[++i]);
 		} else if (strcmp(argv[i], "--gravity") == 0 && i + 1 < argc) {
@@ -707,6 +719,8 @@ int main(int argc, char* argv[]) {
 			args["Rolling Friction"] = str_to_d(argv[++i]);
 		} else if (strcmp(argv[i], "--time-scale") == 0 && i + 1 < argc) {
 			args["Time Scale"] = str_to_d(argv[++i]);
+		} else if (strcmp(argv[i], "--delay") == 0 && i + 1 < argc) {
+			args["Delay"] = str_to_d(argv[++i]);
 		} else if (strcmp(argv[i], "--particle-opacity") == 0 && i + 1 < argc) {
 			args["Opacity"] = str_to_d(argv[++i]);
 		} else if (strcmp(argv[i], "--bounds") == 0 && i + 1 < argc) {
