@@ -7,9 +7,9 @@
 int main(int argc, char* argv[]) {
 	SetConsoleOutputCP(65001);
 
-	vec1  sphereRadius = 0.05f;
+	vec1  sphereRadius = 0.015f;
 	vec1  sphereDisplayRadius = sphereRadius;
-	uint  particleCount = 32;
+	uint  particleCount = 128;
 	vec1  renderScale = 0.5f;
 	bool  openmp = false;
 

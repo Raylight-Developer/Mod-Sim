@@ -217,7 +217,8 @@ void Renderer::f_pipeline() {
 	buffers["raw"] = renderLayer(render_resolution);
 
 	glBindVertexArray(VAO);
-	point_cloud = vector(PARTICLE_COUNT, Particle());
+	point_cloud = vector(PARTICLE_COUNT, GPU_Particle());
+	initialize(point_cloud);
 }
 
 void Renderer::f_tickUpdate() {
@@ -226,7 +227,7 @@ void Renderer::f_tickUpdate() {
 	sim_delta = glfwGetTime() - current_omp_time;
 
 	glDeleteBuffers(1, &buffers["ssbo"]);
-	buffers["ssbo"] = ssboBinding(1, ul_to_u(point_cloud.size() * sizeof(Particle)), point_cloud.data());
+	buffers["ssbo"] = ssboBinding(1, ul_to_u(point_cloud.size() * sizeof(GPU_Particle)), point_cloud.data());
 }
 
 void Renderer::guiLoop() {

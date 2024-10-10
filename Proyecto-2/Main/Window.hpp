@@ -19,7 +19,7 @@ struct Renderer {
 	vec1  RENDER_SCALE;
 	bool  OPENMP;
 
-	vector<Particle> point_cloud;
+	vector<GPU_Particle> point_cloud;
 
 	Transform camera_transform;
 

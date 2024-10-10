@@ -1,10 +1,28 @@
 #include "Kernel.hpp"
 
-void simulate(vector<Particle>& points, const vec1& particle_size,const vec1& time, const bool& openmp) {
+void initialize(vector<GPU_Particle>& points) {
+	float radius = 0.5;
+
 	uint i = 0;
-	for (Particle& particle: points) {
-		particle.pos = vec4(sin(time + float(i) * 0.1f), cos(time + float(i) * 0.1f), 0, 0) * 0.25f;
+	for (GPU_Particle& particle: points) {
 		particle.color = vec4(1, 1, 1, 1);
+
+		const float angle = i * (glm::pi<float>() * (3.0 - sqrt(5.0)));
+		const float r = radius * sqrt(i / (float)(points.size() - 1));
+
+		const float x = r * cos(angle);
+		const float y = r * sin(angle);
+
+		points[i].pos = vec4(x, 0, y, 1);
+		i++;
+	}
+}
+
+void simulate(vector<GPU_Particle>& points, const vec1& particle_size,const vec1& time, const bool& openmp) {
+	uint i = 0;
+	for (GPU_Particle& particle: points) {
+		//particle.pos = vec4(sin(time + float(i) * 0.1f), cos(time + float(i) * 0.1f), 0, 0) * 0.25f;
+		particle.color = vec4(sin(time), 1, cos(time), 1);
 		i++;
 	}
 }

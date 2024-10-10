@@ -13,6 +13,7 @@ struct alignas(16) GPU_Particle {
 	vec4 color;
 };
 
+void initialize(vector<GPU_Particle>& points);
 void simulate(vector<GPU_Particle>& points, const vec1& particle_size,  const vec1& time, const bool& openmp);
 
 enum struct Rotation_Type {
