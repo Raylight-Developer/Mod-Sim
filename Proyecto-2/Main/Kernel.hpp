@@ -3,18 +3,46 @@
 #include "Shared.hpp"
 
 struct CPU_Particle {
-	vec3 pos;
-	vec3 velocity;
-	vec3 acceleration;
+	dvec3 pos;
+	dvec3 velocity;
+	dvec3 acceleration;
 };
 
 struct alignas(16) GPU_Particle {
 	vec4 pos;
 	vec4 color;
+
+	GPU_Particle(const CPU_Particle& particle);
 };
 
-void initialize(vector<GPU_Particle>& points);
-void simulate(vector<GPU_Particle>& points, const vec1& particle_size,  const vec1& time, const bool& openmp);
+struct CPU_Cell {
+	vec2 velocity;
+	vec1 pressure;
+	vec1 density;
+};
+
+struct GPU_Cell {
+	vec2 velocity;
+	vec1 pressure;
+	vec1 density;
+
+	GPU_Cell();
+	GPU_Cell(const CPU_Cell& cell);
+};
+
+using Grid = vector<vector<vector<CPU_Cell>>>;
+
+dvec3 velocityToColor(const dvec3& velocity);
+void  initialize(vector<CPU_Particle>& points);
+void  simulate(vector<CPU_Particle>& points, const dvec1& time, const bool& openmp);
+
+void initialize(Grid& grid, const ulvec3& size);
+void advection (Grid& grid, const ulvec3& size);
+void diffusion (Grid& grid, const ulvec3& size);
+void projection(Grid& grid, const ulvec3& size);
+
+void forceSolve(Grid& grid, const ulvec3& size);
+void pressureSolve(Grid& grid, const ulvec3& size);
 
 enum struct Rotation_Type {
 	QUATERNION,

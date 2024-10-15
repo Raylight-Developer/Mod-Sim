@@ -13,13 +13,14 @@
 struct Renderer {
 	GLFWwindow* window;
 
-	vec1  SPHERE_RADIUS;
-	vec1  SPHERE_DISPLAY_RADIUS;
-	uint  PARTICLE_COUNT;
-	vec1  RENDER_SCALE;
-	bool  OPENMP;
+	dvec1  SPHERE_RADIUS;
+	dvec1  SPHERE_DISPLAY_RADIUS;
+	uint   PARTICLE_COUNT;
+	dvec1  RENDER_SCALE;
+	ulvec3 GRID_SIZE;
 
-	vector<GPU_Particle> point_cloud;
+	vector<CPU_Particle> cpu_point_cloud;
+	Grid cpu_grid;
 
 	Transform camera_transform;
 
@@ -55,13 +56,7 @@ struct Renderer {
 
 	unordered_map<string, GLuint> buffers;
 
-	Renderer(
-		const vec1& SPHERE_RADIUS = 0.01f,
-		const vec1& SPHERE_DISPLAY_RADIUS = 0.01 * 0.5f * 1.5f,
-		const uint& PARTICLE_COUNT = 32,
-		const vec1& RENDER_SCALE = 0.125,
-		const bool& OPENMP = false
-	);
+	Renderer();
 
 	void init();
 	void quit();

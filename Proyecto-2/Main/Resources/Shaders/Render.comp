@@ -19,6 +19,22 @@ bool f_raySphereIntersection(in Ray ray, in vec3 sphere, out float t) {
 	return true;
 }
 
+bool f_rayAABBIntersection(in Ray ray, in AABB box) {
+	vec3 tMin = (box.pmin - ray.origin) * ray.direction;
+	vec3 tMax = (box.pmax - ray.origin) * ray.direction;
+
+	vec3 t1 = min(tMin, tMax);
+	vec3 t2 = max(tMin, tMax);
+
+	float tNear = max(max(t1.x, t1.y), t1.z);
+	float tFar = min(min(t2.x, t2.y), t2.z);
+
+	if (tNear > tFar || tFar < 0.0) {
+		return false;
+	}
+	return true;
+}
+
 Ray f_cameraRay(vec2 uv) {
 	return Ray(camera_pos, normalize(camera_p_uv + (camera_p_u * uv.x) + (camera_p_v * uv.y) - camera_pos));
 }
@@ -28,19 +44,44 @@ void main() {
 	vec2 uv = (pixel_id - 1 - vec2(resolution) / 2.0) / float(max(resolution.x, resolution.y));
 
 	Ray ray = f_cameraRay(uv);
+	ray.direction = 1.0 / ray.direction;
 
-	float t_length = MAX_DIST;
-	float t_dist = MAX_DIST;
+//	float t_length = MAX_DIST;
+//	float t_dist = MAX_DIST;
+//	vec4 color = vec4(0,0,0,1);
+//
+//	for (uint i = 0; i < point_cloud.length(); i++) {
+//		if (f_raySphereIntersection(ray, point_cloud[i].pos.xyz, t_dist)) {
+//			if (t_dist < t_length && t_dist > EPSILON) {
+//				t_length = t_dist;
+//				color = point_cloud[i].col;
+//			}
+//		}
+//	}
+	vec3 half_grid_size = vec3(grid_size / 2) * cell_size;
+	
+	vec4 color_step = vec4(vec3(1.0 / (max(max(grid_size.x, grid_size.y), grid_size.z)) * 0.5), 0.0);
 	vec4 color = vec4(0,0,0,1);
+	for (uint x = 0; x < grid_size.x; ++x) {
+		for (uint y = 0; y < grid_size.y; ++y) {
+			for (uint z = 0; z < grid_size.z; ++z) {
+				AABB box;
+				box.pmin = vec3(x, y, z) * cell_size - half_grid_size ;
+				box.pmax = box.pmin + cell_size;
 
-	for (uint i = 0; i < point_cloud.length(); i++) {
-		if (f_raySphereIntersection(ray, point_cloud[i].pos.xyz, t_dist)) {
-			if (t_dist < t_length && t_dist > EPSILON) {
-				t_length = t_dist;
-				color = point_cloud[i].col;
+				if (f_rayAABBIntersection(ray, box)) {
+					uint index = x * (grid_size.y * grid_size.z) + y * grid_size.z + z;
+					Cell cell = grid[index];
+
+					//color += vec4(vec3(cell.density *0.05f), 0.0);
+					if (cell.density > 0) {
+						color += color_step;
+					}
+				}
 			}
 		}
 	}
 
+	color = clamp(color, 0.0, 1.0);
 	imageStore(raw_render_layer, pixel_id, color);
 }

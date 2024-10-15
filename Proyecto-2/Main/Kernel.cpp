@@ -1,13 +1,52 @@
 #include "Kernel.hpp"
 
-void initialize(vector<GPU_Particle>& points) {
+
+GPU_Particle::GPU_Particle(const CPU_Particle& particle) :
+	pos(vec4(d_to_f(particle.pos), 1.0f)),
+	color(vec4(d_to_f(velocityToColor(particle.velocity)), 1.0f))
+{}
+
+GPU_Cell::GPU_Cell() {
+	velocity = vec2(0.0f);
+	pressure = 0.0f;
+	density = 0.0f;
+}
+
+GPU_Cell::GPU_Cell(const CPU_Cell& cell) {
+	velocity = cell.velocity;
+	pressure = cell.pressure;
+	density = cell.density;
+}
+
+dvec3 velocityToColor(const dvec3& velocity) {
+	const dvec1 maxSpeed = 10.0;
+	dvec1 speed = glm::length(velocity);
+
+	speed = glm::clamp(speed, 0.0, maxSpeed);
+	const dvec1 normalizedSpeed = speed / maxSpeed;
+	dvec3 color;
+
+	if (normalizedSpeed <= 0.5) {
+		dvec1 t = normalizedSpeed * 2.0;
+		color = glm::mix(dvec3(0.0, 0.0, 1.0), dvec3(0.0, 1.0, 0.0), t);
+	}
+	else {
+		dvec1 t = (normalizedSpeed - 0.5) * 2.0;
+		color = glm::mix(dvec3(0.0, 1.0, 0.0), dvec3(1.0, 0.0, 0.0), t);
+	}
+
+	return color;
+}
+
+void initialize(vector<CPU_Particle>& points) {
 	float radius = 0.5;
 
 	uint i = 0;
-	for (GPU_Particle& particle: points) {
-		particle.color = vec4(1, 1, 1, 1);
+	for (CPU_Particle& particle: points) {
+		//particle.color = vec4(1, 1, 1, 1);
+		particle.velocity = dvec3(0.01, 0.01, 0);
 
-		const float angle = i * (glm::pi<float>() * (3.0 - sqrt(5.0)));
+		const float angle = i * (glm::pi<float>() * (3.0f - sqrt(5.0f)));
 		const float r = radius * sqrt(i / (float)(points.size() - 1));
 
 		const float x = r * cos(angle);
@@ -18,12 +57,32 @@ void initialize(vector<GPU_Particle>& points) {
 	}
 }
 
-void simulate(vector<GPU_Particle>& points, const vec1& particle_size,const vec1& time, const bool& openmp) {
+void simulate(vector<CPU_Particle>& points, const dvec1& time, const bool& openmp) {
 	uint i = 0;
-	for (GPU_Particle& particle: points) {
-		//particle.pos = vec4(sin(time + float(i) * 0.1f), cos(time + float(i) * 0.1f), 0, 0) * 0.25f;
-		particle.color = vec4(sin(time), 1, cos(time), 1);
+	for (CPU_Particle& particle: points) {
+		//particle.pos += particle.velocity * time;
 		i++;
+	}
+}
+
+void initialize(Grid& grid, const ulvec3& size) {
+	vec3 center = vec3(size.x / 2.0, size.y / 2.0, size.z / 2.0);
+	float max_distance = glm::max(glm::max(size.x / 2.0, size.y / 2.0), size.z / 2.0);
+
+	for (uint64 x = 0; x < size.x; ++x) {
+		for (uint64 y = 0; y < size.y; ++y) {
+			for (uint64 z = 0; z < size.z; ++z) {
+				CPU_Cell& cell = grid[x][y][z];
+
+				vec3 current_pos = vec3(x, y, z);
+				float distance = glm::length(current_pos - center);
+				if (distance <= max_distance) {
+					cell.density = 1.0f;
+				} else {
+					cell.density = 0.0f;
+				}
+			}
+		}
 	}
 }
 

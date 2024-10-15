@@ -6,20 +6,14 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "External/stb_image.h"
 
-Renderer::Renderer(
-	const vec1& SPHERE_RADIUS,
-	const vec1& SPHERE_DISPLAY_RADIUS,
-	const uint& PARTICLE_COUNT,
-	const vec1& RENDER_SCALE,
-	const bool& OPENMP
-) :
-	SPHERE_RADIUS(SPHERE_RADIUS),
-	SPHERE_DISPLAY_RADIUS(SPHERE_DISPLAY_RADIUS),
-	PARTICLE_COUNT(PARTICLE_COUNT),
-	RENDER_SCALE(RENDER_SCALE),
-	OPENMP(OPENMP)
-{
+Renderer::Renderer() {
 	window = nullptr;
+
+	SPHERE_RADIUS = 0.01;
+	SPHERE_DISPLAY_RADIUS = 0.01;
+	RENDER_SCALE = 0.5;
+	PARTICLE_COUNT = 32;
+	GRID_SIZE = ulvec3(16);
 
 	camera_transform = Transform(dvec3(0, 0, 4));
 
@@ -48,6 +42,7 @@ Renderer::Renderer(
 	current_time = 0.0;
 	window_time = 0.0;
 	frame_time = FPS_60;
+	sim_delta = FPS_60 / 2.0;
 	last_time = 0.0;
 
 	view_layer = 0;
@@ -217,17 +212,37 @@ void Renderer::f_pipeline() {
 	buffers["raw"] = renderLayer(render_resolution);
 
 	glBindVertexArray(VAO);
-	point_cloud = vector(PARTICLE_COUNT, GPU_Particle());
-	initialize(point_cloud);
+	cpu_point_cloud = vector(PARTICLE_COUNT, CPU_Particle());
+	cpu_grid = vector(GRID_SIZE.x, vector(GRID_SIZE.y, vector(GRID_SIZE.z, CPU_Cell())));
+	initialize(cpu_point_cloud);
+	initialize(cpu_grid, GRID_SIZE);
 }
 
 void Renderer::f_tickUpdate() {
-	const dvec1 current_omp_time = glfwGetTime();
-	simulate(point_cloud, SPHERE_RADIUS, d_to_f(current_time), OPENMP);
-	sim_delta = glfwGetTime() - current_omp_time;
+	const dvec1 start = glfwGetTime();
 
-	glDeleteBuffers(1, &buffers["ssbo"]);
-	buffers["ssbo"] = ssboBinding(1, ul_to_u(point_cloud.size() * sizeof(GPU_Particle)), point_cloud.data());
+	//simulate(cpu_point_cloud, SPHERE_RADIUS, current_time);
+
+	sim_delta = glfwGetTime() - start;
+
+	glDeleteBuffers(1, &buffers["particles"]);
+	vector<GPU_Particle> gpu_point_cloud;
+	for (const CPU_Particle& particle : cpu_point_cloud) {
+		gpu_point_cloud.push_back(GPU_Particle(particle));
+	}
+	buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
+
+	glDeleteBuffers(1, &buffers["cells"]);
+	vector<GPU_Cell> gpu_grid(GRID_SIZE.x * GRID_SIZE.y * GRID_SIZE.z);
+	for (uint64 x = 0; x < GRID_SIZE.x; ++x) {
+		for (uint64 y = 0; y < GRID_SIZE.y; ++y) {
+			for (uint64 z = 0; z < GRID_SIZE.z; ++z) {
+				uint64 index = x * (GRID_SIZE.y * GRID_SIZE.z) + y * GRID_SIZE.z + z;
+				gpu_grid[index] = GPU_Cell(cpu_grid[x][y][z]);
+			}
+		}
+	}
+	buffers["cells"] = ssboBinding(2, ul_to_u(gpu_grid.size() * sizeof(GPU_Cell)), gpu_grid.data());
 }
 
 void Renderer::guiLoop() {
@@ -240,10 +255,7 @@ void Renderer::guiLoop() {
 
 	ImGui::Begin("Info");
 	ImGui::Text(("Avg. Frame Delta: " + to_str(current_time / ul_to_d(runframe), 5) + "ms").c_str());
-	if (OPENMP)
-		ImGui::Text(("Avg. OpenMp Delta: " + to_str(sim_deltas / ul_to_d(runframe), 5) + "ms").c_str());
-	else
-		ImGui::Text(("Avg. Sequential Delta: " + to_str(sim_deltas / ul_to_d(runframe), 5) + "ms").c_str());
+	ImGui::Text(("Avg. Sim Delta: " + to_str(sim_deltas / ul_to_d(runframe), 5) + "ms").c_str());
 
 	const dvec1 percent = (sim_deltas / current_time) * 100.0;
 	ImGui::Text(("~CPU[" + to_str(percent, 2) + "]%%").c_str());
@@ -322,20 +334,22 @@ void Renderer::displayLoop() {
 		GLuint compute_program = buffers["compute"];
 
 		glUseProgram(compute_program);
-		glUniform1ui(glGetUniformLocation(compute_program, "frame_count"), ul_to_u(runframe));
-		glUniform1f (glGetUniformLocation(compute_program, "aspect_ratio"), d_to_f(render_aspect_ratio));
-		glUniform1f (glGetUniformLocation(compute_program, "current_time"), d_to_f(current_time));
-		glUniform2ui(glGetUniformLocation(compute_program, "resolution"), render_resolution.x, render_resolution.y);
-		glUniform1ui(glGetUniformLocation(compute_program, "reset"), static_cast<GLuint>(reset));
-		glUniform1ui(glGetUniformLocation(compute_program, "debug"), static_cast<GLuint>(debug));
+		glUniform1ui (glGetUniformLocation(compute_program, "frame_count"), ul_to_u(runframe));
+		glUniform1f  (glGetUniformLocation(compute_program, "aspect_ratio"), d_to_f(render_aspect_ratio));
+		glUniform1f  (glGetUniformLocation(compute_program, "current_time"), d_to_f(current_time));
+		glUniform2ui (glGetUniformLocation(compute_program, "resolution"), render_resolution.x, render_resolution.y);
+		glUniform1ui (glGetUniformLocation(compute_program, "reset"), static_cast<GLuint>(reset));
+		glUniform1ui (glGetUniformLocation(compute_program, "debug"), static_cast<GLuint>(debug));
 
-		glUniform3fv(glGetUniformLocation(compute_program, "camera_pos"),  1, value_ptr(d_to_f(camera_transform.position)));
-		glUniform3fv(glGetUniformLocation(compute_program, "camera_p_uv"), 1, value_ptr(projection_center));
-		glUniform3fv(glGetUniformLocation(compute_program, "camera_p_u"),  1, value_ptr(projection_u));
-		glUniform3fv(glGetUniformLocation(compute_program, "camera_p_v"),  1, value_ptr(projection_v));
+		glUniform3fv (glGetUniformLocation(compute_program, "camera_pos"),  1, value_ptr(d_to_f(camera_transform.position)));
+		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_uv"), 1, value_ptr(projection_center));
+		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_u"),  1, value_ptr(projection_u));
+		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"),  1, value_ptr(projection_v));
 
-		glUniform1f(glGetUniformLocation(compute_program, "sphere_radius"), SPHERE_RADIUS);
-		glUniform1f(glGetUniformLocation(compute_program, "sphere_display_radius"), SPHERE_DISPLAY_RADIUS);
+		glUniform3ui (glGetUniformLocation(compute_program, "grid_size"), ul_to_u(GRID_SIZE.x),  ul_to_u(GRID_SIZE.y),  ul_to_u(GRID_SIZE.z));
+		glUniform1f  (glGetUniformLocation(compute_program, "cell_size"), 0.1f);
+		glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), SPHERE_RADIUS);
+		glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), SPHERE_DISPLAY_RADIUS);
 
 		glBindImageTexture(0, buffers["raw"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
@@ -358,8 +372,10 @@ void Renderer::displayLoop() {
 		runframe++;
 		if (reset) reset = false;
 		if (recompile) {
-			compute_program = computeShaderProgram("Render");
-			display_program = fragmentShaderProgram("Display");
+			glDeleteProgram(buffers["compute"]);
+			glDeleteProgram(buffers["display"]);
+			buffers["compute"] = computeShaderProgram("Render");
+			buffers["display"] = fragmentShaderProgram("Display");
 			recompile = false;
 		}
 

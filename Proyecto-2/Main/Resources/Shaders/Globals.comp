@@ -4,16 +4,19 @@ struct Particle {
 	vec4 pos;
 	vec4 col;
 };
+
+struct Cell {
+	vec2  velocity;
+	float pressure;
+	float density;
+};
 // INTERNAL ---------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 struct AABB {
 	vec3 pmin;
 	vec3 pmax;
 };
-struct BVH {
-	AABB box;
-	uvec2 rows;
-};
+
 struct Ray {
 	vec3  origin;
 	vec3  direction;
