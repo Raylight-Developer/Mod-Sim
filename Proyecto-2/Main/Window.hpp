@@ -18,6 +18,7 @@ struct Renderer {
 	uint   PARTICLE_COUNT;
 	dvec1  RENDER_SCALE;
 	ulvec3 GRID_SIZE;
+	dvec1  CELL_SIZE;
 
 	vector<CPU_Particle> cpu_point_cloud;
 	Grid cpu_grid;

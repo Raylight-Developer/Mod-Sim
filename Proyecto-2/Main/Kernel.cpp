@@ -7,13 +7,15 @@ GPU_Particle::GPU_Particle(const CPU_Particle& particle) :
 {}
 
 GPU_Cell::GPU_Cell() {
-	velocity = vec2(0.0f);
+	velocity = vec3(0.0f);
+	acceleration = vec3(0.0f);
 	pressure = 0.0f;
 	density = 0.0f;
 }
 
 GPU_Cell::GPU_Cell(const CPU_Cell& cell) {
 	velocity = cell.velocity;
+	acceleration = cell.acceleration;
 	pressure = cell.pressure;
 	density = cell.density;
 }
@@ -36,6 +38,13 @@ dvec3 velocityToColor(const dvec3& velocity) {
 	}
 
 	return color;
+}
+
+dvec1 randD() {
+	static std::random_device rd;
+	static std::mt19937 gen(rd());
+	uniform_real_distribution<dvec1> dis(0.0, 1.0);
+	return dis(gen);
 }
 
 void initialize(vector<CPU_Particle>& points) {
@@ -66,24 +75,101 @@ void simulate(vector<CPU_Particle>& points, const dvec1& time, const bool& openm
 }
 
 void initialize(Grid& grid, const ulvec3& size) {
-	vec3 center = vec3(size.x / 2.0, size.y / 2.0, size.z / 2.0);
-	float max_distance = glm::max(glm::max(size.x / 2.0, size.y / 2.0), size.z / 2.0);
+	dvec3 center = dvec3(size.x / 2.0, size.y / 2.0, size.z / 2.0);
+	dvec1 max_distance = glm::max(glm::max(size.x, size.y), size.z) / 2.0;
 
 	for (uint64 x = 0; x < size.x; ++x) {
 		for (uint64 y = 0; y < size.y; ++y) {
 			for (uint64 z = 0; z < size.z; ++z) {
 				CPU_Cell& cell = grid[x][y][z];
 
-				vec3 current_pos = vec3(x, y, z);
-				float distance = glm::length(current_pos - center);
+				dvec3 current_pos = dvec3(x, y, z);
+				dvec1 distance = glm::length(current_pos - center);
 				if (distance <= max_distance) {
-					cell.density = 1.0f;
+					cell.density = 1.0f - (distance / max_distance);
 				} else {
 					cell.density = 0.0f;
+				}
+				cell.density += randD() * 0.5;
+				cell.velocity = vec3(randD(), randD(), randD()) * 2.0f - 1.0f;
+				cell.acceleration = vec3(0);
+			}
+		}
+	}
+}
+
+void simulate(Grid& grid, const ulvec3& size, const dvec1& delta_time) {
+	//for (uint64 x = 0; x < size.x; ++x) {
+	//	for (uint64 y = 0; y < size.y; ++y) {
+	//		for (uint64 z = 0; z < size.z; ++z) {
+	//			CPU_Cell& cell = grid[x][y][z];
+	//			//cell.velocity += cell.acceleration * static_cast<float>(delta_time);
+	//		}
+	//	}
+	//}
+	forceSolve(grid, size, delta_time);
+}
+
+void forceSolve(Grid& grid, const ulvec3& size, const dvec1& delta_time) {
+	for (uint64 x = 0; x < size.x; ++x) {
+		for (uint64 y = 0; y < size.y; ++y) {
+			for (uint64 z = 0; z < size.z; ++z) {
+				ulvec3 pos = ulvec3(x, y, z);
+				CPU_Cell& cell = grid[x][y][z];
+
+				vec3 cell_position = vec3(x, y, z);
+				vec3 tornado_center = vec3(size.x / 2.0, size.y / 2.0, size.z / 2.0);
+				vec1 vortex_radius = 32.0;
+				vec1 tornado_strength = 1.0;
+				vec3 to_center = tornado_center - cell_position;
+				float distance_to_center = glm::length(to_center);
+
+				// If within the vortex radius, apply tornado forces
+				if (distance_to_center < vortex_radius) {
+					// Normalize the vector to center
+					vec3 direction_to_center = glm::normalize(to_center);
+
+					// Apply inward force (toward the tornado center)
+					vec3 inward_force = direction_to_center * tornado_strength * (1.0f - (distance_to_center / vortex_radius));
+
+					// Apply rotational force (perpendicular to the inward force, creating a spiral)
+					vec3 rotational_direction = glm::cross(direction_to_center, vec3(0, 1, 0));  // Rotate around the y-axis (upward)
+					vec3 rotational_force = rotational_direction * tornado_strength * (1.0f - (distance_to_center / vortex_radius));
+
+					// Sum of forces: inward + rotational
+					vec3 total_force = inward_force + rotational_force;
+
+					// Update cell's acceleration based on the total force applied
+					cell.acceleration += total_force;
+
+					// Update velocity based on acceleration and delta time (simple integration)
+					cell.velocity += cell.acceleration * d_to_f(delta_time);
+
+					// Optionally, reset acceleration after each step if you're accumulating forces
+					cell.acceleration = vec3(0.0f);
 				}
 			}
 		}
 	}
+}
+
+vec3 vorticitySolve(const Grid& grid, const ulvec3& pos, const ulvec3& size) {
+	vec3 vorticity(0.0f);
+
+	if (pos.x > 0 && pos.x < size.x - 1 && pos.y > 0 && pos.y < size.y - 1 && pos.z > 0 && pos.z < size.z - 1) {
+		vec3 vel_right = grid[pos.x + 1][pos.y][pos.z].velocity;
+		vec3 vel_left = grid[pos.x - 1][pos.y][pos.z].velocity;
+		vec3 vel_up = grid[pos.x][pos.y + 1][pos.z].velocity;
+		vec3 vel_down = grid[pos.x][pos.y - 1][pos.z].velocity;
+		vec3 vel_front = grid[pos.x][pos.y][pos.z + 1].velocity;
+		vec3 vel_back = grid[pos.x][pos.y][pos.z - 1].velocity;
+
+		vorticity.x = (vel_front.y - vel_back.y) - (vel_up.z - vel_down.z);
+		vorticity.y = (vel_right.z - vel_left.z) - (vel_front.x - vel_back.x);
+		vorticity.z = (vel_up.x - vel_down.x) - (vel_right.y - vel_left.y);
+	}
+
+	return vorticity;
 }
 
 Transform::Transform(const dvec3& position, const dvec3& rotation, const dvec3& scale, const Rotation_Type& type) :

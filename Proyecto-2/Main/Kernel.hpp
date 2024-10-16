@@ -16,14 +16,16 @@ struct alignas(16) GPU_Particle {
 };
 
 struct CPU_Cell {
-	vec2 velocity;
+	vec3 velocity;
+	vec3 acceleration;
 	vec1 pressure;
 	vec1 density;
 };
 
 struct GPU_Cell {
-	vec2 velocity;
+	vec3 velocity;
 	vec1 pressure;
+	vec3 acceleration;
 	vec1 density;
 
 	GPU_Cell();
@@ -31,19 +33,26 @@ struct GPU_Cell {
 };
 
 using Grid = vector<vector<vector<CPU_Cell>>>;
-
 dvec3 velocityToColor(const dvec3& velocity);
+dvec1 randD();
+
+// Particles
 void  initialize(vector<CPU_Particle>& points);
 void  simulate(vector<CPU_Particle>& points, const dvec1& time, const bool& openmp);
 
+//Grid
 void initialize(Grid& grid, const ulvec3& size);
-void advection (Grid& grid, const ulvec3& size);
-void diffusion (Grid& grid, const ulvec3& size);
-void projection(Grid& grid, const ulvec3& size);
+void simulate  (Grid& grid, const ulvec3& size, const dvec1& delta_time);
+void advection (Grid& grid, const ulvec3& size, const dvec1& delta_time);
+void diffusion (Grid& grid, const ulvec3& size, const dvec1& delta_time);
+void projection(Grid& grid, const ulvec3& size, const dvec1& delta_time);
 
-void forceSolve(Grid& grid, const ulvec3& size);
-void pressureSolve(Grid& grid, const ulvec3& size);
+void forceSolve(Grid& grid, const ulvec3& size, const dvec1& delta_time);
+void pressureSolve(Grid& grid, const ulvec3& size, const dvec1& delta_time);
 
+vec3 vorticitySolve(const Grid& grid, const ulvec3& pos, const ulvec3& size);
+
+//Util
 enum struct Rotation_Type {
 	QUATERNION,
 	AXIS,

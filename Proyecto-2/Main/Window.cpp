@@ -13,9 +13,10 @@ Renderer::Renderer() {
 	SPHERE_DISPLAY_RADIUS = 0.01;
 	RENDER_SCALE = 0.5;
 	PARTICLE_COUNT = 32;
-	GRID_SIZE = ulvec3(16);
+	GRID_SIZE = ulvec3(64, 1, 64);
+	CELL_SIZE = 1.0 / glm::max(glm::max(GRID_SIZE.x, GRID_SIZE.y), GRID_SIZE.z);
 
-	camera_transform = Transform(dvec3(0, 0, 4));
+	camera_transform = Transform(dvec3(0, 4, 0), dvec3(-90.0, 0, 0.0));
 
 	frame_counter = 0;
 	frame_count = 0;
@@ -221,7 +222,7 @@ void Renderer::f_pipeline() {
 void Renderer::f_tickUpdate() {
 	const dvec1 start = glfwGetTime();
 
-	//simulate(cpu_point_cloud, SPHERE_RADIUS, current_time);
+	simulate(cpu_grid, GRID_SIZE, frame_time);
 
 	sim_delta = glfwGetTime() - start;
 
@@ -347,7 +348,7 @@ void Renderer::displayLoop() {
 		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"),  1, value_ptr(projection_v));
 
 		glUniform3ui (glGetUniformLocation(compute_program, "grid_size"), ul_to_u(GRID_SIZE.x),  ul_to_u(GRID_SIZE.y),  ul_to_u(GRID_SIZE.z));
-		glUniform1f  (glGetUniformLocation(compute_program, "cell_size"), 0.1f);
+		glUniform1f  (glGetUniformLocation(compute_program, "cell_size"), d_to_f(CELL_SIZE));
 		glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), SPHERE_RADIUS);
 		glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), SPHERE_DISPLAY_RADIUS);
 

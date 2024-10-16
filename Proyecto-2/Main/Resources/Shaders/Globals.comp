@@ -6,8 +6,9 @@ struct Particle {
 };
 
 struct Cell {
-	vec2  velocity;
+	vec3  velocity;
 	float pressure;
+	vec3  acceleration;
 	float density;
 };
 // INTERNAL ---------------------------------------------------------------------------------------
