@@ -3,6 +3,7 @@
 #include "Shared.hpp"
 
 struct CPU_Particle {
+	dvec1 mass;
 	dvec3 pos;
 	dvec3 velocity;
 	dvec3 acceleration;
@@ -35,11 +36,12 @@ struct GPU_Cell {
 using Grid = vector<vector<vector<CPU_Cell>>>;
 dvec3 velocityToColor(const dvec3& velocity);
 dvec1 randD();
+vec1  randF();
 
 // Particles
 void  initialize(vector<CPU_Particle>& points);
-void  simulate(vector<CPU_Particle>& points, const dvec1& time, const bool& openmp);
-
+void  simulate(vector<CPU_Particle>& points, const dvec1& delta_time);
+dvec3 computeVortexForce(const dvec3& pos, const dvec3& vortexCenter,  const dvec1& spinstrength, const dvec1& centrifugalStrength);
 //Grid
 void initialize(Grid& grid, const ulvec3& size);
 void simulate  (Grid& grid, const ulvec3& size, const dvec1& delta_time);
@@ -51,6 +53,7 @@ void forceSolve(Grid& grid, const ulvec3& size, const dvec1& delta_time);
 void pressureSolve(Grid& grid, const ulvec3& size, const dvec1& delta_time);
 
 vec3 vorticitySolve(const Grid& grid, const ulvec3& pos, const ulvec3& size);
+vec3 computePressureGradient(const Grid& grid, uint64 x, uint64 y, uint64 z, const uvec3& size);
 
 //Util
 enum struct Rotation_Type {
