@@ -27,6 +27,9 @@ string preprocessShader(const string& file_path);
 // Math
 dvec1 randD();
 vec1  randF();
+dvec1 randD(const dvec1& min, const dvec1& max);
+vec1  randF(const vec1& min, const vec1& max);
+bool insideAABB(const dvec3& point, dvec3& p_min, const dvec3& p_max);
 
 enum struct Rotation_Type {
 	QUATERNION,

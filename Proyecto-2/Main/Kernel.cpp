@@ -48,8 +48,12 @@ GPU_Cell::GPU_Cell(const CPU_Cell& cell) {
 	temperature = d_to_f(cell.temperature);
 }
 
-void initialize(vector<CPU_Particle>& points) {
+void initialize(Cloud& points) {
 	dvec1 radius = 0.45;
+	const ulvec3 size = ulvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
+	const dvec3  half_size = ul_to_d(size) * SESSION_GET("CELL_SIZE", dvec1) * 0.5;
+	const dvec3 pmin = -half_size;
+	const dvec3 pmax = half_size;
 
 	for (uint64 i = 0; i < points.size(); i++) {
 		CPU_Particle& particle = points[i];
@@ -57,20 +61,21 @@ void initialize(vector<CPU_Particle>& points) {
 		const dvec1 r = radius * sqrt(i / (dvec1)(points.size() - 1));
 
 		const dvec1 x = r * cos(angle);
-		const dvec1 y = r * sin(angle);
+		const dvec1 z = r * sin(angle);
+		const dvec1 y = randD(pmin.y, pmax.y);
 
 		particle.mass = randD() * 0.5 + 0.1;
 		particle.humidity = randD() * 0.5 + 0.1;
 		particle.pressure = randD() * 0.5 + 0.1;
 		particle.temperature = 15.0 + randD() * 10.0;
 
-		particle.position = dvec3(x, 0, y);
+		particle.position = dvec3(x, y, z);
 		particle.velocity = dvec3(0.0);
 		particle.acceleration = dvec3(0.0);
 	}
 }
 
-void simulate(vector<CPU_Particle>& points, const dvec1& delta_time) {
+void simulate(Cloud& points, const dvec1& delta_time) {
 	for (CPU_Particle& particle: points) {
 		computeThermodynamics(particle);
 		updateVelocity(particle, points, delta_time);
@@ -78,7 +83,7 @@ void simulate(vector<CPU_Particle>& points, const dvec1& delta_time) {
 	}
 }
 
-void updateVelocity(CPU_Particle& particle, const vector<CPU_Particle>& neighbors, const dvec1& delta_time) {
+void updateVelocity(CPU_Particle& particle, const Cloud& neighbors, const dvec1& delta_time) {
 	dvec3 navier_stokes_force = computeNavierStokes(particle, neighbors);
 	dvec3 coriolis_force = computeCoriolisEffect(particle);
 
@@ -132,7 +137,7 @@ void handleBorderCollision(CPU_Particle& particle) {
 	}
 }
 
-dvec3 computeNavierStokes(const CPU_Particle& particle, const vector<CPU_Particle>& neighbors) {
+dvec3 computeNavierStokes(const CPU_Particle& particle, const Cloud& neighbors) {
 	dvec3 pressure_gradient(0.0);
 	dvec3 velocity_diffusion(0.0);
 
@@ -170,6 +175,8 @@ dvec1 computeThermodynamics(CPU_Particle& particle) {
 
 void initialize(Grid& grid) {
 	const ulvec3 size = ulvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
+	const dvec1 cell_size = SESSION_GET("CELL_SIZE", dvec1);
+	const dvec3 half_size = ul_to_d(size) * SESSION_GET("CELL_SIZE", dvec1) * 0.5;
 	dvec3 center = dvec3(size) / 2.0;
 	dvec1 max_distance = glm::max(glm::max(size.x, size.y), size.z) / 2.0;
 
@@ -187,20 +194,37 @@ void initialize(Grid& grid) {
 				}
 				cell.density *= randD() * 0.5 + 0.5;
 				cell.pressure = randD() * 0.5 + 0.5;
+				cell.pmin = dvec3(x, y, z) * cell_size - half_size ;
+				cell.pmax = cell.pmin + cell_size;
 			}
 		}
 	}
 }
 
-void simulate(Grid& grid, const dvec1& delta_time) {
+void simulate(Grid& grid, const Cloud& particles, const dvec1& delta_time) {
 	const ulvec3 size = ulvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
+	const uint64 grid_count = SESSION_GET("GRID_SIZE_X", uint64) * SESSION_GET("GRID_SIZE_Y", uint64) * SESSION_GET("GRID_SIZE_Z", uint64);
+	const uint64 particle_count = SESSION_GET("PARTICLE_COUNT", uint64);
+	const dvec1  normalized_density = (dvec1)(particle_count / grid_count);
+
 	for (uint64 x = 0; x < size.x; ++x) {
 		for (uint64 y = 0; y < size.y; ++y) {
 			for (uint64 z = 0; z < size.z; ++z) {
 				CPU_Cell& cell = grid[x][y][z];
+				computeDensity(cell, particles, normalized_density);
 			}
 		}
 	}
+}
+
+void computeDensity(CPU_Cell& cell, const Cloud& particles, const dvec1& normalized_density) {
+	cell.particle_count = 0;
+	for (const auto& particle : particles) {
+		if (insideAABB(particle.position, cell.pmin, cell.pmax)) {
+			cell.particle_count++;
+		}
+	}
+	cell.density = (dvec1)(cell.particle_count / normalized_density);
 }
 
 void forceSolve(Grid& grid, const dvec1& delta_time) {

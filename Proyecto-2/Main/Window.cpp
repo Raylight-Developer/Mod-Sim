@@ -227,7 +227,7 @@ void Renderer::f_tickUpdate() {
 	if (runframe > 10) {
 		const dvec1 delta = delta_time * SESSION_GET("TIME_SCALE", dvec1);
 		simulate(cpu_point_cloud, delta);
-		simulate(cpu_grid, delta);
+		simulate(cpu_grid, cpu_point_cloud, delta);
 	}
 
 	sim_delta = glfwGetTime() - start;
