@@ -23,7 +23,7 @@ void main() {
 	vec4 color = vec4(0,0,0,1);
 
 	for (uint i = 0; i < point_cloud.length(); i++) {
-		if (f_raySphereIntersection(ray, point_cloud[i].pos.xyz, t_dist)) {
+		if (f_raySphereIntersection(ray, point_cloud[i].position.xyz, t_dist)) {
 			if (t_dist < t_length && t_dist > EPSILON) {
 				t_length = t_dist;
 				color = vec4(velocityToColor(point_cloud[i].velocity.xyz), 1.0);
@@ -36,7 +36,7 @@ void main() {
 	AABB rootBox;
 	rootBox.pmin = -half_grid_size;
 	rootBox.pmax = half_grid_size;
-	float color_step = (1.0 / (max(max(grid_size.x, grid_size.y), grid_size.z)));
+	float color_step = (1.0 / (max(max(grid_size.x, grid_size.y), grid_size.z))) * 2.0;
 	for (uint x = 0; x < grid_size.x; ++x) {
 		for (uint y = 0; y < grid_size.y; ++y) {
 			for (uint z = 0; z < grid_size.z; ++z) {
@@ -46,7 +46,7 @@ void main() {
 				if (f_rayAABBIntersection(ray, box)) {
 					uint index = x * (grid_size.y * grid_size.z) + y * grid_size.z + z;
 					Cell cell = grid[index];
-					color += vec4(temperatureTocolor(cell.temperature) * cell.density , 0.0);
+					color += vec4(temperatureTocolor(cell.temperature), 0.0) * (cell.density+0.1) * color_step;
 				}
 			}
 		}

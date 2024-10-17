@@ -21,6 +21,7 @@ struct Session {
 	Session& operator=(const Session&) = delete;
 
 	Lace log = Lace();
+	unordered_map<string, uint64> params = {};
 };
 
 #undef LOG
@@ -46,5 +47,5 @@ struct Session {
 
 #define LOG Session::getInstance().log
 #define FLUSH Session::getInstance().flushLog()
-#define COUT_S Lace lace; lace <<
-#define COUT_E ; cout << lace.str()
+#define SESSION_SET(key, val, type) Session::getInstance().params[key] = bits<type, uint64>(val)
+#define SESSION_GET(key, type) bits<uint64, type>(Session::getInstance().params[key])

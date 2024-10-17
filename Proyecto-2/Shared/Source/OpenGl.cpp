@@ -97,21 +97,21 @@ void checkProgramLinking(const GLuint& program) {
 
 void printShaderErrorWithContext(const string& shaderSource, const string& errorLog) {
 	LOG += 1;
-	size_t pos = errorLog.find('(');
-	if (pos == string::npos) {
+	size_t position = errorLog.find('(');
+	if (position == string::npos) {
 		LOG ENDL << "Error: Unable to parse error log."; FLUSH;
 		LOG -= 1;
 		return;
 	}
 
-	size_t endPos = errorLog.find(')', pos);
+	size_t endPos = errorLog.find(')', position);
 	if (endPos == string::npos) {
 		LOG ENDL << "Error: Unable to parse error log."; FLUSH;
 		LOG -= 1;
 		return;
 	}
 
-	uint64 lineNumber = str_to_ul(errorLog.substr(pos + 1, endPos - pos - 1));
+	uint64 lineNumber = str_to_ul(errorLog.substr(position + 1, endPos - position - 1));
 
 	Tokens lines = f_split(shaderSource, "\n");
 

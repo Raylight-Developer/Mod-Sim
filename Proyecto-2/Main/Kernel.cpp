@@ -8,10 +8,15 @@
 #define SEA_SURFACE_TEMP  28.5       // C
 #define LATITUDE          15.0
 
-GPU_Particle::GPU_Particle(const CPU_Particle& particle) :
-	pos(d_to_f(particle.pos), 1.0f),
-	velocity(d_to_f(particle.velocity), 1.0f)
-{}
+GPU_Particle::GPU_Particle() {
+	position = vec4(.0f);
+	velocity = vec4(0.0f);
+}
+
+GPU_Particle::GPU_Particle(const CPU_Particle& particle) {
+	position = vec4(d_to_f(particle.position), 1.0f);
+	velocity = vec4(d_to_f(particle.velocity), 1.0f);
+}
 
 GPU_Cell::GPU_Cell() {
 	density = 0.0f;
@@ -21,14 +26,14 @@ GPU_Cell::GPU_Cell() {
 }
 
 GPU_Cell::GPU_Cell(const CPU_Cell& cell) {
-	density     = cell.density;
-	humidity    = cell.humidity;
-	pressure    = cell.pressure;
-	temperature = cell.temperature;
+	density     = d_to_f(cell.density);
+	humidity    = d_to_f(cell.humidity);
+	pressure    = d_to_f(cell.pressure);
+	temperature = d_to_f(cell.temperature);
 }
 
 void initialize(vector<CPU_Particle>& points) {
-	dvec1 radius = 0.5;
+	dvec1 radius = 0.45;
 
 	for (uint64 i = 0; i < points.size(); i++) {
 		CPU_Particle& particle = points[i];
@@ -41,9 +46,9 @@ void initialize(vector<CPU_Particle>& points) {
 		particle.mass = randD() * 0.5 + 0.1;
 		particle.humidity = randD() * 0.5 + 0.1;
 		particle.pressure = randD() * 0.5 + 0.1;
-		particle.temperature = 15.0;
+		particle.temperature = 15.0 + randD() * 10.0;
 
-		particle.pos = dvec3(x, 0, y);
+		particle.position = dvec3(x, 0, y);
 		particle.velocity = dvec3(0.0);
 		particle.acceleration = dvec3(0.0);
 	}
@@ -57,12 +62,54 @@ void simulate(vector<CPU_Particle>& points, const dvec1& delta_time) {
 	}
 }
 
+void updateVelocity(CPU_Particle& particle, const vector<CPU_Particle>& neighbors, const dvec1& delta_time) {
+	dvec3 navier_stokes_force = computeNavierStokes(particle, neighbors);
+	dvec3 coriolis_force = computeCoriolisEffect(particle);
+
+	particle.acceleration = (navier_stokes_force + coriolis_force) / particle.mass;
+	particle.velocity += particle.acceleration * delta_time;
+}
+
+void updatePosition(CPU_Particle& particle, const dvec1& delta_time) {
+	particle.position += particle.velocity * delta_time;
+}
+
+void handleBorderCollision(CPU_Particle& particle) {
+	//if (particle.position.x - params.radius < bounding_box.left()) {
+	//	particle.position.x = (bounding_box.left() + params.radius);
+	//	particle.velocity.x = (-particle.velocity.x * params.restitution);
+	//	params.colliding = true;
+	//}
+	//else if (particle.position.x + params.radius > bounding_box.right()) {
+	//	particle.position.x = (bounding_box.right() - params.radius);
+	//	particle.velocity.x = (-particle.velocity.x * params.restitution);
+	//	params.colliding = true;
+	//}
+	//else {
+	//	params.colliding = false;
+	//}
+	//
+	//if (particle.position.y - params.radius < bounding_box.top()) {
+	//	particle.position.y = (bounding_box.top() + params.radius);
+	//	particle.velocity.y = (-particle.velocity.y * params.restitution);
+	//	params.colliding = true;
+	//}
+	//else if (particle.position.y + params.radius > bounding_box.bottom()) {
+	//	particle.position.y = (bounding_box.bottom() - params.radius);
+	//	particle.velocity.y = (-particle.velocity.y * params.restitution);
+	//	params.colliding = true;
+	//}
+	//else {
+	//	params.colliding = false;
+	//}
+}
+
 dvec3 computeNavierStokes(const CPU_Particle& particle, const vector<CPU_Particle>& neighbors) {
 	dvec3 pressure_gradient(0.0);
 	dvec3 velocity_diffusion(0.0);
 
 	for (const auto& neighbor : neighbors) {
-		dvec3 distance = particle.pos - neighbor.pos;
+		dvec3 distance = particle.position - neighbor.position;
 		dvec1 dist_squared = length2(distance);
 
 		if (dist_squared > 0.0) {
@@ -87,24 +134,14 @@ dvec1 computeThermodynamics(CPU_Particle& particle) {
 	return particle.temperature;
 }
 
-void updateVelocity(CPU_Particle& particle, const vector<CPU_Particle>& neighbors, const dvec1& delta_time) {
-	dvec3 navier_stokes_force = computeNavierStokes(particle, neighbors);
-	dvec3 coriolis_force = computeCoriolisEffect(particle);
-
-	particle.acceleration = (navier_stokes_force + coriolis_force) / particle.mass;
-	particle.velocity += particle.acceleration * delta_time;
-}
-
-void updatePosition(CPU_Particle& particle, const dvec1& delta_time) {
-	particle.pos += particle.velocity * delta_time;
-}
 
 
 
 
 
 
-void initialize(Grid& grid, const ulvec3& size) {
+void initialize(Grid& grid) {
+	const ulvec3 size = ulvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
 	dvec3 center = dvec3(size) / 2.0;
 	dvec1 max_distance = glm::max(glm::max(size.x, size.y), size.z) / 2.0;
 
@@ -127,7 +164,8 @@ void initialize(Grid& grid, const ulvec3& size) {
 	}
 }
 
-void simulate(Grid& grid, const ulvec3& size, const dvec1& delta_time) {
+void simulate(Grid& grid, const dvec1& delta_time) {
+	const ulvec3 size = ulvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
 	for (uint64 x = 0; x < size.x; ++x) {
 		for (uint64 y = 0; y < size.y; ++y) {
 			for (uint64 z = 0; z < size.z; ++z) {
@@ -137,11 +175,12 @@ void simulate(Grid& grid, const ulvec3& size, const dvec1& delta_time) {
 	}
 }
 
-void forceSolve(Grid& grid, const ulvec3& size, const dvec1& delta_time) {
+void forceSolve(Grid& grid, const dvec1& delta_time) {
+	const ulvec3 size = ulvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
 	for (uint64 x = 0; x < size.x; ++x) {
 		for (uint64 y = 0; y < size.y; ++y) {
 			for (uint64 z = 0; z < size.z; ++z) {
-				ulvec3 pos = ulvec3(x, y, z);
+				ulvec3 position = ulvec3(x, y, z);
 				CPU_Cell& cell = grid[x][y][z];
 			}
 		}
@@ -162,185 +201,4 @@ dvec3 computePressureGradient(const Grid& grid, const uint64& x, const uint64& y
 	if (z < size.z - 1) gradient.z += grid[x][y][z + 1].pressure - grid[x][y][z].pressure;
 
 	return gradient;
-}
-
-Transform::Transform(const dvec3& position, const dvec3& rotation, const dvec3& scale, const Rotation_Type& type) :
-	rotation_type(type),
-	position(position),
-	euler_rotation(rotation),
-	scale(scale)
-{
-	quat_rotation = dquat(1.0, 0.0, 0.0, 0.0);
-	axis_rotation = dvec3(0.0);
-
-	x_vec = dvec3(1.0, 0.0, 0.0);
-	y_vec = dvec3(0.0, 1.0, 0.0);
-	z_vec = dvec3(0.0, 0.0, 1.0);
-}
-
-Transform::Transform(const dvec3& position, const dvec3& axis, const dvec3& rotation, const dvec3& scale, const Rotation_Type& type) :
-	rotation_type(type),
-	position(position),
-	euler_rotation(rotation),
-	scale(scale),
-	axis_rotation(axis)
-{
-	quat_rotation = dquat(1.0, 0.0, 0.0, 0.0);
-
-	x_vec = dvec3(1.0, 0.0, 0.0);
-	y_vec = dvec3(0.0, 1.0, 0.0);
-	z_vec = dvec3(0.0, 0.0, 1.0);
-}
-
-Transform::Transform(const dvec3& position, const dquat& rotation, const dvec3& scale, const Rotation_Type& type) :
-	rotation_type(type),
-	position(position),
-	quat_rotation(rotation),
-	scale(scale)
-{
-	euler_rotation = dvec3(0.0);
-	axis_rotation = dvec3(0.0);
-
-	x_vec = dvec3(1.0, 0.0, 0.0);
-	y_vec = dvec3(0.0, 1.0, 0.0);
-	z_vec = dvec3(0.0, 0.0, 1.0);
-}
-// TODO account for different rotation modes
-Transform Transform::operator+(const Transform& other) const {
-	Transform result;
-	result.position       = position       + other.position;
-	result.euler_rotation = euler_rotation + other.euler_rotation;
-	result.axis_rotation  = axis_rotation  + other.axis_rotation;
-	//result.quat_rotation  = quat_rotation  + other.quat_rotation;
-	result.scale          = scale          + other.scale;
-	return result;
-}
-Transform Transform::operator-(const Transform& other) const {
-	Transform result;
-	result.position       = position       - other.position;
-	result.euler_rotation = euler_rotation - other.euler_rotation;
-	result.axis_rotation  = axis_rotation  - other.axis_rotation;
-	//result.quat_rotation  = quat_rotation  - other.quat_rotation;
-	result.scale          = scale          - other.scale;
-	return result;
-}
-Transform Transform::operator*(const Transform& other) const {
-	Transform result;
-	result.position       = position       * other.position;
-	result.euler_rotation = euler_rotation * other.euler_rotation;
-	result.axis_rotation  = axis_rotation  * other.axis_rotation;
-	//result.quat_rotation  = quat_rotation  * other.quat_rotation;
-	result.scale          = scale          * other.scale;
-	return result;
-}
-Transform Transform::operator/(const Transform& other) const {
-	Transform result;
-	result.position       = position       / other.position;
-	result.euler_rotation = euler_rotation / other.euler_rotation;
-	result.axis_rotation  = axis_rotation  / other.axis_rotation;
-	//result.quat_rotation  = quat_rotation  / other.quat_rotation;
-	result.scale          = scale          / other.scale;
-	return result;
-}
-
-Transform Transform::operator*(const dvec1& other) const {
-	Transform result;
-	result.position       = position       * other;
-	result.euler_rotation = euler_rotation * other;
-	result.axis_rotation  = axis_rotation  * other;
-	//result.quat_rotation  = quat_rotation  * other;
-	result.scale          = scale          * other;
-	return result;
-}
-
-void Transform::moveLocal(const dvec3& value) {
-	f_computeVectors();
-	position += value.x * x_vec;
-	position += value.y * y_vec;
-	position += value.z * z_vec;
-}
-
-void Transform::rotate(const dvec3& value) {
-	switch (rotation_type) {
-		case Rotation_Type::QUATERNION: {
-			const dquat pitch = glm::angleAxis(glm::radians(value.x), dvec3(1, 0, 0));
-			const dquat yaw   = glm::angleAxis(glm::radians(value.y), dvec3(0, 1, 0));
-			const dquat roll  = glm::angleAxis(glm::radians(value.z), dvec3(0, 0, 1));
-
-			quat_rotation = yaw * pitch * roll * quat_rotation;
-			quat_rotation = glm::normalize(quat_rotation);
-			break;
-		}
-		case Rotation_Type::XYZ: {
-			euler_rotation += value;
-
-			if (euler_rotation.x > 89.0)  euler_rotation.x = 89.0;
-			if (euler_rotation.x < -89.0) euler_rotation.x = -89.0;
-		}
-	}
-}
-
-void Transform::orbit(const dvec3& pivot, const dvec2& py_rotation) {
-	switch (rotation_type) {
-		case Rotation_Type::QUATERNION: {
-			rotate(glm::vec3(py_rotation.x, py_rotation.y, 0.0));
-
-			const dvec3 forward   = glm::normalize(glm::inverse(quat_rotation) * dvec3(0, 0, -1));
-			const dvec3 direction = glm::normalize(position - pivot);
-			const dvec1 z_distance  = glm::length(position - pivot);
-
-			position = pivot - forward * z_distance;
-			break;
-		}
-		case Rotation_Type::XYZ: {
-			rotate(dvec3(py_rotation.x, py_rotation.y, 0.0));
-
-			const dmat4 matrix = glm::yawPitchRoll(glm::radians(euler_rotation.y), glm::radians(euler_rotation.x), glm::radians(euler_rotation.z));
-			const dvec3 z_vector = -matrix[2];
-
-			const dvec1 z_distance = glm::length(pivot - position);
-			const dvec3 camera_position = position - z_vector * z_distance;
-
-			position = pivot - z_vector * z_distance;
-			break;
-		}
-	}
-}
-
-void Transform::f_computeVectors() {
-	dmat4 rotation_matrix;
-	switch (rotation_type) {
-		case Rotation_Type::QUATERNION: {
-			rotation_matrix = glm::mat4_cast(quat_rotation);
-			break;
-		}
-		case Rotation_Type::XYZ: {
-			rotation_matrix = glm::yawPitchRoll(glm::radians(euler_rotation.y), glm::radians(euler_rotation.x), glm::radians(euler_rotation.z));
-			break;
-		}
-	}
-	x_vec = rotation_matrix[0];
-	y_vec = rotation_matrix[1];
-	z_vec = rotation_matrix[2];
-}
-
-dmat4 Transform::getMatrix() const {
-	const dmat4 translation_matrix = glm::translate(dmat4(1.0), position);
-	const dmat4 scale_matrix = glm::scale(dmat4(1.0), scale);
-	dmat4 rotation_matrix = dmat4(1.0);
-
-	switch (rotation_type) {
-		case Rotation_Type::QUATERNION: {
-			rotation_matrix = glm::toMat4(quat_rotation);
-			break;
-		}
-		case Rotation_Type::XYZ: {
-			const dmat4 rotationX = glm::rotate(dmat4(1.0), euler_rotation.x * DEG_RAD, dvec3(1.0, 0.0, 0.0));
-			const dmat4 rotationY = glm::rotate(dmat4(1.0), euler_rotation.y * DEG_RAD, dvec3(0.0, 1.0, 0.0));
-			const dmat4 rotationZ = glm::rotate(dmat4(1.0), euler_rotation.z * DEG_RAD, dvec3(0.0, 0.0, 1.0));
-			rotation_matrix =  rotationZ * rotationY * rotationX;
-			break;
-		}
-	}
-	return translation_matrix * rotation_matrix * scale_matrix;
 }

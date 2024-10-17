@@ -13,13 +13,6 @@
 struct Renderer {
 	GLFWwindow* window;
 
-	dvec1  SPHERE_RADIUS;
-	dvec1  SPHERE_DISPLAY_RADIUS;
-	uint   PARTICLE_COUNT;
-	dvec1  RENDER_SCALE;
-	ulvec3 GRID_SIZE;
-	dvec1  CELL_SIZE;
-
 	vector<CPU_Particle> cpu_point_cloud;
 	Grid cpu_grid;
 
@@ -72,8 +65,8 @@ struct Renderer {
 	void resize();
 
 	static void framebufferSize(GLFWwindow* window, int width, int height);
-	static void cursorPos(GLFWwindow* window, dvec1 xpos, dvec1 ypos);
+	static void cursorPos(GLFWwindow* window, double xpos, double ypos);
 	static void mouseButton(GLFWwindow* window, int button, int action, int mods);
-	static void scroll(GLFWwindow* window, dvec1 xoffset, dvec1 yoffset);
+	static void scroll(GLFWwindow* window, double xoffset, double yoffset);
 	static void key(GLFWwindow* window, int key, int scancode, int action, int mods);
 };

@@ -9,12 +9,16 @@
 Renderer::Renderer() {
 	window = nullptr;
 
-	SPHERE_RADIUS = 0.01;
-	SPHERE_DISPLAY_RADIUS = 0.01;
-	RENDER_SCALE = 0.5;
-	PARTICLE_COUNT = 128;
-	GRID_SIZE = ulvec3(16, 16, 16);
-	CELL_SIZE = 1.0 / glm::max(glm::max(GRID_SIZE.x, GRID_SIZE.y), GRID_SIZE.z);
+	SESSION_SET("PARTICLE_DISPLAY_RADIUS", 0.01, dvec1);
+	SESSION_SET("PARTICLE_RADIUS", 0.01, dvec1);
+	SESSION_SET("PARTICLE_COUNT", 128, uint64);
+
+	SESSION_SET("RENDER_SCALE", 0.5, dvec1);
+
+	SESSION_SET("GRID_SIZE_X", 16, uint64);
+	SESSION_SET("GRID_SIZE_Y", 16, uint64);
+	SESSION_SET("GRID_SIZE_Z", 16, uint64);
+	SESSION_SET("CELL_SIZE", 1.0 / max(max(SESSION_GET("GRID_SIZE_X", uint64), SESSION_GET("GRID_SIZE_Y", uint64)), SESSION_GET("GRID_SIZE_Z", uint64)), dvec1);
 
 	camera_transform = Transform(dvec3(0, 5, 0), dvec3(-90.0, 0, 0.0));
 
@@ -25,7 +29,7 @@ Renderer::Renderer() {
 	display_resolution = uvec2(3840U, 2160U);
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
 
-	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(RENDER_SCALE));
+	render_resolution = d_to_u(u_to_d(display_resolution) * SESSION_GET("RENDER_SCALE", dvec1));
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
 
 	recompile = false;
@@ -209,17 +213,17 @@ void Renderer::f_pipeline() {
 	buffers["raw"] = renderLayer(render_resolution);
 
 	glBindVertexArray(VAO);
-	cpu_point_cloud = vector(PARTICLE_COUNT, CPU_Particle());
-	cpu_grid = vector(GRID_SIZE.x, vector(GRID_SIZE.y, vector(GRID_SIZE.z, CPU_Cell())));
+	cpu_point_cloud = vector(SESSION_GET("PARTICLE_COUNT", uint64), CPU_Particle());
+	cpu_grid = vector(SESSION_GET("GRID_SIZE_X", uint64), vector(SESSION_GET("GRID_SIZE_Y", uint64), vector(SESSION_GET("GRID_SIZE_Z", uint64), CPU_Cell())));
 	initialize(cpu_point_cloud);
-	initialize(cpu_grid, GRID_SIZE);
+	initialize(cpu_grid);
 }
 
 void Renderer::f_tickUpdate() {
 	const dvec1 start = glfwGetTime();
 	if (runframe > 10) {
 		simulate(cpu_point_cloud, 0.0005);
-		simulate(cpu_grid, GRID_SIZE, 0.0005);
+		simulate(cpu_grid, 0.0005);
 	}
 
 	sim_delta = glfwGetTime() - start;
@@ -232,6 +236,7 @@ void Renderer::f_tickUpdate() {
 	buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
 
 	glDeleteBuffers(1, &buffers["cells"]);
+	const ulvec3 GRID_SIZE = ulvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
 	vector<GPU_Cell> gpu_grid(GRID_SIZE.x * GRID_SIZE.y * GRID_SIZE.z);
 	for (uint64 x = 0; x < GRID_SIZE.x; ++x) {
 		for (uint64 y = 0; y < GRID_SIZE.y; ++y) {
@@ -311,15 +316,15 @@ void Renderer::displayLoop() {
 		glUniform1f  (glGetUniformLocation(compute_program, "current_time"), d_to_f(current_time));
 		glUniform2ui (glGetUniformLocation(compute_program, "resolution"), render_resolution.x, render_resolution.y);
 
-		glUniform3fv (glGetUniformLocation(compute_program, "camera_pos"),  1, value_ptr(d_to_f(camera_transform.position)));
-		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_uv"), 1, value_ptr(projection_center));
-		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_u"),  1, value_ptr(projection_u));
-		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"),  1, value_ptr(projection_v));
+		glUniform3fv (glGetUniformLocation(compute_program, "camera_pos"), 1, value_ptr(d_to_f(camera_transform.position)));
+		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_uv"),1, value_ptr(projection_center));
+		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_u"), 1, value_ptr(projection_u));
+		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"), 1, value_ptr(projection_v));
 
-		glUniform3ui (glGetUniformLocation(compute_program, "grid_size"), ul_to_u(GRID_SIZE.x),  ul_to_u(GRID_SIZE.y),  ul_to_u(GRID_SIZE.z));
-		glUniform1f  (glGetUniformLocation(compute_program, "cell_size"), d_to_f(CELL_SIZE));
-		glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), SPHERE_RADIUS);
-		glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), SPHERE_DISPLAY_RADIUS);
+		glUniform3ui (glGetUniformLocation(compute_program, "grid_size"), ul_to_u(SESSION_GET("GRID_SIZE_X", uint64)), ul_to_u(SESSION_GET("GRID_SIZE_Y", uint64)), ul_to_u(SESSION_GET("GRID_SIZE_Z", uint64)));
+		glUniform1f  (glGetUniformLocation(compute_program, "cell_size"), d_to_f(SESSION_GET("CELL_SIZE", dvec1)));
+		glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), d_to_f(SESSION_GET("PARTICLE_RADIUS", dvec1)));
+		glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), d_to_f(SESSION_GET("PARTICLE_DISPLAY_RADIUS", dvec1)));
 
 		glBindImageTexture(0, buffers["raw"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
