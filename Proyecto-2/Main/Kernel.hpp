@@ -11,6 +11,10 @@ struct CPU_Particle {
 	dvec3 position;
 	dvec3 velocity;
 	dvec3 acceleration;
+
+	bool  colliding;
+
+	CPU_Particle();
 };
 
 struct alignas(16) GPU_Particle {
@@ -45,7 +49,7 @@ void  initialize(vector<CPU_Particle>& points);
 void  simulate  (vector<CPU_Particle>& points, const dvec1& delta_time);
 void updateVelocity(CPU_Particle& particle, const vector<CPU_Particle>& neighbors, const dvec1& delta_time);
 void updatePosition(CPU_Particle& particle, const dvec1& delta_time);
-void handleBorderCollision(CPU_Particle& particle, const ulvec3& grid_size, const dvec1& cell_size);
+void handleBorderCollision(CPU_Particle& particle);
 dvec3 computeNavierStokes(const CPU_Particle& particle, const vector<CPU_Particle>& neighbors);
 dvec3 computeCoriolisEffect(const CPU_Particle& particle);
 dvec1 computeThermodynamics(CPU_Particle& particle);

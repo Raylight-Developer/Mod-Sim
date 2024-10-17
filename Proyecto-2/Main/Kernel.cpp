@@ -7,6 +7,22 @@
 #define STEFAN_BOLTZMANN  5.67e-8    // W/m²·K⁴
 #define SEA_SURFACE_TEMP  28.5       // C
 #define LATITUDE          15.0
+#define RESTITUTION       1.0
+#define GRAVITY           dvec3(0.0, -9.81, 0.0)
+
+
+CPU_Particle::CPU_Particle() {
+	mass = randD() * 0.5 + 0.1;
+	humidity = randD() * 0.5 + 0.1;
+	pressure = randD() * 0.5 + 0.1;
+	temperature = 15.0 + randD() * 10.0;
+
+	position = dvec3(0.0);
+	velocity = dvec3(0.0);
+	acceleration = dvec3(0.0);
+
+	colliding = false;
+}
 
 GPU_Particle::GPU_Particle() {
 	position = vec4(.0f);
@@ -66,42 +82,54 @@ void updateVelocity(CPU_Particle& particle, const vector<CPU_Particle>& neighbor
 	dvec3 navier_stokes_force = computeNavierStokes(particle, neighbors);
 	dvec3 coriolis_force = computeCoriolisEffect(particle);
 
-	particle.acceleration = (navier_stokes_force + coriolis_force) / particle.mass;
+	//particle.acceleration = (navier_stokes_force + coriolis_force) / particle.mass;
+	particle.acceleration = GRAVITY / particle.mass;
 	particle.velocity += particle.acceleration * delta_time;
 }
 
 void updatePosition(CPU_Particle& particle, const dvec1& delta_time) {
 	particle.position += particle.velocity * delta_time;
+	handleBorderCollision(particle);
 }
 
 void handleBorderCollision(CPU_Particle& particle) {
-	//if (particle.position.x - params.radius < bounding_box.left()) {
-	//	particle.position.x = (bounding_box.left() + params.radius);
-	//	particle.velocity.x = (-particle.velocity.x * params.restitution);
-	//	params.colliding = true;
-	//}
-	//else if (particle.position.x + params.radius > bounding_box.right()) {
-	//	particle.position.x = (bounding_box.right() - params.radius);
-	//	particle.velocity.x = (-particle.velocity.x * params.restitution);
-	//	params.colliding = true;
-	//}
-	//else {
-	//	params.colliding = false;
-	//}
-	//
-	//if (particle.position.y - params.radius < bounding_box.top()) {
-	//	particle.position.y = (bounding_box.top() + params.radius);
-	//	particle.velocity.y = (-particle.velocity.y * params.restitution);
-	//	params.colliding = true;
-	//}
-	//else if (particle.position.y + params.radius > bounding_box.bottom()) {
-	//	particle.position.y = (bounding_box.bottom() - params.radius);
-	//	particle.velocity.y = (-particle.velocity.y * params.restitution);
-	//	params.colliding = true;
-	//}
-	//else {
-	//	params.colliding = false;
-	//}
+	const dvec1 radius = SESSION_GET("PARTICLE_RADIUS", dvec1);
+	const ulvec3 size = ulvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
+	const dvec3  half_size = ul_to_d(size) * SESSION_GET("CELL_SIZE", dvec1) * 0.5;
+
+	particle.colliding = false;
+	if (particle.position.x - radius < 0.0 - half_size.x) {
+		particle.position.x = (radius - half_size.x);
+		particle.velocity.x = (-particle.velocity.x * RESTITUTION);
+		particle.colliding = true;
+	}
+	else if (particle.position.x + radius >  half_size.x ) {
+		particle.position.x = (half_size.x - radius);
+		particle.velocity.x = (-particle.velocity.x * RESTITUTION);
+		particle.colliding = true;
+	}
+
+	if (particle.position.y - radius < 0.0 - half_size.y) {
+		particle.position.y = (radius - half_size.y);
+		particle.velocity.y = (-particle.velocity.y * RESTITUTION);
+		particle.colliding = true;
+	}
+	else if (particle.position.y + radius >  half_size.y ) {
+		particle.position.y = (half_size.y - radius);
+		particle.velocity.y = (-particle.velocity.y * RESTITUTION);
+		particle.colliding = true;
+	}
+
+	if (particle.position.z - radius < 0.0 - half_size.z) {
+		particle.position.z = (radius - half_size.z);
+		particle.velocity.z = (-particle.velocity.z * RESTITUTION);
+		particle.colliding = true;
+	}
+	else if (particle.position.z + radius >  half_size.z ) {
+		particle.position.z = (half_size.z - radius);
+		particle.velocity.z = (-particle.velocity.z * RESTITUTION);
+		particle.colliding = true;
+	}
 }
 
 dvec3 computeNavierStokes(const CPU_Particle& particle, const vector<CPU_Particle>& neighbors) {

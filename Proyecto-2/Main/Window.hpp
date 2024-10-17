@@ -41,7 +41,7 @@ struct Renderer {
 	dvec1 sim_delta;
 	dvec1 current_time;
 	dvec1 window_time;
-	dvec1 frame_time;
+	dvec1 delta_time;
 	dvec1 last_time;
 
 	unordered_map<string, GLuint> buffers;

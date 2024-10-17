@@ -11,16 +11,18 @@ Renderer::Renderer() {
 
 	SESSION_SET("PARTICLE_DISPLAY_RADIUS", 0.01, dvec1);
 	SESSION_SET("PARTICLE_RADIUS", 0.01, dvec1);
-	SESSION_SET("PARTICLE_COUNT", 128, uint64);
+	SESSION_SET("PARTICLE_COUNT", 1024, uint64);
 
 	SESSION_SET("RENDER_SCALE", 0.5, dvec1);
+	SESSION_SET("TIME_SCALE", 0.05, dvec1);
 
-	SESSION_SET("GRID_SIZE_X", 16, uint64);
-	SESSION_SET("GRID_SIZE_Y", 16, uint64);
-	SESSION_SET("GRID_SIZE_Z", 16, uint64);
+	SESSION_SET("GRID_SIZE_X", 8, uint64);
+	SESSION_SET("GRID_SIZE_Y", 8, uint64);
+	SESSION_SET("GRID_SIZE_Z", 8, uint64);
 	SESSION_SET("CELL_SIZE", 1.0 / max(max(SESSION_GET("GRID_SIZE_X", uint64), SESSION_GET("GRID_SIZE_Y", uint64)), SESSION_GET("GRID_SIZE_Z", uint64)), dvec1);
 
-	camera_transform = Transform(dvec3(0, 5, 0), dvec3(-90.0, 0, 0.0));
+	camera_transform = Transform(dvec3(0, 0, 4), dvec3(0));
+	camera_transform.orbit(dvec3(0), dvec3(-15, 25, 0));
 
 	frame_counter = 0;
 	frame_count = 0;
@@ -38,13 +40,13 @@ Renderer::Renderer() {
 	camera_orbit_sensitivity = 2.5;
 	keys = vector(348, false);
 	current_mouse = dvec2(display_resolution) / 2.0;
-	last_mouse = dvec2(display_resolution) / 2.0;
+	last_mouse = current_mouse;
 
 	sim_deltas = 0.0;
 
 	current_time = 0.0;
 	window_time = 0.0;
-	frame_time = FPS_60;
+	delta_time = FPS_60;
 	sim_delta = FPS_60 / 2.0;
 	last_time = 0.0;
 }
@@ -82,6 +84,7 @@ void Renderer::initGlfw() {
 	display_resolution = uvec2(mode->width, mode->height);
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
 	last_mouse = glm::dvec2(display_resolution) / 2.0;
+	current_mouse = last_mouse;
 
 	window = glfwCreateWindow(display_resolution.x, display_resolution.y, "Screensaver", NULL, NULL);
 
@@ -222,8 +225,9 @@ void Renderer::f_pipeline() {
 void Renderer::f_tickUpdate() {
 	const dvec1 start = glfwGetTime();
 	if (runframe > 10) {
-		simulate(cpu_point_cloud, 0.0005);
-		simulate(cpu_grid, 0.0005);
+		const dvec1 delta = delta_time * SESSION_GET("TIME_SCALE", dvec1);
+		simulate(cpu_point_cloud, delta);
+		simulate(cpu_grid, delta);
 	}
 
 	sim_delta = glfwGetTime() - start;
@@ -274,9 +278,9 @@ void Renderer::guiLoop() {
 
 void Renderer::gameLoop() {
 	if (keys[GLFW_MOUSE_BUTTON_RIGHT] or keys[GLFW_MOUSE_BUTTON_LEFT]) {
-		const dvec1 xoffset = (last_mouse.x - current_mouse.x) * frame_time * camera_orbit_sensitivity;
-		const dvec1 yoffset = (last_mouse.y - current_mouse.y) * frame_time * camera_orbit_sensitivity;
-		camera_transform.orbit(dvec3(0), dvec3(yoffset, xoffset, 0.0));
+		const dvec1 xoffset = (last_mouse.x - current_mouse.x) * delta_time * camera_orbit_sensitivity;
+		const dvec1 yoffset = (last_mouse.y - current_mouse.y) * delta_time * camera_orbit_sensitivity;
+		camera_transform.orbit(dvec3(0.0), dvec3(yoffset, xoffset, 0.0));
 		last_mouse = current_mouse;
 	}
 }
@@ -290,9 +294,9 @@ void Renderer::displayLoop() {
 
 	while (!glfwWindowShouldClose(window)) {
 		current_time = glfwGetTime();
-		frame_time = current_time - last_time;
+		delta_time = current_time - last_time;
 		last_time = current_time;
-		window_time += frame_time;
+		window_time += delta_time;
 
 		gameLoop();
 		const mat4 matrix = d_to_f(glm::yawPitchRoll(camera_transform.euler_rotation.y * DEG_RAD, camera_transform.euler_rotation.x * DEG_RAD, camera_transform.euler_rotation.z * DEG_RAD));
@@ -410,10 +414,10 @@ void Renderer::mouseButton(GLFWwindow* window, int button, int action, int mods)
 void Renderer::scroll(GLFWwindow* window, double xoffset, double yoffset) {
 	Renderer* instance = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
 	if (yoffset < 0) {
-		instance->camera_transform.moveLocal(dvec3(0.0, 0.0,  25.0) * instance->camera_zoom_sensitivity * instance->frame_time);
+		instance->camera_transform.moveLocal(dvec3(0.0, 0.0,  25.0) * instance->camera_zoom_sensitivity * instance->delta_time);
 	}
 	if (yoffset > 0) {
-		instance->camera_transform.moveLocal(dvec3(0.0, 0.0, -25.0) * instance->camera_zoom_sensitivity * instance->frame_time);
+		instance->camera_transform.moveLocal(dvec3(0.0, 0.0, -25.0) * instance->camera_zoom_sensitivity * instance->delta_time);
 	}
 }
 
