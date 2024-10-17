@@ -230,3 +230,17 @@ string preprocessShader(const string& file_path) {
 	}
 	throw runtime_error(to_string(errno));
 }
+
+dvec1 randD() {
+	static std::random_device rd;
+	static std::mt19937 gen(rd());
+	uniform_real_distribution<dvec1> dis(0.0, 1.0);
+	return dis(gen);
+}
+
+vec1 randF() {
+	static std::random_device rd;
+	static std::mt19937 gen(rd());
+	uniform_real_distribution<vec1> dis(0.0f, 1.0f);
+	return dis(gen);
+}

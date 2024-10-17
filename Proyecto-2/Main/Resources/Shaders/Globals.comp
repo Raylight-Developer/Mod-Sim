@@ -2,14 +2,14 @@
 //-------------------------------------------------------------------------------------------------
 struct Particle {
 	vec4 pos;
-	vec4 col;
+	vec4 velocity;
 };
 
 struct Cell {
-	vec3  velocity;
-	float pressure;
-	vec3  acceleration;
 	float density;
+	float humidity;
+	float pressure;
+	float temperature;
 };
 // INTERNAL ---------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------

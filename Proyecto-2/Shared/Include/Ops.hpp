@@ -20,10 +20,13 @@ bool   f_contains(const string& input, const string& substring);
 string loadFromFile(const string& file_path);
 void writeToFile(const string& filename, const string& content);
 
-
 // Opengl
 string processSubShader(const string& file_path);
 string preprocessShader(const string& file_path);
+
+// Math
+dvec1 randD();
+vec1  randF();
 
 // Templates
 template<typename T>

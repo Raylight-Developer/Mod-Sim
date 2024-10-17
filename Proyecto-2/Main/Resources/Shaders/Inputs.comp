@@ -16,8 +16,6 @@ uniform uint  frame_count;
 uniform float aspect_ratio;
 uniform float current_time;
 uniform uvec2 resolution;
-uniform bool  reset;
-uniform bool  debug;
 
 uniform vec3 camera_pos;
 uniform vec3 camera_p_uv;

@@ -1,131 +1,111 @@
 ﻿#include "Kernel.hpp"
 
+#define AIR_DENSITY       1.225      // kg/m^3 (at sea level)
+#define GAS_CONSTANT      287.05     // J/(kg·K) for dry air
+#define EARTH_ROTATION    7.2921e-5  // radians per second
+#define SPECIFIC_HEAT_AIR 1005.0     // J/(kg·K)
+#define STEFAN_BOLTZMANN  5.67e-8    // W/m²·K⁴
+#define SEA_SURFACE_TEMP  28.5       // C
+#define LATITUDE          15.0
 
 GPU_Particle::GPU_Particle(const CPU_Particle& particle) :
-	pos(vec4(d_to_f(particle.pos), 1.0f)),
-	color(vec4(d_to_f(velocityToColor(particle.velocity)), 1.0f))
+	pos(d_to_f(particle.pos), 1.0f),
+	velocity(d_to_f(particle.velocity), 1.0f)
 {}
 
 GPU_Cell::GPU_Cell() {
-	velocity = vec3(0.0f);
-	acceleration = vec3(0.0f);
-	pressure = 0.0f;
 	density = 0.0f;
+	humidity = 0.0f;
+	pressure = 0.0f;
+	temperature = 0.0f;
 }
 
 GPU_Cell::GPU_Cell(const CPU_Cell& cell) {
-	velocity = cell.velocity;
-	acceleration = cell.acceleration;
-	pressure = cell.pressure;
-	density = cell.density;
-}
-
-dvec3 velocityToColor(const dvec3& velocity) {
-	const dvec1 maxSpeed = 1.0;
-	dvec1 speed = glm::length(velocity);
-
-	speed = glm::clamp(speed, 0.0, maxSpeed);
-	const dvec1 normalizedSpeed = speed / maxSpeed;
-	dvec3 color;
-
-	if (normalizedSpeed <= 0.5) {
-		dvec1 t = normalizedSpeed * 2.0;
-		color = glm::mix(dvec3(0.0, 0.0, 1.0), dvec3(0.0, 1.0, 0.0), t);
-	}
-	else {
-		dvec1 t = (normalizedSpeed - 0.5) * 2.0;
-		color = glm::mix(dvec3(0.0, 1.0, 0.0), dvec3(1.0, 0.0, 0.0), t);
-	}
-
-	return color;
-}
-
-dvec1 randD() {
-	static std::random_device rd;
-	static std::mt19937 gen(rd());
-	uniform_real_distribution<dvec1> dis(0.0, 1.0);
-	return dis(gen);
-}
-
-vec1 randF() {
-	static std::random_device rd;
-	static std::mt19937 gen(rd());
-	uniform_real_distribution<vec1> dis(0.0f, 1.0f);
-	return dis(gen);
+	density     = cell.density;
+	humidity    = cell.humidity;
+	pressure    = cell.pressure;
+	temperature = cell.temperature;
 }
 
 void initialize(vector<CPU_Particle>& points) {
 	dvec1 radius = 0.5;
 
-	uint i = 0;
-	for (CPU_Particle& particle: points) {
-		particle.velocity = dvec3(randD(), randD(), randD()) * 0.2 - 0.1;
-		particle.acceleration = dvec3(0.0);
-		particle.mass = 1.0;
-
+	for (uint64 i = 0; i < points.size(); i++) {
+		CPU_Particle& particle = points[i];
 		const dvec1 angle = i * (glm::pi<dvec1>() * (3.0 - sqrt(5.0)));
-		const dvec1 r = radius * sqrt((i+points.size()) / (dvec1)(points.size() - 1));
+		const dvec1 r = radius * sqrt(i / (dvec1)(points.size() - 1));
 
 		const dvec1 x = r * cos(angle);
 		const dvec1 y = r * sin(angle);
 
+		particle.mass = randD() * 0.5 + 0.1;
+		particle.humidity = randD() * 0.5 + 0.1;
+		particle.pressure = randD() * 0.5 + 0.1;
+		particle.temperature = 15.0;
+
 		particle.pos = dvec3(x, 0, y);
-		i++;
+		particle.velocity = dvec3(0.0);
+		particle.acceleration = dvec3(0.0);
 	}
 }
 
 void simulate(vector<CPU_Particle>& points, const dvec1& delta_time) {
-	const dvec3 tornado_center(0.0, 0.0, 0.0); // Center of the tornado
-	const dvec1 tornado_strength = 0.12; // Adjust strength of the tornado
-	const dvec1 rotation_speed = 0.05; // Speed of rotation around the center
-
 	for (CPU_Particle& particle: points) {
-		dvec3 direction = particle.pos - tornado_center;
-		dvec1 distance = length(direction);
+		computeThermodynamics(particle);
+		updateVelocity(particle, points, delta_time);
+		updatePosition(particle, delta_time);
+	}
+}
 
-		if (distance > 0.0) { // Avoid division by zero
-			// Normalize direction
-			direction = normalize(direction);
+dvec3 computeNavierStokes(const CPU_Particle& particle, const vector<CPU_Particle>& neighbors) {
+	dvec3 pressure_gradient(0.0);
+	dvec3 velocity_diffusion(0.0);
 
-			// Calculate the centripetal force (toward the center)
-			dvec3 centripetal_force = -direction * tornado_strength;
+	for (const auto& neighbor : neighbors) {
+		dvec3 distance = particle.pos - neighbor.pos;
+		dvec1 dist_squared = length2(distance);
 
-			// Calculate tangential force (perpendicular to direction)
-			dvec3 tangential_force = dvec3(-direction.z, 0.0, direction.x) * rotation_speed;
-
-			// Update acceleration
-			particle.acceleration = (centripetal_force + tangential_force) / distance;
-
-			// Update velocity and position using Euler integration
-			particle.velocity += particle.acceleration * delta_time;
-			particle.velocity = clamp(particle.velocity, -1.0, 1.0);
-			particle.pos += particle.velocity * delta_time;
+		if (dist_squared > 0.0) {
+			pressure_gradient += (neighbor.pressure - particle.pressure) / dist_squared * normalize(distance);
+			velocity_diffusion += (neighbor.velocity - particle.velocity) / dist_squared;
 		}
 	}
+
+	return -pressure_gradient + velocity_diffusion;
 }
 
-dvec3 computeVortexForce(const dvec3& pos, const dvec3& vortexCenter, const dvec1& spinstrength, const dvec1& centrifugalStrength) {
-	const dvec3 offset = pos - vortexCenter;
-	dvec3 direction = pos - vortexCenter;
-
-	dvec1 distance = length(direction);
-
-	if (distance > 0.0) {
-		direction = normalize(direction);
-
-		dvec3 tangentialForce = cross(direction, dvec3(0.0, 1.0, 0.0));
-		tangentialForce *= spinstrength / (distance * distance);
-
-		dvec3 centrifugalforce = offset * -centrifugalStrength;
-
-		return tangentialForce + centrifugalforce;
-	}
-
-	return dvec3(0.0);
+dvec3 computeCoriolisEffect(const CPU_Particle& particle) {
+	const dvec1 coriolisParameter = 2.0 * EARTH_ROTATION * sin(LATITUDE);
+	return coriolisParameter * cross(dvec3(0.0, 1.0, 0.0), particle.velocity);
 }
+
+dvec1 computeThermodynamics(CPU_Particle& particle) {
+	dvec1 radiation_loss = STEFAN_BOLTZMANN * pow(particle.temperature, 4);
+	dvec1 heat_gain = SEA_SURFACE_TEMP * particle.humidity * SPECIFIC_HEAT_AIR * (SEA_SURFACE_TEMP - particle.temperature);
+
+	particle.temperature += (heat_gain - radiation_loss) / (particle.mass * SPECIFIC_HEAT_AIR);
+	return particle.temperature;
+}
+
+void updateVelocity(CPU_Particle& particle, const vector<CPU_Particle>& neighbors, const dvec1& delta_time) {
+	dvec3 navier_stokes_force = computeNavierStokes(particle, neighbors);
+	dvec3 coriolis_force = computeCoriolisEffect(particle);
+
+	particle.acceleration = (navier_stokes_force + coriolis_force) / particle.mass;
+	particle.velocity += particle.acceleration * delta_time;
+}
+
+void updatePosition(CPU_Particle& particle, const dvec1& delta_time) {
+	particle.pos += particle.velocity * delta_time;
+}
+
+
+
+
+
 
 void initialize(Grid& grid, const ulvec3& size) {
-	dvec3 center = dvec3(size) / 4.0;
+	dvec3 center = dvec3(size) / 2.0;
 	dvec1 max_distance = glm::max(glm::max(size.x, size.y), size.z) / 2.0;
 
 	for (uint64 x = 0; x < size.x; ++x) {
@@ -141,53 +121,20 @@ void initialize(Grid& grid, const ulvec3& size) {
 					cell.density = 0.0f;
 				}
 				cell.density *= randD() * 0.5 + 0.5;
-				cell.pressure = cell.density;
-				cell.velocity = vec3(randD(), randD(), randD()) * 2.0f - 1.0f;
-				cell.acceleration = vec3(0);
+				cell.pressure = randD() * 0.5 + 0.5;
 			}
 		}
 	}
 }
 
 void simulate(Grid& grid, const ulvec3& size, const dvec1& delta_time) {
-	Grid new_grid = grid;
 	for (uint64 x = 0; x < size.x; ++x) {
 		for (uint64 y = 0; y < size.y; ++y) {
 			for (uint64 z = 0; z < size.z; ++z) {
 				CPU_Cell& cell = grid[x][y][z];
-
-				glm::vec3 pressure_gradient = computePressureGradient(grid, x, y, z, size);
-
-				// Update velocity based on pressure gradient (pressure force)
-				cell.velocity += pressure_gradient * 1.0f * d_to_f(delta_time);
-
-				// Update density based on velocity divergence
-				// Approximation: as fluid moves into or out of the cell, density is updated
-				// Simplified form of continuity equation: density change ∝ velocity divergence
-				glm::vec3 velocity_gradient(0.0f);
-
-				// Check neighboring velocities to calculate divergence
-				if (x > 0) velocity_gradient.x += grid[x - 1][y][z].velocity.x - cell.velocity.x;
-				if (x < size.x - 1) velocity_gradient.x += grid[x + 1][y][z].velocity.x - cell.velocity.x;
-
-				if (y > 0) velocity_gradient.y += grid[x][y - 1][z].velocity.y - cell.velocity.y;
-				if (y < size.y - 1) velocity_gradient.y += grid[x][y + 1][z].velocity.y - cell.velocity.y;
-
-				if (z > 0) velocity_gradient.z += grid[x][y][z - 1].velocity.z - cell.velocity.z;
-				if (z < size.z - 1) velocity_gradient.z += grid[x][y][z + 1].velocity.z - cell.velocity.z;
-
-				// Update density based on velocity divergence (simplified continuity equation)
-				float velocity_divergence = glm::dot(velocity_gradient, glm::vec3(1.0f));  // Divergence as a scalar
-				cell.density -= velocity_divergence * delta_time * 1.0f;  // Negative divergence reduces density
-
-				// Optionally, clamp density to a reasonable range (e.g., non-negative)
-				cell.density = glm::max(0.0f, cell.density);
-
 			}
 		}
 	}
-	forceSolve(new_grid, size, delta_time);
-	grid = new_grid;
 }
 
 void forceSolve(Grid& grid, const ulvec3& size, const dvec1& delta_time) {
@@ -196,64 +143,13 @@ void forceSolve(Grid& grid, const ulvec3& size, const dvec1& delta_time) {
 			for (uint64 z = 0; z < size.z; ++z) {
 				ulvec3 pos = ulvec3(x, y, z);
 				CPU_Cell& cell = grid[x][y][z];
-
-				vec3 cell_position = vec3(x, y, z);
-				vec3 tornado_center = vec3(size.x / 2.0, size.y / 2.0, size.z / 2.0);
-				vec1 vortex_radius = 32.0;
-				vec1 tornado_strength = 1.0;
-				vec3 to_center = tornado_center - cell_position;
-				float distance_to_center = glm::length(to_center);
-
-				// If within the vortex radius, apply tornado forces
-				if (distance_to_center < vortex_radius) {
-					// Normalize the vector to center
-					vec3 direction_to_center = glm::normalize(to_center);
-
-					// Apply inward force (toward the tornado center)
-					vec3 inward_force = direction_to_center * tornado_strength * (1.0f - (distance_to_center / vortex_radius));
-
-					// Apply rotational force (perpendicular to the inward force, creating a spiral)
-					vec3 rotational_direction = glm::cross(direction_to_center, vec3(0, 1, 0));  // Rotate around the y-axis (upward)
-					vec3 rotational_force = rotational_direction * tornado_strength * (1.0f - (distance_to_center / vortex_radius));
-
-					// Sum of forces: inward + rotational
-					vec3 total_force = inward_force + rotational_force;
-
-					// Update cell's acceleration based on the total force applied
-					cell.acceleration += total_force * randF();
-
-					// Update velocity based on acceleration and delta time (simple integration)
-					cell.velocity += cell.acceleration * d_to_f(delta_time);
-
-					// Optionally, reset acceleration after each step if you're accumulating forces
-					cell.acceleration = vec3(0.0f);
-				}
 			}
 		}
 	}
 }
 
-vec3 vorticitySolve(const Grid& grid, const ulvec3& pos, const ulvec3& size) {
-	vec3 vorticity(0.0f);
-
-	if (pos.x > 0 && pos.x < size.x - 1 && pos.y > 0 && pos.y < size.y - 1 && pos.z > 0 && pos.z < size.z - 1) {
-		vec3 vel_right = grid[pos.x + 1][pos.y][pos.z].velocity;
-		vec3 vel_left = grid[pos.x - 1][pos.y][pos.z].velocity;
-		vec3 vel_up = grid[pos.x][pos.y + 1][pos.z].velocity;
-		vec3 vel_down = grid[pos.x][pos.y - 1][pos.z].velocity;
-		vec3 vel_front = grid[pos.x][pos.y][pos.z + 1].velocity;
-		vec3 vel_back = grid[pos.x][pos.y][pos.z - 1].velocity;
-
-		vorticity.x = (vel_front.y - vel_back.y) - (vel_up.z - vel_down.z);
-		vorticity.y = (vel_right.z - vel_left.z) - (vel_front.x - vel_back.x);
-		vorticity.z = (vel_up.x - vel_down.x) - (vel_right.y - vel_left.y);
-	}
-
-	return vorticity;
-}
-
-vec3 computePressureGradient(const Grid& grid, uint64 x, uint64 y, uint64 z, const uvec3& size) {
-	vec3 gradient(0.0f);
+dvec3 computePressureGradient(const Grid& grid, const uint64& x, const uint64& y, const uint64& z, const uvec3& size) {
+	dvec3 gradient(0.0);
 
 	// Check boundaries and calculate differences between neighboring cells
 	if (x > 0) gradient.x += grid[x - 1][y][z].pressure - grid[x][y][z].pressure;
@@ -276,6 +172,10 @@ Transform::Transform(const dvec3& position, const dvec3& rotation, const dvec3& 
 {
 	quat_rotation = dquat(1.0, 0.0, 0.0, 0.0);
 	axis_rotation = dvec3(0.0);
+
+	x_vec = dvec3(1.0, 0.0, 0.0);
+	y_vec = dvec3(0.0, 1.0, 0.0);
+	z_vec = dvec3(0.0, 0.0, 1.0);
 }
 
 Transform::Transform(const dvec3& position, const dvec3& axis, const dvec3& rotation, const dvec3& scale, const Rotation_Type& type) :
@@ -286,6 +186,10 @@ Transform::Transform(const dvec3& position, const dvec3& axis, const dvec3& rota
 	axis_rotation(axis)
 {
 	quat_rotation = dquat(1.0, 0.0, 0.0, 0.0);
+
+	x_vec = dvec3(1.0, 0.0, 0.0);
+	y_vec = dvec3(0.0, 1.0, 0.0);
+	z_vec = dvec3(0.0, 0.0, 1.0);
 }
 
 Transform::Transform(const dvec3& position, const dquat& rotation, const dvec3& scale, const Rotation_Type& type) :
@@ -296,6 +200,10 @@ Transform::Transform(const dvec3& position, const dquat& rotation, const dvec3& 
 {
 	euler_rotation = dvec3(0.0);
 	axis_rotation = dvec3(0.0);
+
+	x_vec = dvec3(1.0, 0.0, 0.0);
+	y_vec = dvec3(0.0, 1.0, 0.0);
+	z_vec = dvec3(0.0, 0.0, 1.0);
 }
 // TODO account for different rotation modes
 Transform Transform::operator+(const Transform& other) const {
@@ -346,20 +254,74 @@ Transform Transform::operator*(const dvec1& other) const {
 }
 
 void Transform::moveLocal(const dvec3& value) {
-	const dmat4 matrix = glm::yawPitchRoll(euler_rotation.y * DEG_RAD, euler_rotation.x * DEG_RAD, euler_rotation.z * DEG_RAD);
-	const dvec3 x_vector = matrix[0];
-	const dvec3 y_vector = matrix[1];
-	const dvec3 z_vector = matrix[2];
-	position += value.x * x_vector;
-	position += value.y * y_vector;
-	position += value.z * z_vector;
+	f_computeVectors();
+	position += value.x * x_vec;
+	position += value.y * y_vec;
+	position += value.z * z_vec;
 }
 
 void Transform::rotate(const dvec3& value) {
-	euler_rotation += value;
+	switch (rotation_type) {
+		case Rotation_Type::QUATERNION: {
+			const dquat pitch = glm::angleAxis(glm::radians(value.x), dvec3(1, 0, 0));
+			const dquat yaw   = glm::angleAxis(glm::radians(value.y), dvec3(0, 1, 0));
+			const dquat roll  = glm::angleAxis(glm::radians(value.z), dvec3(0, 0, 1));
 
-	if (euler_rotation.x > 89.0)  euler_rotation.x = 89.0;
-	if (euler_rotation.x < -89.0) euler_rotation.x = -89.0;
+			quat_rotation = yaw * pitch * roll * quat_rotation;
+			quat_rotation = glm::normalize(quat_rotation);
+			break;
+		}
+		case Rotation_Type::XYZ: {
+			euler_rotation += value;
+
+			if (euler_rotation.x > 89.0)  euler_rotation.x = 89.0;
+			if (euler_rotation.x < -89.0) euler_rotation.x = -89.0;
+		}
+	}
+}
+
+void Transform::orbit(const dvec3& pivot, const dvec2& py_rotation) {
+	switch (rotation_type) {
+		case Rotation_Type::QUATERNION: {
+			rotate(glm::vec3(py_rotation.x, py_rotation.y, 0.0));
+
+			const dvec3 forward   = glm::normalize(glm::inverse(quat_rotation) * dvec3(0, 0, -1));
+			const dvec3 direction = glm::normalize(position - pivot);
+			const dvec1 z_distance  = glm::length(position - pivot);
+
+			position = pivot - forward * z_distance;
+			break;
+		}
+		case Rotation_Type::XYZ: {
+			rotate(dvec3(py_rotation.x, py_rotation.y, 0.0));
+
+			const dmat4 matrix = glm::yawPitchRoll(glm::radians(euler_rotation.y), glm::radians(euler_rotation.x), glm::radians(euler_rotation.z));
+			const dvec3 z_vector = -matrix[2];
+
+			const dvec1 z_distance = glm::length(pivot - position);
+			const dvec3 camera_position = position - z_vector * z_distance;
+
+			position = pivot - z_vector * z_distance;
+			break;
+		}
+	}
+}
+
+void Transform::f_computeVectors() {
+	dmat4 rotation_matrix;
+	switch (rotation_type) {
+		case Rotation_Type::QUATERNION: {
+			rotation_matrix = glm::mat4_cast(quat_rotation);
+			break;
+		}
+		case Rotation_Type::XYZ: {
+			rotation_matrix = glm::yawPitchRoll(glm::radians(euler_rotation.y), glm::radians(euler_rotation.x), glm::radians(euler_rotation.z));
+			break;
+		}
+	}
+	x_vec = rotation_matrix[0];
+	y_vec = rotation_matrix[1];
+	z_vec = rotation_matrix[2];
 }
 
 dmat4 Transform::getMatrix() const {

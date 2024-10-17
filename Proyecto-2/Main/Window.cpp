@@ -12,11 +12,11 @@ Renderer::Renderer() {
 	SPHERE_RADIUS = 0.01;
 	SPHERE_DISPLAY_RADIUS = 0.01;
 	RENDER_SCALE = 0.5;
-	PARTICLE_COUNT = 512;
-	GRID_SIZE = ulvec3(64, 1, 64);
+	PARTICLE_COUNT = 128;
+	GRID_SIZE = ulvec3(16, 16, 16);
 	CELL_SIZE = 1.0 / glm::max(glm::max(GRID_SIZE.x, GRID_SIZE.y), GRID_SIZE.z);
 
-	camera_transform = Transform(dvec3(1.25, 0.4, 4), dvec3(-5.0, 18.0, 0.0));
+	camera_transform = Transform(dvec3(0, 5, 0), dvec3(-90.0, 0, 0.0));
 
 	frame_counter = 0;
 	frame_count = 0;
@@ -29,11 +29,9 @@ Renderer::Renderer() {
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
 
 	recompile = false;
-	reset = false;
-	debug = false;
 
-	camera_move_sensitivity = 1.5;
-	camera_view_sensitivity = 2.5;
+	camera_zoom_sensitivity = 1.0;
+	camera_orbit_sensitivity = 2.5;
 	keys = vector(348, false);
 	current_mouse = dvec2(display_resolution) / 2.0;
 	last_mouse = dvec2(display_resolution) / 2.0;
@@ -45,8 +43,6 @@ Renderer::Renderer() {
 	frame_time = FPS_60;
 	sim_delta = FPS_60 / 2.0;
 	last_time = 0.0;
-
-	view_layer = 0;
 }
 
 void Renderer::init() {
@@ -221,9 +217,10 @@ void Renderer::f_pipeline() {
 
 void Renderer::f_tickUpdate() {
 	const dvec1 start = glfwGetTime();
-
-	simulate(cpu_point_cloud, frame_time);
-	simulate(cpu_grid, GRID_SIZE, frame_time);
+	if (runframe > 10) {
+		simulate(cpu_point_cloud, 0.0005);
+		simulate(cpu_grid, GRID_SIZE, 0.0005);
+	}
 
 	sim_delta = glfwGetTime() - start;
 
@@ -271,37 +268,10 @@ void Renderer::guiLoop() {
 }
 
 void Renderer::gameLoop() {
-	if (keys[GLFW_KEY_D]) {
-		camera_transform.moveLocal(dvec3(1.0, 0.0, 0.0)* camera_move_sensitivity * frame_time);
-		reset = true;
-	}
-	if (keys[GLFW_KEY_A]) {
-		camera_transform.moveLocal(dvec3(-1.0, 0.0, 0.0)* camera_move_sensitivity * frame_time);
-		reset = true;
-	}
-	if (keys[GLFW_KEY_E] || keys[GLFW_KEY_SPACE]) {
-		camera_transform.moveLocal(dvec3(0.0, 1.0, 0.0)* camera_move_sensitivity * frame_time);
-		reset = true;
-	}
-	if (keys[GLFW_KEY_Q] || keys[GLFW_KEY_LEFT_CONTROL]) {
-		camera_transform.moveLocal(dvec3(0.0, -1.0, 0.0)* camera_move_sensitivity * frame_time);
-		reset = true;
-	}
-	if (keys[GLFW_KEY_W]) {
-		camera_transform.moveLocal(dvec3(0.0, 0.0, -1.0)* camera_move_sensitivity * frame_time);
-		reset = true;
-	}
-	if (keys[GLFW_KEY_S]) {
-		camera_transform.moveLocal(dvec3(0.0, 0.0, 1.0)* camera_move_sensitivity * frame_time);
-		reset = true;
-	}
-	if (keys[GLFW_MOUSE_BUTTON_RIGHT]) {
-		const dvec1 xoffset = (last_mouse.x - current_mouse.x) * frame_time * camera_view_sensitivity;
-		const dvec1 yoffset = (last_mouse.y - current_mouse.y) * frame_time * camera_view_sensitivity;
-
-		camera_transform.rotate(dvec3(yoffset, xoffset, 0.0));
-		reset = true;
-
+	if (keys[GLFW_MOUSE_BUTTON_RIGHT] or keys[GLFW_MOUSE_BUTTON_LEFT]) {
+		const dvec1 xoffset = (last_mouse.x - current_mouse.x) * frame_time * camera_orbit_sensitivity;
+		const dvec1 yoffset = (last_mouse.y - current_mouse.y) * frame_time * camera_orbit_sensitivity;
+		camera_transform.orbit(dvec3(0), dvec3(yoffset, xoffset, 0.0));
 		last_mouse = current_mouse;
 	}
 }
@@ -340,8 +310,6 @@ void Renderer::displayLoop() {
 		glUniform1f  (glGetUniformLocation(compute_program, "aspect_ratio"), d_to_f(render_aspect_ratio));
 		glUniform1f  (glGetUniformLocation(compute_program, "current_time"), d_to_f(current_time));
 		glUniform2ui (glGetUniformLocation(compute_program, "resolution"), render_resolution.x, render_resolution.y);
-		glUniform1ui (glGetUniformLocation(compute_program, "reset"), static_cast<GLuint>(reset));
-		glUniform1ui (glGetUniformLocation(compute_program, "debug"), static_cast<GLuint>(debug));
 
 		glUniform3fv (glGetUniformLocation(compute_program, "camera_pos"),  1, value_ptr(d_to_f(camera_transform.position)));
 		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_uv"), 1, value_ptr(projection_center));
@@ -365,14 +333,11 @@ void Renderer::displayLoop() {
 		glClear(GL_COLOR_BUFFER_BIT);
 		glUniform1f (glGetUniformLocation(display_program, "display_aspect_ratio"), d_to_f(display_aspect_ratio));
 		glUniform1f (glGetUniformLocation(display_program, "render_aspect_ratio") , d_to_f(render_aspect_ratio));
-		glUniform1ui(glGetUniformLocation(display_program, "view_layer"), view_layer);
-		glUniform1ui(glGetUniformLocation(display_program, "debug"), static_cast<GLuint>(debug));
 		bindRenderLayer(display_program, 0, buffers["raw"], "raw_render_layer");
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
 		frame_counter++;
 		runframe++;
-		if (reset) reset = false;
 		if (recompile) {
 			glDeleteProgram(buffers["compute"]);
 			glDeleteProgram(buffers["display"]);
@@ -440,12 +405,10 @@ void Renderer::mouseButton(GLFWwindow* window, int button, int action, int mods)
 void Renderer::scroll(GLFWwindow* window, double xoffset, double yoffset) {
 	Renderer* instance = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
 	if (yoffset < 0) {
-		instance->reset = true;
-		instance->camera_move_sensitivity /= 1.05;
+		instance->camera_transform.moveLocal(dvec3(0.0, 0.0,  25.0) * instance->camera_zoom_sensitivity * instance->frame_time);
 	}
 	if (yoffset > 0) {
-		instance->reset = true;
-		instance->camera_move_sensitivity *= 1.05;
+		instance->camera_transform.moveLocal(dvec3(0.0, 0.0, -25.0) * instance->camera_zoom_sensitivity * instance->frame_time);
 	}
 }
 
@@ -454,24 +417,6 @@ void Renderer::key(GLFWwindow* window, int key, int scancode, int action, int mo
 	// Input Handling
 	if (key == GLFW_KEY_F5 && action == GLFW_PRESS) {
 		instance->recompile = true;
-	}
-	if (key == GLFW_KEY_V  && action == GLFW_PRESS) {
-		instance->debug = !instance->debug;
-	}
-	if (key == GLFW_KEY_RIGHT  && action == GLFW_PRESS) {
-		if (instance->view_layer < 3)
-			instance->view_layer++;
-		else
-			instance->view_layer = 0;
-	}
-	if (key == GLFW_KEY_LEFT  && action == GLFW_PRESS) {
-		if (instance->view_layer > 0)
-			instance->view_layer--;
-		else
-			instance->view_layer = 3;
-	}
-	if (key == GLFW_KEY_C && action == GLFW_PRESS) {
-		instance->reset = true;
 	}
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, GLFW_TRUE);

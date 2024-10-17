@@ -1,0 +1,34 @@
+vec3 velocityToColor(vec3 velocity) {
+	vec3 color;
+	float maxSpeed = 10.0;
+	float speed = length(velocity);
+	speed = clamp(speed, 0.0, maxSpeed);
+	float normalizedSpeed = speed / maxSpeed;
+
+	if (normalizedSpeed <= 0.5) {
+		float t = normalizedSpeed * 2.0;
+		color = mix(vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 0.0), t);
+	}
+	else {
+		float t = (normalizedSpeed - 0.5) * 2.0;
+		color = mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), t);
+	}
+	return color;
+}
+
+vec3 temperatureTocolor(float temp) {
+	vec3 color;
+	float maxTemp = 40.0;
+	temp = clamp(temp, 0.0, maxTemp);
+	float normalizedTemp = temp / maxTemp;
+
+	if (normalizedTemp <= 0.5) {
+		float t = normalizedTemp * 2.0;
+		color = mix(vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 0.0), t);
+	}
+	else {
+		float t = (normalizedTemp - 0.5) * 2.0;
+		color = mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), t);
+	}
+	return color;
+}

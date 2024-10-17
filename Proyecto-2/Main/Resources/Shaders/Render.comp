@@ -3,60 +3,13 @@
 #version 460
 #include "Globals.comp"
 #include "Inputs.comp"
+#include "Coloring.comp"
+#include "Intersection.comp"
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-
-bool f_raySphereIntersection(in Ray ray, in vec3 sphere, out float t) {
-	vec3 CO = ray.origin - sphere;
-	float a = dot(ray.direction, ray.direction);
-	float b = 2.0*dot(ray.direction, CO);
-	float c = dot(CO, CO) - sphere_display_radius*sphere_display_radius;
-	float delta = b*b - 4.0*a*c;
-	if(delta < 0.0) {
-		return false;
-	}
-	t = (-b-sqrt(delta)) / (2.0*a);
-	return true;
-}
-
-bool f_rayAABBIntersection(in Ray ray, in AABB box) {
-	vec3 tMin = (box.pmin - ray.origin) * ray.direction;
-	vec3 tMax = (box.pmax - ray.origin) * ray.direction;
-
-	vec3 t1 = min(tMin, tMax);
-	vec3 t2 = max(tMin, tMax);
-
-	float tNear = max(max(t1.x, t1.y), t1.z);
-	float tFar = min(min(t2.x, t2.y), t2.z);
-
-	if (tNear > tFar || tFar < 0.0) {
-		return false;
-	}
-	return true;
-}
 
 Ray f_cameraRay(vec2 uv) {
 	return Ray(camera_pos, normalize(camera_p_uv + (camera_p_u * uv.x) + (camera_p_v * uv.y) - camera_pos));
-}
-
-vec3 velocityToColor(vec3 velocity) {
-	float maxSpeed = 10.0;
-	float speed = length(velocity);
-
-	speed = clamp(speed, 0.0, maxSpeed);
-	float normalizedSpeed = speed / maxSpeed;
-	vec3 color;
-
-	if (normalizedSpeed <= 0.5) {
-		float t = normalizedSpeed * 2.0;
-		color = mix(vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 0.0), t);
-	}
-	else {
-		float t = (normalizedSpeed - 0.5) * 2.0;
-		color = mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), t);
-	}
-
-	return color;
 }
 
 void main() {
@@ -73,36 +26,31 @@ void main() {
 		if (f_raySphereIntersection(ray, point_cloud[i].pos.xyz, t_dist)) {
 			if (t_dist < t_length && t_dist > EPSILON) {
 				t_length = t_dist;
-				color = point_cloud[i].col;
+				color = vec4(velocityToColor(point_cloud[i].velocity.xyz), 1.0);
 			}
 		}
 	}
 
-//	ray.direction = 1.0 / ray.direction;
-//	vec3 half_grid_size = vec3(grid_size / 2) * cell_size;
-//	AABB rootBox;
-//	rootBox.pmin = -half_grid_size;
-//	rootBox.pmax = half_grid_size;
-//
-//	float color_step = (1.0 / (max(max(grid_size.x, grid_size.y), grid_size.z)));
-//	color_step = 1.0;
-//	for (uint x = 0; x < grid_size.x; ++x) {
-//		for (uint y = 0; y < grid_size.y; ++y) {
-//			for (uint z = 0; z < grid_size.z; ++z) {
-//				AABB box;
-//				box.pmin = vec3(x, y, z) * cell_size - half_grid_size ;
-//				box.pmax = box.pmin + cell_size;
-//
-//				if (f_rayAABBIntersection(ray, box)) {
-//					uint index = x * (grid_size.y * grid_size.z) + y * grid_size.z + z;
-//					Cell cell = grid[index];
-//
-//					color = vec4(velocityToColor(cell.velocity) * cell.density , 0.0);
-//
-//				}
-//			}
-//		}
-//	}
+	ray.direction = 1.0 / ray.direction;
+	vec3 half_grid_size = vec3(grid_size / 2) * cell_size;
+	AABB rootBox;
+	rootBox.pmin = -half_grid_size;
+	rootBox.pmax = half_grid_size;
+	float color_step = (1.0 / (max(max(grid_size.x, grid_size.y), grid_size.z)));
+	for (uint x = 0; x < grid_size.x; ++x) {
+		for (uint y = 0; y < grid_size.y; ++y) {
+			for (uint z = 0; z < grid_size.z; ++z) {
+				AABB box;
+				box.pmin = vec3(x, y, z) * cell_size - half_grid_size ;
+				box.pmax = box.pmin + cell_size;
+				if (f_rayAABBIntersection(ray, box)) {
+					uint index = x * (grid_size.y * grid_size.z) + y * grid_size.z + z;
+					Cell cell = grid[index];
+					color += vec4(temperatureTocolor(cell.temperature) * cell.density , 0.0);
+				}
+			}
+		}
+	}
 
 	color = clamp(color, 0.0, 1.0);
 	imageStore(raw_render_layer, pixel_id, color);

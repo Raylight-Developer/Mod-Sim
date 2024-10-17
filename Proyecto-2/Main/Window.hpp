@@ -35,11 +35,9 @@ struct Renderer {
 	uint64 runframe;
 
 	bool recompile;
-	bool reset;
-	bool debug;
 
-	dvec1 camera_move_sensitivity;
-	dvec1 camera_view_sensitivity;
+	dvec1 camera_zoom_sensitivity;
+	dvec1 camera_orbit_sensitivity;
 	vector<bool> keys;
 
 	dvec2 current_mouse;
@@ -52,8 +50,6 @@ struct Renderer {
 	dvec1 window_time;
 	dvec1 frame_time;
 	dvec1 last_time;
-
-	uint view_layer;
 
 	unordered_map<string, GLuint> buffers;
 

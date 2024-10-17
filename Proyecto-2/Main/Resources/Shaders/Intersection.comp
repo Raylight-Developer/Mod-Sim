@@ -1,0 +1,28 @@
+bool f_raySphereIntersection(in Ray ray, in vec3 sphere, out float t) {
+	vec3 CO = ray.origin - sphere;
+	float a = dot(ray.direction, ray.direction);
+	float b = 2.0*dot(ray.direction, CO);
+	float c = dot(CO, CO) - sphere_display_radius*sphere_display_radius;
+	float delta = b*b - 4.0*a*c;
+	if(delta < 0.0) {
+		return false;
+	}
+	t = (-b-sqrt(delta)) / (2.0*a);
+	return true;
+}
+
+bool f_rayAABBIntersection(in Ray ray, in AABB box) {
+	vec3 tMin = (box.pmin - ray.origin) * ray.direction;
+	vec3 tMax = (box.pmax - ray.origin) * ray.direction;
+
+	vec3 t1 = min(tMin, tMax);
+	vec3 t2 = max(tMin, tMax);
+
+	float tNear = max(max(t1.x, t1.y), t1.z);
+	float tFar = min(min(t2.x, t2.y), t2.z);
+
+	if (tNear > tFar || tFar < 0.0) {
+		return false;
+	}
+	return true;
+}

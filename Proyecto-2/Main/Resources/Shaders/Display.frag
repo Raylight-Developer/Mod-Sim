@@ -2,8 +2,6 @@
 
 uniform float display_aspect_ratio;
 uniform float render_aspect_ratio;
-uniform uint  view_layer;
-uniform bool  debug;
 
 uniform sampler2D raw_render_layer;
 
