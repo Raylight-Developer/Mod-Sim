@@ -35,6 +35,11 @@ struct CPU_Cell {
 
 	dvec3 pmin;
 	dvec3 pmax;
+
+	dvec3 velocity_field;
+	dvec3 acceleration_field;
+
+	CPU_Cell();
 };
 
 struct GPU_Cell {
@@ -58,13 +63,16 @@ void updatePosition(CPU_Particle& particle, const dvec1& delta_time);
 void handleBorderCollision(CPU_Particle& particle);
 dvec3 computeNavierStokes(const CPU_Particle& particle, const Cloud& neighbors);
 dvec3 computeCoriolisEffect(const CPU_Particle& particle);
-dvec1 computeThermodynamics(CPU_Particle& particle);
+void  computeThermodynamics(CPU_Particle& particle, const dvec1& half_size);
 
 //Grid
 void initialize(Grid& grid);
 void simulate  (Grid& grid, const Cloud& particles, const dvec1& delta_time);
-void computeDensity(CPU_Cell& cell, const Cloud& particles, const dvec1& normalized_density);
+void integrate (CPU_Cell& cell, const dvec1& delta_time);
+void computeParticleData(CPU_Cell& cell, const Cloud& particles, const dvec1& delta_time, const dvec1& normalized_density);
 dvec3 computePressureGradient(const Grid& grid, const uint64& x, const uint64& y, const uint64& z, const uvec3& size);
+
+void  computeConvection(CPU_Cell& cell, const dvec1& delta_time);
 
 void advection (Grid& grid, const dvec1& delta_time);
 void diffusion (Grid& grid, const dvec1& delta_time);

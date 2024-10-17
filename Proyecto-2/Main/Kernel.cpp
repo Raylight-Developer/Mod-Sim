@@ -1,15 +1,17 @@
 ﻿#include "Kernel.hpp"
 
-#define AIR_DENSITY       1.225      // kg/m^3 (at sea level)
-#define GAS_CONSTANT      287.05     // J/(kg·K) for dry air
-#define EARTH_ROTATION    7.2921e-5  // radians per second
-#define SPECIFIC_HEAT_AIR 1005.0     // J/(kg·K)
-#define STEFAN_BOLTZMANN  5.67e-8    // W/m²·K⁴
-#define SEA_SURFACE_TEMP  28.5       // C
-#define LATITUDE          15.0
-#define RESTITUTION       1.0
-#define GRAVITY           dvec3(0.0, -9.81, 0.0)
-
+#define AIR_DENSITY        1.225      // kg/m^3 (at sea level)
+#define GAS_CONSTANT       287.05     // J/(kg·K) for dry air
+#define EARTH_ROTATION     7.2921e-5  // radians per second
+#define SPECIFIC_HEAT_AIR  1005.0     // J/(kg·K)
+#define STEFAN_BOLTZMANN   5.67e-8    // W/m²·K⁴
+#define SEA_SURFACE_TEMP   28.5       // C
+#define AMBIENT_TEMP       15.5       // C
+#define HEAT_TRANSFER_RATE 0.6        // W/m·K
+#define HEAT_LOSS_RATE     0.2        // W/m·K
+#define LATITUDE           15.0
+#define RESTITUTION        1.0
+#define GRAVITY            dvec3(0.0, -9.81, 0.0)
 
 CPU_Particle::CPU_Particle() {
 	mass = randD() * 0.5 + 0.1;
@@ -17,21 +19,36 @@ CPU_Particle::CPU_Particle() {
 	pressure = randD() * 0.5 + 0.1;
 	temperature = 15.0 + randD() * 10.0;
 
-	position = dvec3(0.0);
-	velocity = dvec3(0.0);
-	acceleration = dvec3(0.0);
+	position = dvec3(0);
+	velocity = dvec3(0);
+	acceleration = dvec3(0);
 
 	colliding = false;
 }
 
 GPU_Particle::GPU_Particle() {
-	position = vec4(.0f);
-	velocity = vec4(0.0f);
+	position = vec4(0);
+	velocity = vec4(0);
 }
 
 GPU_Particle::GPU_Particle(const CPU_Particle& particle) {
-	position = vec4(d_to_f(particle.position), 1.0f);
-	velocity = vec4(d_to_f(particle.velocity), 1.0f);
+	position = vec4(d_to_f(particle.position), 1);
+	velocity = vec4(d_to_f(particle.velocity), 1);
+}
+
+CPU_Cell::CPU_Cell() {
+	density  = 0.0;
+	humidity = 0.0;
+	pressure = 0.0;
+	temperature = AMBIENT_TEMP;
+
+	particle_count = 0;
+
+	pmin = dvec3(0);
+	pmax = dvec3(0);
+
+	velocity_field = dvec3(0);
+	acceleration_field = dvec3(0);
 }
 
 GPU_Cell::GPU_Cell() {
@@ -62,12 +79,12 @@ void initialize(Cloud& points) {
 
 		const dvec1 x = r * cos(angle);
 		const dvec1 z = r * sin(angle);
-		const dvec1 y = randD(pmin.y, pmax.y);
+		const dvec1 y = randD(pmin.y, pmin.y + half_size.y * 0.25);
 
 		particle.mass = randD() * 0.5 + 0.1;
 		particle.humidity = randD() * 0.5 + 0.1;
 		particle.pressure = randD() * 0.5 + 0.1;
-		particle.temperature = 15.0 + randD() * 10.0;
+		particle.temperature = AMBIENT_TEMP + 10.0;
 
 		particle.position = dvec3(x, y, z);
 		particle.velocity = dvec3(0.0);
@@ -76,8 +93,12 @@ void initialize(Cloud& points) {
 }
 
 void simulate(Cloud& points, const dvec1& delta_time) {
+	const ulvec3 size = ulvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
+	const dvec1  cell_size = SESSION_GET("CELL_SIZE", dvec1);
+	const dvec3  half_size = ul_to_d(size) * SESSION_GET("CELL_SIZE", dvec1) * 0.5;
+
 	for (CPU_Particle& particle: points) {
-		computeThermodynamics(particle);
+		computeThermodynamics(particle, half_size.y);
 		updateVelocity(particle, points, delta_time);
 		updatePosition(particle, delta_time);
 	}
@@ -159,12 +180,13 @@ dvec3 computeCoriolisEffect(const CPU_Particle& particle) {
 	return coriolisParameter * cross(dvec3(0.0, 1.0, 0.0), particle.velocity);
 }
 
-dvec1 computeThermodynamics(CPU_Particle& particle) {
+void computeThermodynamics(CPU_Particle& particle, const dvec1& half_size) {
 	dvec1 radiation_loss = STEFAN_BOLTZMANN * pow(particle.temperature, 4);
 	dvec1 heat_gain = SEA_SURFACE_TEMP * particle.humidity * SPECIFIC_HEAT_AIR * (SEA_SURFACE_TEMP - particle.temperature);
 
-	particle.temperature += (heat_gain - radiation_loss) / (particle.mass * SPECIFIC_HEAT_AIR);
-	return particle.temperature;
+	if (particle.position.y <= -half_size + half_size * 0.1) {
+		particle.temperature = SEA_SURFACE_TEMP;
+	}
 }
 
 
@@ -192,6 +214,7 @@ void initialize(Grid& grid) {
 				} else {
 					cell.density = 0.0f;
 				}
+				cell.temperature = AMBIENT_TEMP + randD() - 0.5;
 				cell.density *= randD() * 0.5 + 0.5;
 				cell.pressure = randD() * 0.5 + 0.5;
 				cell.pmin = dvec3(x, y, z) * cell_size - half_size ;
@@ -211,19 +234,28 @@ void simulate(Grid& grid, const Cloud& particles, const dvec1& delta_time) {
 		for (uint64 y = 0; y < size.y; ++y) {
 			for (uint64 z = 0; z < size.z; ++z) {
 				CPU_Cell& cell = grid[x][y][z];
-				computeDensity(cell, particles, normalized_density);
+				integrate(cell, delta_time);
+				computeParticleData(cell, particles, delta_time, normalized_density);
 			}
 		}
 	}
 }
 
-void computeDensity(CPU_Cell& cell, const Cloud& particles, const dvec1& normalized_density) {
+void integrate(CPU_Cell& cell, const dvec1& delta_time) {
+	//cell.acceleration_field = GRAVITY;
+	//cell.velocity_field += cell.acceleration_field * delta_time;
+}
+
+void computeParticleData(CPU_Cell& cell, const Cloud& particles, const dvec1& delta_time, const dvec1& normalized_density) {
 	cell.particle_count = 0;
 	for (const auto& particle : particles) {
 		if (insideAABB(particle.position, cell.pmin, cell.pmax)) {
 			cell.particle_count++;
+
+			cell.temperature += particle.temperature * HEAT_TRANSFER_RATE * delta_time;
 		}
 	}
+	cell.temperature -= HEAT_LOSS_RATE * (cell.temperature - AMBIENT_TEMP) * delta_time;
 	cell.density = (dvec1)(cell.particle_count / normalized_density);
 }
 

@@ -36,7 +36,7 @@ void main() {
 	AABB rootBox;
 	rootBox.pmin = -half_grid_size;
 	rootBox.pmax = half_grid_size;
-	float color_step = (1.0 / (max(max(grid_size.x, grid_size.y), grid_size.z))) * 2.0;
+	float color_step = (1.0 / (max(max(grid_size.x, grid_size.y), grid_size.z)));
 	for (uint x = 0; x < grid_size.x; ++x) {
 		for (uint y = 0; y < grid_size.y; ++y) {
 			for (uint z = 0; z < grid_size.z; ++z) {
@@ -46,7 +46,7 @@ void main() {
 				if (f_rayAABBIntersection(ray, box)) {
 					uint index = x * (grid_size.y * grid_size.z) + y * grid_size.z + z;
 					Cell cell = grid[index];
-					color += vec4(temperatureTocolor(cell.temperature), 0.0) * (cell.density+0.1) * color_step;
+					color += vec4(temperatureTocolor(cell.temperature), 0.0) * color_step;// * cell.density;
 				}
 			}
 		}
