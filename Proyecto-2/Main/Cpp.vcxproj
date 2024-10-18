@@ -49,6 +49,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(ProjectDir)\Include;$(SolutionDir)\Shared\Include;$(IncludePath);C:\Programs\Coding\Lib\imgui-1.90</IncludePath>
     <OutDir>$(SolutionDir)\</OutDir>
+    <LinkIncremental>
+    </LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(ProjectDir)\Include;$(SolutionDir)\Shared\Include;$(IncludePath);C:\Programs\Coding\Lib\imgui-1.90</IncludePath>
@@ -60,11 +62,11 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalOptions>/LTCG %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -76,12 +78,12 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <OpenMPSupport />
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalOptions>/LTCG %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -90,7 +92,6 @@
     <ClCompile Include="..\Shared\Source\OpenGl.cpp" />
     <ClCompile Include="..\Shared\Source\Ops.cpp" />
     <ClCompile Include="..\Shared\Source\Session.cpp" />
-    <ClCompile Include="Flip.cpp" />
     <ClCompile Include="Kernel.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Window.cpp" />
@@ -107,7 +108,6 @@
     <ClInclude Include="..\Shared\Include\Shared.hpp" />
     <ClInclude Include="..\Shared\Include\String.hpp" />
     <ClInclude Include="..\Shared\Include\Types.hpp" />
-    <ClInclude Include="Flip.hpp" />
     <ClInclude Include="Kernel.hpp" />
     <ClInclude Include="Window.hpp" />
   </ItemGroup>

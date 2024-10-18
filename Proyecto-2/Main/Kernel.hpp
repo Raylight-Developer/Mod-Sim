@@ -23,7 +23,8 @@ struct CPU_Particle {
 };
 
 struct alignas(16) GPU_Particle {
-	vec4 position;
+	vec3 position;
+	vec1 temperature;
 	vec4 velocity;
 
 	GPU_Particle();
@@ -37,6 +38,7 @@ struct CPU_Cell {
 	dvec1 temperature;
 
 	vector<CPU_Particle*> particles;
+	uint  particle_count;
 
 	dvec3 pmin;
 	dvec3 pmax;
@@ -74,11 +76,6 @@ struct Flip {
 	Grid grid;
 	Particles particles;
 
-	int fNumX, fNumY, fNumZ;
-	vector<float> u, v, w, du, dv, dw;
-	vector<float> p, s;
-	vector<uint> numCellParticles, firstCellParticle, cellParticleIds;
-
 	Flip();
 
 	void init();
@@ -88,7 +85,20 @@ struct Flip {
 	void simulate(const dvec1& delta_time);
 
 	void integrate(const dvec1& delta_time);
-	void updateDensity();
+
+	void thermodynamics(CPU_Particle& particle, const dvec1& delta_time);
+	void seaThermalTransfer(CPU_Particle& particle, const dvec1& delta_time);
+	void atmosphereThermalTransfer(CPU_Particle& particle, const dvec1& delta_time);
+
+	void scatter(const dvec1& delta_time);
+	void gather(const dvec1& delta_time);
+
+	void navierStokes();
+	void computeCoriolis();
+	void computePressure();
+	void computeTemperature();
+
+
 
 
 	void particleCollisions(const dvec1& delta_time);

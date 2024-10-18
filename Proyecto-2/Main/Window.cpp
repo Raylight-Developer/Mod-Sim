@@ -22,7 +22,7 @@ Renderer::Renderer() {
 	SESSION_SET("CELL_SIZE", 1.0 / max(max(SESSION_GET("GRID_SIZE_X", uint64), SESSION_GET("GRID_SIZE_Y", uint64)), SESSION_GET("GRID_SIZE_Z", uint64)), dvec1);
 
 	camera_transform = Transform(dvec3(0, 0, 4), dvec3(0));
-	camera_transform.orbit(dvec3(0), dvec3(85, 0, 0));
+	camera_transform.orbit(dvec3(0), dvec3(0, 0, 0));
 
 	frame_counter = 0;
 	frame_count = 0;
@@ -217,47 +217,35 @@ void Renderer::f_pipeline() {
 
 	glBindVertexArray(VAO);
 	flip.init();
-	sim = FlipFluid();
 }
 
 void Renderer::f_tickUpdate() {
 	const dvec1 start = glfwGetTime();
-	if (runframe > 100) {
-		const dvec1 delta = delta_time * SESSION_GET("TIME_SCALE", dvec1);
-		//flip.simulate(delta);
-		sim.simulate(delta);
-	}
+
+	const dvec1 delta = delta_time * SESSION_GET("TIME_SCALE", dvec1);
+	flip.simulate(delta);
 
 	sim_delta = glfwGetTime() - start;
 
-	//glDeleteBuffers(1, &buffers["particles"]);
-	//vector<GPU_Particle> gpu_point_cloud;
-	//for (const CPU_Particle& particle : flip.particles) {
-	//	gpu_point_cloud.push_back(GPU_Particle(particle));
-	//}
-	//buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
-	//
-	//glDeleteBuffers(1, &buffers["cells"]);
-	//const ulvec3 GRID_SIZE = ulvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
-	//vector<GPU_Cell> gpu_grid(GRID_SIZE.x * GRID_SIZE.y * GRID_SIZE.z);
-	//for (uint64 x = 0; x < GRID_SIZE.x; ++x) {
-	//	for (uint64 y = 0; y < GRID_SIZE.y; ++y) {
-	//		for (uint64 z = 0; z < GRID_SIZE.z; ++z) {
-	//			uint64 index = x * (GRID_SIZE.y * GRID_SIZE.z) + y * GRID_SIZE.z + z;
-	//			gpu_grid[index] = GPU_Cell(flip.grid[x][y][z]);
-	//		}
-	//	}
-	//}
-	//buffers["cells"] = ssboBinding(2, ul_to_u(gpu_grid.size() * sizeof(GPU_Cell)), gpu_grid.data());
-	vector<GPU_Particle> gpu_particles;
-	for (const auto& pos : sim.particlePos) {
-		auto particle = GPU_Particle();
-		particle.position.x = pos.x;
-		particle.position.z = pos.y;
-		gpu_particles.push_back(particle);
+	glDeleteBuffers(1, &buffers["particles"]);
+	vector<GPU_Particle> gpu_point_cloud;
+	for (const CPU_Particle& particle : flip.particles) {
+		gpu_point_cloud.push_back(GPU_Particle(particle));
 	}
-	glDeleteBuffers(1, &buffers["flip"]);
-	buffers["filp"] = ssboBinding(3, ul_to_u(gpu_particles.size() * sizeof(GPU_Particle)), gpu_particles.data());
+	buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
+	
+	glDeleteBuffers(1, &buffers["cells"]);
+	const ulvec3 GRID_SIZE = ulvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
+	vector<GPU_Cell> gpu_grid(GRID_SIZE.x * GRID_SIZE.y * GRID_SIZE.z);
+	for (uint64 x = 0; x < GRID_SIZE.x; ++x) {
+		for (uint64 y = 0; y < GRID_SIZE.y; ++y) {
+			for (uint64 z = 0; z < GRID_SIZE.z; ++z) {
+				uint64 index = x * (GRID_SIZE.y * GRID_SIZE.z) + y * GRID_SIZE.z + z;
+				gpu_grid[index] = GPU_Cell(flip.grid[x][y][z]);
+			}
+		}
+	}
+	buffers["cells"] = ssboBinding(2, ul_to_u(gpu_grid.size() * sizeof(GPU_Cell)), gpu_grid.data());
 }
 
 void Renderer::guiLoop() {

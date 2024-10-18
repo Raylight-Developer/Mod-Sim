@@ -22,35 +22,35 @@ void main() {
 	float t_dist = MAX_DIST;
 	vec4 color = vec4(0,0,0,1);
 
-	for (uint i = 0; i < flip_point_cloud.length(); i++) {
-		if (f_raySphereIntersection(ray, flip_point_cloud[i].position.xyz, t_dist)) {
+	for (uint i = 0; i < point_cloud.length(); i++) {
+		if (f_raySphereIntersection(ray, point_cloud[i].position.xyz, t_dist)) {
 			if (t_dist < t_length && t_dist > EPSILON) {
 				t_length = t_dist;
-				color = vec4(1.0);
+				color = vec4(temperatureTocolor(point_cloud[i].temperature), 1.0);
 			}
 		}
 	}
 
-	//ray.direction = 1.0 / ray.direction;
-	//vec3 half_grid_size = vec3(grid_size / 2) * cell_size;
-	//AABB rootBox;
-	//rootBox.pmin = -half_grid_size;
-	//rootBox.pmax = half_grid_size;
-	//float color_step = (1.0 / (max(max(grid_size.x, grid_size.y), grid_size.z)));
-	//for (uint x = 0; x < grid_size.x; ++x) {
-	//	for (uint y = 0; y < grid_size.y; ++y) {
-	//		for (uint z = 0; z < grid_size.z; ++z) {
-	//			AABB box;
-	//			box.pmin = vec3(x, y, z) * cell_size - half_grid_size ;
-	//			box.pmax = box.pmin + cell_size;
-	//			if (f_rayAABBIntersection(ray, box)) {
-	//				uint index = x * (grid_size.y * grid_size.z) + y * grid_size.z + z;
-	//				Cell cell = grid[index];
-	//				color += vec4(temperatureTocolor(cell.temperature), 0.0) * color_step;// * cell.density;
-	//			}
-	//		}
-	//	}
-	//}
+	ray.direction = 1.0 / ray.direction;
+	vec3 half_grid_size = vec3(grid_size / 2) * cell_size;
+	AABB rootBox;
+	rootBox.pmin = -half_grid_size;
+	rootBox.pmax = half_grid_size;
+	float color_step = (1.0 / (max(max(grid_size.x, grid_size.y), grid_size.z))) * 0.25;
+	for (uint x = 0; x < grid_size.x; ++x) {
+		for (uint y = 0; y < grid_size.y; ++y) {
+			for (uint z = 0; z < grid_size.z; ++z) {
+				AABB box;
+				box.pmin = vec3(x, y, z) * cell_size - half_grid_size ;
+				box.pmax = box.pmin + cell_size;
+				if (f_rayAABBIntersection(ray, box)) {
+					uint index = x * (grid_size.y * grid_size.z) + y * grid_size.z + z;
+					Cell cell = grid[index];
+					color += vec4(temperatureTocolor(cell.temperature), 0.0) * color_step;// * cell.density;
+				}
+			}
+		}
+	}
 
 	color = clamp(color, 0.0, 1.0);
 	imageStore(raw_render_layer, pixel_id, color);

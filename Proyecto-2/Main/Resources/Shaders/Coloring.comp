@@ -20,7 +20,7 @@ vec3 velocityToColor(vec3 velocity) {
 
 vec3 temperatureTocolor(float temp) {
 	vec3 color;
-	float normalizedTemp = clamp(f_mapFloat(10.0, 30.0, 0.0, 1.0, temp), 0.0, 1.0);
+	float normalizedTemp = clamp(f_mapFloat(0.0, 30.0, 0.0, 1.0, temp), 0.0, 1.0);
 
 	if (normalizedTemp <= 0.5) {
 		float t = normalizedTemp * 2.0;

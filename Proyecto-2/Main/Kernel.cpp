@@ -5,8 +5,6 @@
 #define EARTH_ROTATION     7.2921e-5  // radians per second
 #define SPECIFIC_HEAT_AIR  1005.0     // J/(kg·K)
 #define STEFAN_BOLTZMANN   5.67e-8    // W/m²·K⁴
-#define SEA_SURFACE_TEMP   28.5       // C
-#define AMBIENT_TEMP       15.5       // C
 #define HEAT_TRANSFER_RATE 0.6        // W/m·K
 #define HEAT_LOSS_RATE     0.2        // W/m·K
 #define LATITUDE           15.0
@@ -15,6 +13,11 @@
 #define PARTICLE_RESTITUTION       0.95
 #define RESTITUTION                0.95
 #define GRAVITY                    dvec3(0.0, -9.81, 0.0)
+
+#define ATMOSPHERE_TEMP    5.5        // C
+#define SEA_SURFACE_TEMP   28.5       // C
+#define AMBIENT_TEMP       15.5       // C
+#define CORIOLIS           dvec3(2 * 15.0, 0, 0)
 
 CPU_Particle::CPU_Particle() {
 	mass = 0;
@@ -33,12 +36,14 @@ CPU_Particle::CPU_Particle() {
 }
 
 GPU_Particle::GPU_Particle() {
-	position = vec4(0);
+	position = vec3(0);
+	temperature = 0;
 	velocity = vec4(0);
 }
 
 GPU_Particle::GPU_Particle(const CPU_Particle& particle) {
-	position = vec4(d_to_f(particle.position), 1);
+	position = d_to_f(particle.position);
+	temperature = d_to_f(particle.temperature);
 	velocity = vec4(d_to_f(particle.velocity), 1);
 }
 
@@ -49,6 +54,7 @@ CPU_Cell::CPU_Cell() {
 	temperature = AMBIENT_TEMP;
 
 	particles = {};
+	particle_count = 0;
 
 	pmin = dvec3(0);
 	pmax = dvec3(0);
@@ -71,30 +77,6 @@ GPU_Cell::GPU_Cell(const CPU_Cell& cell) {
 	temperature = d_to_f(cell.temperature);
 }
 
-void Flip::initParticles() {
-	dvec1 radius = 0.45;
-	const dvec3 pmin = -HALF_SIZE;
-	const dvec3 pmax = HALF_SIZE;
-
-	for (uint64 i = 0; i < particles.size(); i++) {
-		CPU_Particle& particle = particles[i];
-		const dvec1 angle = i * (glm::pi<dvec1>() * (3.0 - sqrt(5.0)));
-		const dvec1 r = radius * sqrt(i / (dvec1)(particles.size() - 1));
-
-		const dvec1 x = r * cos(angle);
-		const dvec1 z = r * sin(angle);
-		const dvec1 y = pmin.y + HALF_SIZE.y * 0.25;
-
-		particle.position = dvec3(x, y, z);
-		particle.velocity = dvec3(randD(-0.5, 0.5), 0, randD(-0.5, 0.5));
-
-		particle.mass = 0.005;//randD() * 0.5 + 0.1;
-		particle.humidity = randD() * 0.5 + 0.1;
-		particle.pressure = randD() * 0.5 + 0.1;
-		particle.temperature = AMBIENT_TEMP + randD() * 10.0;
-	}
-}
-
 Flip::Flip() {
 	PARTICLE_RADIUS = SESSION_GET("PARTICLE_RADIUS", dvec1);
 	PARTICLE_COUNT = ul_to_u(SESSION_GET("PARTICLE_COUNT", uint64));
@@ -105,26 +87,40 @@ Flip::Flip() {
 	GRID_SIZE      = dvec3(GRID_CELLS) * CELL_SIZE;
 	HALF_SIZE      = GRID_SIZE * 0.5;
 	REST_DENSITY = 0.0;
-
-	fNumX = floor(GRID_SIZE.x / CELL_SIZE) + 1;
-	fNumY = floor(GRID_SIZE.y / CELL_SIZE) + 1;
-	fNumZ = floor(GRID_SIZE.z / CELL_SIZE) + 1;
 }
 
 void Flip::init() {
 	particles = vector(SESSION_GET("PARTICLE_COUNT", uint64), CPU_Particle());
 	grid = vector(SESSION_GET("GRID_SIZE_X", uint64), vector(SESSION_GET("GRID_SIZE_Y", uint64), vector(SESSION_GET("GRID_SIZE_Z", uint64), CPU_Cell())));
-	
-	vector<ivec3> neighbors = {
-		ivec3( 1, 0,  0),
-		ivec3(-1, 0,  0),
-		ivec3(0,  1,  0),
-		ivec3(0, -1,  0),
-		ivec3(0,  0,  1),
-		ivec3(0,  0, -1),
-	};
+
 	initParticles();
 	initGrid();
+}
+
+void Flip::initParticles() {
+	const dvec1 radius = 0.45;
+
+	for (uint64 i = 0; i < particles.size(); i++) {
+		CPU_Particle& particle = particles[i];
+		const dvec1 normalized_i = i / (double)(particles.size() - 1);
+		const dvec1 theta = acos(1.0 - 2.0 * normalized_i);
+		const dvec1 phi = i * (glm::pi<dvec1>() * (3.0 - sqrt(5.0)));
+
+		const dvec1 x = radius * sin(theta) * cos(phi);
+		const dvec1 y = radius * cos(theta);
+		const dvec1 z = radius * sin(theta) * sin(phi);
+
+		particle.position = dvec3(x, y, z);
+		particle.velocity = dvec3(randD(-0.5, 0.5), 0, randD(-0.5, 0.5));
+
+		particle.mass = randD() * 0.0025 + 0.0025;
+		particle.humidity = randD() * 0.5 + 0.1;
+		particle.pressure = randD() * 0.5 + 0.1;
+		particle.temperature = AMBIENT_TEMP + randD(-1.0, 1.0);
+
+		seaThermalTransfer(particle, 0.05);
+		atmosphereThermalTransfer(particle, 0.05);
+	}
 }
 
 void Flip::initGrid() {
@@ -132,11 +128,14 @@ void Flip::initGrid() {
 		for (uint y = 0; y < GRID_CELLS.y; ++y) {
 			for (uint z = 0; z < GRID_CELLS.z; ++z) {
 				CPU_Cell& cell = grid[x][y][z];
-				cell.temperature = AMBIENT_TEMP + randD() - 0.5;
-				cell.pressure = randD() * 0.5 + 0.5;
-				cell.density = randD() * 0.5 + 0.5;
+				cell.pressure = 0.5;
+				cell.density = 0.5;
 				cell.pmin = dvec3(x, y, z) * CELL_SIZE - (GRID_SIZE * 0.5) ;
 				cell.pmax = cell.pmin + CELL_SIZE;
+				cell.temperature = AMBIENT_TEMP;
+				//if (y == 0) {
+				//	cell.temperature = SEA_SURFACE_TEMP;
+				//}
 			}
 		}
 	}
@@ -144,7 +143,7 @@ void Flip::initGrid() {
 
 void Flip::simulate(const dvec1& delta_time) {
 	integrate(delta_time);
-	particleCollisions(delta_time);
+	scatter(delta_time);
 }
 
 void Flip::integrate(const dvec1& delta_time) {
@@ -152,10 +151,89 @@ void Flip::integrate(const dvec1& delta_time) {
 		particle.acceleration = particle.mass * GRAVITY * delta_time;
 		particle.velocity += particle.acceleration * delta_time;
 		particle.position += particle.velocity * delta_time;
+
+		seaThermalTransfer(particle, delta_time);
+		atmosphereThermalTransfer(particle, delta_time);
+
+		thermodynamics(particle, delta_time);
+
+		boundingCollisions(particle);
 	}
 }
 
-void Flip::updateDensity() {
+void Flip::thermodynamics(CPU_Particle& particle, const dvec1& delta_time) {
+
+}
+
+void Flip::seaThermalTransfer(CPU_Particle& particle, const dvec1& delta_time) {
+	if (particle.position.y <= -HALF_SIZE.y * 0.5) {
+		const dvec1 t = f_map(-HALF_SIZE.y, -HALF_SIZE.y * 0.5, 1.0, 0.0, clamp(particle.position.y, -HALF_SIZE.y, -HALF_SIZE.y * 0.5));
+		particle.temperature = glm::mix(AMBIENT_TEMP, SEA_SURFACE_TEMP + randD(-1.0, 1.0), t);
+	}
+}
+
+void Flip::atmosphereThermalTransfer(CPU_Particle& particle, const dvec1& delta_time) {
+	if (particle.position.y >= HALF_SIZE.y * 0.5) {
+		const dvec1 t = f_map(HALF_SIZE.y, HALF_SIZE.y * 0.5, 1.0, 0.0, clamp(particle.position.y, HALF_SIZE.y * 0.5, HALF_SIZE.y));
+		particle.temperature = glm::mix(AMBIENT_TEMP, ATMOSPHERE_TEMP + randD(-1.0, 1.0), t);
+	}
+}
+
+void Flip::scatter(const dvec1& delta_time) {
+	const dvec1 normalized_density = (dvec1)(PARTICLE_COUNT / GRID_COUNT);
+	for (uint x = 0; x < GRID_CELLS.x; ++x) {
+		for (uint y = 0; y < GRID_CELLS.y; ++y) {
+			for (uint z = 0; z < GRID_CELLS.z; ++z) {
+				CPU_Cell& cell = grid[x][y][z];
+				cell.particle_count = 0;
+				for (const auto& particle : particles) {
+					if (insideAABB(particle.position, cell.pmin, cell.pmax)) {
+						cell.particle_count++;
+						//cell.temperature += particle.temperature * HEAT_TRANSFER_RATE * delta_time;
+					}
+				}
+				//cell.temperature -= HEAT_LOSS_RATE * (cell.temperature - AMBIENT_TEMP) * delta_time;
+				cell.density = (dvec1)(cell.particle_count / normalized_density);
+
+				dvec3 pressure_gradient = dvec3(0);
+				for (int dx = -1; dx <= 1; dx++) {
+					for (int dy = -1; dy <= 1; dy++) {
+						for (int dz = -1; dz <= 1; dz++) {
+							if (dx == 0 && dy == 0 && dz == 0) {
+								continue;
+							}
+							uint ni = x + dx;
+							uint nj = y + dy;
+							uint nk = z + dz;
+
+							if (ni >= 0 && ni < GRID_CELLS.x &&
+								nj >= 0 && nj < GRID_CELLS.y &&
+								nk >= 0 && nk < GRID_CELLS.z) {
+
+								CPU_Cell& neighbor_cell = grid[ni][nj][nk];
+
+								if (dx != 0) {
+									pressure_gradient.x += (neighbor_cell.pressure - cell.pressure) / CELL_SIZE;
+								}
+								if (dy != 0) {
+									pressure_gradient.y += (neighbor_cell.pressure - cell.pressure) / CELL_SIZE;
+								}
+								if (dz != 0) {
+									pressure_gradient.z += (neighbor_cell.pressure - cell.pressure) / CELL_SIZE;
+								}
+							}
+						}
+					}
+				}
+				pressure_gradient /= 26.0;
+				cell.velocity_field -= pressure_gradient * (1.0 / cell.density);
+			}
+		}
+	}
+}
+
+void Flip::gather(const dvec1& delta_time) {
+
 }
 
 void Flip::particleCollisions(const dvec1& delta_time) {

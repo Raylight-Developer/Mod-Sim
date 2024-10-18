@@ -29,7 +29,7 @@ dvec1 randD();
 vec1  randF();
 dvec1 randD(const dvec1& min, const dvec1& max);
 vec1  randF(const vec1& min, const vec1& max);
-bool insideAABB(const dvec3& point, dvec3& p_min, const dvec3& p_max);
+bool  insideAABB(const dvec3& point, dvec3& p_min, const dvec3& p_max);
 
 uvec3 u_to_u3(const uint& index, const uvec3& size);
 ulvec3 u_to_u3(const uint64& index, const ulvec3& size);

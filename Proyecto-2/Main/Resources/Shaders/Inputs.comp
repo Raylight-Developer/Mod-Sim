@@ -12,10 +12,6 @@ layout(std430, binding = 2) buffer CellDataBuffer {
 	Cell grid[];
 };
 
-layout(std430, binding = 3) buffer PFlipointDataBuffer {
-	Particle flip_point_cloud[];
-};
-
 uniform uint  frame_count;
 uniform float aspect_ratio;
 uniform float current_time;
