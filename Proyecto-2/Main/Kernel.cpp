@@ -11,13 +11,14 @@
 #define HEAT_LOSS_RATE     0.2        // W/m·K
 #define LATITUDE           15.0
 
-#define PARTICLE_COLLISION_SAMPLES 10
+#define PARTICLE_COLLISION_SAMPLES 5
 #define PARTICLE_RESTITUTION       0.95
 #define RESTITUTION                0.95
 #define GRAVITY                    dvec3(0.0, -9.81, 0.0)
 
 CPU_Particle::CPU_Particle() {
 	mass = 0;
+	density = 0;
 	humidity = 0;
 	pressure = 0;
 	temperature = 0;
@@ -100,8 +101,14 @@ Flip::Flip() {
 	GRID_CELLS     = uvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
 	GRID_COUNT     = GRID_CELLS.x * GRID_CELLS.y * GRID_CELLS.z;
 	CELL_SIZE      = SESSION_GET("CELL_SIZE", dvec1);
+	INV_CELL_SIZE  = 1.0 / CELL_SIZE;
 	GRID_SIZE      = dvec3(GRID_CELLS) * CELL_SIZE;
 	HALF_SIZE      = GRID_SIZE * 0.5;
+	REST_DENSITY = 0.0;
+
+	fNumX = floor(GRID_SIZE.x / CELL_SIZE) + 1;
+	fNumY = floor(GRID_SIZE.y / CELL_SIZE) + 1;
+	fNumZ = floor(GRID_SIZE.z / CELL_SIZE) + 1;
 }
 
 void Flip::init() {
@@ -142,10 +149,13 @@ void Flip::simulate(const dvec1& delta_time) {
 
 void Flip::integrate(const dvec1& delta_time) {
 	for (CPU_Particle& particle : particles) {
-		particle.acceleration += particle.mass * GRAVITY * delta_time;
+		particle.acceleration = particle.mass * GRAVITY * delta_time;
 		particle.velocity += particle.acceleration * delta_time;
 		particle.position += particle.velocity * delta_time;
 	}
+}
+
+void Flip::updateDensity() {
 }
 
 void Flip::particleCollisions(const dvec1& delta_time) {

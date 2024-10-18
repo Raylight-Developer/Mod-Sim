@@ -9,10 +9,12 @@
 
 #include "OpenGL.hpp"
 #include "Kernel.hpp"
+#include "Flip.hpp"
 
 struct Renderer {
 	GLFWwindow* window;
 	Flip flip;
+	FlipFluid sim;
 
 	Transform camera_transform;
 

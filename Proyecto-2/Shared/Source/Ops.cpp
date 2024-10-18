@@ -265,6 +265,22 @@ bool insideAABB(const dvec3& point, dvec3& p_min, const dvec3& p_max) {
 		(point.z >= p_min.z && point.z <= p_max.z);
 }
 
+uvec3 u_to_u3(const uint& index, const uvec3& size) {
+	uvec3 res;
+	res.z = index % size.z;
+	res.y = (index / size.z) % size.y;
+	res.x = index / (size.y * size.z);
+	return res;
+}
+
+ulvec3 u_to_u3(const uint64& index, const ulvec3& size) {
+	ulvec3 res;
+	res.z = index % size.z;
+	res.y = (index / size.z) % size.y;
+	res.x = index / (size.y * size.z);
+	return res;
+}
+
 
 Transform::Transform(const dvec3& position, const dvec3& rotation, const dvec3& scale, const Rotation_Type& type) :
 	rotation_type(type),

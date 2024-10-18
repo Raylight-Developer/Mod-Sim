@@ -5,6 +5,7 @@ struct CPU_Cell;
 
 struct CPU_Particle {
 	dvec1 mass;
+	dvec1 density;
 	dvec1 humidity;
 	dvec1 pressure;
 	dvec1 temperature;
@@ -65,11 +66,18 @@ struct Flip {
 	uvec3 GRID_CELLS;
 	uint  GRID_COUNT;
 	dvec1 CELL_SIZE;
+	dvec1 INV_CELL_SIZE;
 	dvec3 GRID_SIZE;
 	dvec3 HALF_SIZE;
+	dvec1 REST_DENSITY;
 
 	Grid grid;
 	Particles particles;
+
+	int fNumX, fNumY, fNumZ;
+	vector<float> u, v, w, du, dv, dw;
+	vector<float> p, s;
+	vector<uint> numCellParticles, firstCellParticle, cellParticleIds;
 
 	Flip();
 
@@ -80,6 +88,9 @@ struct Flip {
 	void simulate(const dvec1& delta_time);
 
 	void integrate(const dvec1& delta_time);
+	void updateDensity();
+
+
 	void particleCollisions(const dvec1& delta_time);
 	void particleCollisionsUnoptimized(const dvec1& delta_time);
 	void boundingCollisions(CPU_Particle& particle);

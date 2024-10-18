@@ -67,7 +67,7 @@ typedef glm::tvec4<int64> ilvec4; // 256-bits
 
 // UINT
 
-typedef uint32_t             uint; //max: 4'294'967'295
+typedef unsigned int         uint; //max: 4'294'967'295
 typedef uint8_t             uint8; //max: 255
 typedef uint16_t           uint16; //max: 65'535
 typedef uint32_t           uint32; //max: 4'294'967'295
