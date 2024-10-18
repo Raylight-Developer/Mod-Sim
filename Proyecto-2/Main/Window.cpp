@@ -16,13 +16,13 @@ Renderer::Renderer() {
 	SESSION_SET("RENDER_SCALE", 0.5, dvec1);
 	SESSION_SET("TIME_SCALE", 0.05, dvec1);
 
-	SESSION_SET("GRID_SIZE_X", 8, uint64);
-	SESSION_SET("GRID_SIZE_Y", 8, uint64);
-	SESSION_SET("GRID_SIZE_Z", 8, uint64);
+	SESSION_SET("GRID_SIZE_X", 12, uint64);
+	SESSION_SET("GRID_SIZE_Y", 12, uint64);
+	SESSION_SET("GRID_SIZE_Z", 12, uint64);
 	SESSION_SET("CELL_SIZE", 1.0 / max(max(SESSION_GET("GRID_SIZE_X", uint64), SESSION_GET("GRID_SIZE_Y", uint64)), SESSION_GET("GRID_SIZE_Z", uint64)), dvec1);
 
 	camera_transform = Transform(dvec3(0, 0, 4), dvec3(0));
-	camera_transform.orbit(dvec3(0), dvec3(-15, 25, 0));
+	camera_transform.orbit(dvec3(0), dvec3(85, 0, 0));
 
 	frame_counter = 0;
 	frame_count = 0;
@@ -36,19 +36,29 @@ Renderer::Renderer() {
 
 	recompile = false;
 
-	camera_zoom_sensitivity = 1.0;
-	camera_orbit_sensitivity = 2.5;
+	camera_zoom_sensitivity = 0.1;
+	camera_orbit_sensitivity = 5.0;
 	keys = vector(348, false);
 	current_mouse = dvec2(display_resolution) / 2.0;
 	last_mouse = current_mouse;
 
 	sim_deltas = 0.0;
+	flip = Flip();
 
 	current_time = 0.0;
 	window_time = 0.0;
 	delta_time = FPS_60;
 	sim_delta = FPS_60 / 2.0;
 	last_time = 0.0;
+}
+
+Renderer::~Renderer() {
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+
+	glfwDestroyWindow(window);
+	glfwTerminate();
 }
 
 void Renderer::init() {
@@ -58,16 +68,6 @@ void Renderer::init() {
 
 	f_pipeline();
 	displayLoop();
-}
-
-void Renderer::quit() {
-	ImGui_ImplOpenGL3_Shutdown();
-	ImGui_ImplGlfw_Shutdown();
-	ImGui::DestroyContext();
-
-	glfwDestroyWindow(window);
-	glfwTerminate();
-	exit(0);
 }
 
 void Renderer::initGlfw() {
@@ -216,25 +216,21 @@ void Renderer::f_pipeline() {
 	buffers["raw"] = renderLayer(render_resolution);
 
 	glBindVertexArray(VAO);
-	cpu_point_cloud = vector(SESSION_GET("PARTICLE_COUNT", uint64), CPU_Particle());
-	cpu_grid = vector(SESSION_GET("GRID_SIZE_X", uint64), vector(SESSION_GET("GRID_SIZE_Y", uint64), vector(SESSION_GET("GRID_SIZE_Z", uint64), CPU_Cell())));
-	initialize(cpu_point_cloud);
-	initialize(cpu_grid);
+	flip.init();
 }
 
 void Renderer::f_tickUpdate() {
 	const dvec1 start = glfwGetTime();
-	if (runframe > 10) {
+	if (runframe > 100) {
 		const dvec1 delta = delta_time * SESSION_GET("TIME_SCALE", dvec1);
-		simulate(cpu_point_cloud, delta);
-		simulate(cpu_grid, cpu_point_cloud, delta);
+		flip.simulate(delta);
 	}
 
 	sim_delta = glfwGetTime() - start;
 
 	glDeleteBuffers(1, &buffers["particles"]);
 	vector<GPU_Particle> gpu_point_cloud;
-	for (const CPU_Particle& particle : cpu_point_cloud) {
+	for (const CPU_Particle& particle : flip.particles) {
 		gpu_point_cloud.push_back(GPU_Particle(particle));
 	}
 	buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
@@ -246,7 +242,7 @@ void Renderer::f_tickUpdate() {
 		for (uint64 y = 0; y < GRID_SIZE.y; ++y) {
 			for (uint64 z = 0; z < GRID_SIZE.z; ++z) {
 				uint64 index = x * (GRID_SIZE.y * GRID_SIZE.z) + y * GRID_SIZE.z + z;
-				gpu_grid[index] = GPU_Cell(cpu_grid[x][y][z]);
+				gpu_grid[index] = GPU_Cell(flip.grid[x][y][z]);
 			}
 		}
 	}

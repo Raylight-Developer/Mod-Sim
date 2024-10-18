@@ -12,9 +12,7 @@
 
 struct Renderer {
 	GLFWwindow* window;
-
-	vector<CPU_Particle> cpu_point_cloud;
-	Grid cpu_grid;
+	Flip flip;
 
 	Transform camera_transform;
 
@@ -47,9 +45,9 @@ struct Renderer {
 	unordered_map<string, GLuint> buffers;
 
 	Renderer();
+	~Renderer();
 
 	void init();
-	void quit();
 
 	void initGlfw();
 	void initImGui();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Shared.hpp"
+struct CPU_Cell;
 
 struct CPU_Particle {
 	dvec1 mass;
@@ -13,6 +14,9 @@ struct CPU_Particle {
 	dvec3 acceleration;
 
 	bool  colliding;
+
+	uvec3 cell_id;
+	CPU_Cell* cell;
 
 	CPU_Particle();
 };
@@ -31,7 +35,7 @@ struct CPU_Cell {
 	dvec1 pressure;
 	dvec1 temperature;
 
-	uint  particle_count;
+	vector<CPU_Particle*> particles;
 
 	dvec3 pmin;
 	dvec3 pmax;
@@ -53,27 +57,33 @@ struct GPU_Cell {
 };
 
 using Grid = vector<vector<vector<CPU_Cell>>>;
-using Cloud = vector<CPU_Particle>;
+using Particles = vector<CPU_Particle>;
 
-// Particles
-void initialize(Cloud& points);
-void simulate  (Cloud& points, const dvec1& delta_time);
-void updateVelocity(CPU_Particle& particle, const Cloud& neighbors, const dvec1& delta_time);
-void updatePosition(CPU_Particle& particle, const dvec1& delta_time);
-void handleBorderCollision(CPU_Particle& particle);
-dvec3 computeNavierStokes(const CPU_Particle& particle, const Cloud& neighbors);
-dvec3 computeCoriolisEffect(const CPU_Particle& particle);
-void  computeThermodynamics(CPU_Particle& particle, const dvec1& half_size);
+struct Flip {
+	dvec1 PARTICLE_RADIUS;
+	uint  PARTICLE_COUNT;
+	uvec3 GRID_CELLS;
+	uint  GRID_COUNT;
+	dvec1 CELL_SIZE;
+	dvec3 GRID_SIZE;
+	dvec3 HALF_SIZE;
 
-//Grid
-void initialize(Grid& grid);
-void simulate  (Grid& grid, const Cloud& particles, const dvec1& delta_time);
-void integrate (CPU_Cell& cell, const dvec1& delta_time);
-void computeParticleData(CPU_Cell& cell, const Cloud& particles, const dvec1& delta_time, const dvec1& normalized_density);
-dvec3 computePressureGradient(const Grid& grid, const uint64& x, const uint64& y, const uint64& z, const uvec3& size);
+	Grid grid;
+	Particles particles;
 
-void  computeConvection(CPU_Cell& cell, const dvec1& delta_time);
+	Flip();
 
-void advection (Grid& grid, const dvec1& delta_time);
-void diffusion (Grid& grid, const dvec1& delta_time);
-void projection(Grid& grid, const dvec1& delta_time);
+	void init();
+	void initGrid();
+	void initParticles();
+
+	void simulate(const dvec1& delta_time);
+
+	void integrate(const dvec1& delta_time);
+	void particleCollisions(const dvec1& delta_time);
+	void particleCollisionsUnoptimized(const dvec1& delta_time);
+	void boundingCollisions(CPU_Particle& particle);
+
+	bool resolveOverlap(CPU_Particle* particle_a, CPU_Particle* particle_b);
+	void resolveCollision(CPU_Particle* particle_a, CPU_Particle* particle_b);
+};
