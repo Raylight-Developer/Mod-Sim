@@ -28,7 +28,7 @@ struct alignas(16) GPU_Particle {
 	vec4 velocity;
 
 	GPU_Particle();
-	GPU_Particle(const CPU_Particle& particle);
+	GPU_Particle(const CPU_Particle* particle);
 };
 
 struct CPU_Cell {
@@ -56,11 +56,8 @@ struct GPU_Cell {
 	vec1 temperature;
 
 	GPU_Cell();
-	GPU_Cell(const CPU_Cell& cell);
+	GPU_Cell(const CPU_Cell* cell);
 };
-
-using Grid = vector<vector<vector<CPU_Cell>>>;
-using Particles = vector<CPU_Particle>;
 
 struct Flip {
 	dvec1 PARTICLE_RADIUS;
@@ -73,8 +70,8 @@ struct Flip {
 	dvec3 HALF_SIZE;
 	dvec1 REST_DENSITY;
 
-	Grid grid;
-	Particles particles;
+	vector<CPU_Cell*> grid;
+	vector<CPU_Particle*> particles;
 
 	Flip();
 
@@ -86,9 +83,9 @@ struct Flip {
 
 	void integrate(const dvec1& delta_time);
 
-	void thermodynamics(CPU_Particle& particle, const dvec1& delta_time);
-	void seaThermalTransfer(CPU_Particle& particle, const dvec1& delta_time);
-	void atmosphereThermalTransfer(CPU_Particle& particle, const dvec1& delta_time);
+	void thermodynamics(CPU_Particle* particle, const dvec1& delta_time);
+	void seaThermalTransfer(CPU_Particle* particle, const dvec1& delta_time);
+	void atmosphereThermalTransfer(CPU_Particle* particle, const dvec1& delta_time);
 
 	void scatter(const dvec1& delta_time);
 	void gather(const dvec1& delta_time);
@@ -98,12 +95,13 @@ struct Flip {
 	void computePressure();
 	void computeTemperature();
 
+	CPU_Cell* getGrid(const uint64& x, const uint64& y, const uint64& z);
 
 
 
 	void particleCollisions(const dvec1& delta_time);
 	void particleCollisionsUnoptimized(const dvec1& delta_time);
-	void boundingCollisions(CPU_Particle& particle);
+	void boundingCollisions(CPU_Particle* particle);
 
 	bool resolveOverlap(CPU_Particle* particle_a, CPU_Particle* particle_b);
 	void resolveCollision(CPU_Particle* particle_a, CPU_Particle* particle_b);

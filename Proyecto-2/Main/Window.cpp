@@ -229,19 +229,19 @@ void Renderer::f_tickUpdate() {
 
 	glDeleteBuffers(1, &buffers["particles"]);
 	vector<GPU_Particle> gpu_point_cloud;
-	for (const CPU_Particle& particle : flip.particles) {
+	for (const CPU_Particle* particle : flip.particles) {
 		gpu_point_cloud.push_back(GPU_Particle(particle));
 	}
 	buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
 	
 	glDeleteBuffers(1, &buffers["cells"]);
-	const ulvec3 GRID_SIZE = ulvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
-	vector<GPU_Cell> gpu_grid(GRID_SIZE.x * GRID_SIZE.y * GRID_SIZE.z);
-	for (uint64 x = 0; x < GRID_SIZE.x; ++x) {
-		for (uint64 y = 0; y < GRID_SIZE.y; ++y) {
-			for (uint64 z = 0; z < GRID_SIZE.z; ++z) {
-				uint64 index = x * (GRID_SIZE.y * GRID_SIZE.z) + y * GRID_SIZE.z + z;
-				gpu_grid[index] = GPU_Cell(flip.grid[x][y][z]);
+	const ulvec3 GRID_CELLS = ulvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
+	vector<GPU_Cell> gpu_grid(GRID_CELLS.x * GRID_CELLS.y * GRID_CELLS.z);
+	for (uint64 x = 0; x < GRID_CELLS.x; ++x) {
+		for (uint64 y = 0; y < GRID_CELLS.y; ++y) {
+			for (uint64 z = 0; z < GRID_CELLS.z; ++z) {
+				uint64 index = x * (GRID_CELLS.y * GRID_CELLS.z) + y * GRID_CELLS.z + z;
+				gpu_grid[index] = GPU_Cell(flip.getGrid(x, y, z));
 			}
 		}
 	}
