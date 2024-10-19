@@ -55,6 +55,13 @@ struct GPU_Cell {
 	vec1 pressure;
 	vec1 temperature;
 
+	vec3 pmin;
+	uint a;
+	vec3 pmax;
+	uint b;
+	uvec4 pointers_a;
+	uvec4 pointers_b;
+
 	GPU_Cell();
 	GPU_Cell(const CPU_Cell* cell);
 };
@@ -69,6 +76,7 @@ struct Flip {
 	dvec3 GRID_SIZE;
 	dvec3 HALF_SIZE;
 	dvec1 REST_DENSITY;
+	dvec1 DT;
 
 	vector<CPU_Cell*> grid;
 	vector<CPU_Particle*> particles;
@@ -81,14 +89,16 @@ struct Flip {
 
 	void simulate(const dvec1& delta_time);
 
-	void integrate(const dvec1& delta_time);
+	void integrate();
 
-	void thermodynamics(CPU_Particle* particle, const dvec1& delta_time);
-	void seaThermalTransfer(CPU_Particle* particle, const dvec1& delta_time);
-	void atmosphereThermalTransfer(CPU_Particle* particle, const dvec1& delta_time);
+	void thermodynamics(CPU_Particle* particle);
+	void seaThermalTransfer(CPU_Particle* particle);
+	void atmosphereThermalTransfer(CPU_Particle* particle);
 
-	void scatter(const dvec1& delta_time);
-	void gather(const dvec1& delta_time);
+	void scatter();
+	void gather();
+
+	void computeGrid();
 
 	void navierStokes();
 	void computeCoriolis();
@@ -97,12 +107,16 @@ struct Flip {
 
 	CPU_Cell* getGrid(const uint64& x, const uint64& y, const uint64& z);
 
+	vector<GPU_Particle> gpuParticles() const;
+	vector<GPU_Cell> gpuGrid() const;
 
-
-	void particleCollisions(const dvec1& delta_time);
-	void particleCollisionsUnoptimized(const dvec1& delta_time);
+	void particleCollisions();
+	void particleCollisionsUnoptimized();
 	void boundingCollisions(CPU_Particle* particle);
 
 	bool resolveOverlap(CPU_Particle* particle_a, CPU_Particle* particle_b);
 	void resolveCollision(CPU_Particle* particle_a, CPU_Particle* particle_b);
 };
+
+dvec1 calculateAirDensity(const dvec1& pressure, const dvec1& temperature);
+dvec1 calculateInterpolationWeight(const CPU_Particle* particle, const CPU_Cell* cell);

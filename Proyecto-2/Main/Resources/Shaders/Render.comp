@@ -36,17 +36,19 @@ void main() {
 	AABB rootBox;
 	rootBox.pmin = -half_grid_size;
 	rootBox.pmax = half_grid_size;
-	float color_step = (1.0 / (max(max(grid_size.x, grid_size.y), grid_size.z))) * 0.25;
-	for (uint x = 0; x < grid_size.x; ++x) {
-		for (uint y = 0; y < grid_size.y; ++y) {
-			for (uint z = 0; z < grid_size.z; ++z) {
-				AABB box;
-				box.pmin = vec3(x, y, z) * cell_size - half_grid_size ;
-				box.pmax = box.pmin + cell_size;
-				if (f_rayAABBIntersection(ray, box)) {
-					uint index = x * (grid_size.y * grid_size.z) + y * grid_size.z + z;
-					Cell cell = grid[index];
-					color += vec4(temperatureTocolor(cell.temperature), 0.0) * color_step;// * cell.density;
+	if (f_rayAABBIntersection(ray, rootBox)) {
+		float color_step = (1.0 / (max(max(grid_size.x, grid_size.y), grid_size.z))) * 5.0;
+		for (uint x = 0; x < grid_size.x; ++x) {
+			for (uint y = 0; y < grid_size.y; ++y) {
+				for (uint z = 0; z < grid_size.z; ++z) {
+					AABB box;
+					box.pmin = vec3(x, y, z) * cell_size - half_grid_size ;
+					box.pmax = box.pmin + cell_size;
+					if (f_rayAABBIntersection(ray, box)) {
+						uint index = x * (grid_size.y * grid_size.z) + y * grid_size.z + z;
+						Cell cell = grid[index];
+						color += vec4(temperatureTocolor(cell.temperature), 0.0) * color_step;// * cell.density;
+					}
 				}
 			}
 		}

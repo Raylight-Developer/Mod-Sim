@@ -11,6 +11,13 @@ struct Cell {
 	float humidity;
 	float pressure;
 	float temperature;
+
+	vec3 pmin;
+	uint a;
+	vec3 pmax;
+	uint b;
+	uvec4 pointers_a;
+	uvec4 pointers_b;
 };
 // INTERNAL ---------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------

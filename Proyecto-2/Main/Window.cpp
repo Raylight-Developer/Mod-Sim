@@ -13,12 +13,12 @@ Renderer::Renderer() {
 	SESSION_SET("PARTICLE_RADIUS", 0.01, dvec1);
 	SESSION_SET("PARTICLE_COUNT", 1024, uint64);
 
-	SESSION_SET("RENDER_SCALE", 0.5, dvec1);
+	SESSION_SET("RENDER_SCALE", 0.25, dvec1);
 	SESSION_SET("TIME_SCALE", 0.05, dvec1);
 
-	SESSION_SET("GRID_SIZE_X", 12, uint64);
-	SESSION_SET("GRID_SIZE_Y", 12, uint64);
-	SESSION_SET("GRID_SIZE_Z", 12, uint64);
+	SESSION_SET("GRID_SIZE_X", 32, uint64);
+	SESSION_SET("GRID_SIZE_Y", 32, uint64);
+	SESSION_SET("GRID_SIZE_Z", 32, uint64);
 	SESSION_SET("CELL_SIZE", 1.0 / max(max(SESSION_GET("GRID_SIZE_X", uint64), SESSION_GET("GRID_SIZE_Y", uint64)), SESSION_GET("GRID_SIZE_Z", uint64)), dvec1);
 
 	camera_transform = Transform(dvec3(0, 0, 4), dvec3(0));
@@ -83,8 +83,8 @@ void Renderer::initGlfw() {
 
 	display_resolution = uvec2(mode->width, mode->height);
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
-	last_mouse = glm::dvec2(display_resolution) / 2.0;
-	current_mouse = last_mouse;
+	current_mouse = glm::dvec2(display_resolution) / 2.0;
+	last_mouse = current_mouse;
 
 	window = glfwCreateWindow(display_resolution.x, display_resolution.y, "Screensaver", NULL, NULL);
 
@@ -228,23 +228,11 @@ void Renderer::f_tickUpdate() {
 	sim_delta = glfwGetTime() - start;
 
 	glDeleteBuffers(1, &buffers["particles"]);
-	vector<GPU_Particle> gpu_point_cloud;
-	for (const CPU_Particle* particle : flip.particles) {
-		gpu_point_cloud.push_back(GPU_Particle(particle));
-	}
+	vector<GPU_Particle> gpu_point_cloud = flip.gpuParticles();
 	buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
 	
 	glDeleteBuffers(1, &buffers["cells"]);
-	const ulvec3 GRID_CELLS = ulvec3(SESSION_GET("GRID_SIZE_X", uint64),SESSION_GET("GRID_SIZE_Y", uint64),SESSION_GET("GRID_SIZE_Z", uint64));
-	vector<GPU_Cell> gpu_grid(GRID_CELLS.x * GRID_CELLS.y * GRID_CELLS.z);
-	for (uint64 x = 0; x < GRID_CELLS.x; ++x) {
-		for (uint64 y = 0; y < GRID_CELLS.y; ++y) {
-			for (uint64 z = 0; z < GRID_CELLS.z; ++z) {
-				uint64 index = x * (GRID_CELLS.y * GRID_CELLS.z) + y * GRID_CELLS.z + z;
-				gpu_grid[index] = GPU_Cell(flip.getGrid(x, y, z));
-			}
-		}
-	}
+	vector<GPU_Cell> gpu_grid = flip.gpuGrid();
 	buffers["cells"] = ssboBinding(2, ul_to_u(gpu_grid.size() * sizeof(GPU_Cell)), gpu_grid.data());
 }
 
@@ -275,7 +263,7 @@ void Renderer::gameLoop() {
 	if (keys[GLFW_MOUSE_BUTTON_RIGHT] or keys[GLFW_MOUSE_BUTTON_LEFT]) {
 		const dvec1 xoffset = (last_mouse.x - current_mouse.x) * delta_time * camera_orbit_sensitivity;
 		const dvec1 yoffset = (last_mouse.y - current_mouse.y) * delta_time * camera_orbit_sensitivity;
-		camera_transform.orbit(dvec3(0.0), dvec3(yoffset, xoffset, 0.0));
+		camera_transform.orbit(dvec3(0.0), dvec2(yoffset, xoffset));
 		last_mouse = current_mouse;
 	}
 }
@@ -391,16 +379,14 @@ void Renderer::mouseButton(GLFWwindow* window, int button, int action, int mods)
 		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
 			double xpos, ypos;
 			glfwGetCursorPos(window, &xpos, &ypos);
-			instance->last_mouse = dvec2(xpos, ypos);
+			instance->current_mouse = dvec2(xpos, ypos);
+			instance->last_mouse = instance->current_mouse;
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		}
 	}
 	else if (action == GLFW_RELEASE) {
 		instance->keys[button] = false;
 		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-			double xpos, ypos;
-			glfwGetCursorPos(window, &xpos, &ypos);
-			instance->last_mouse = dvec2(xpos, ypos);
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
 	}
