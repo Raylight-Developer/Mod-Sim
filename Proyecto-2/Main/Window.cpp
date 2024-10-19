@@ -274,11 +274,8 @@ void Renderer::guiLoop() {
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	ImGui::Begin("Info");
 
+	ImGui::SeparatorText("Average Stats");
 	{
-		ImGui::SeparatorText("Average Stats");
-		ImGui::Text(("Frame Delta: " + to_str((current_time / ul_to_d(runframe) * 1000.0), 3) + "ms").c_str());
-		ImGui::Text(("Sim   Delta: " + to_str((sim_time_aggregate / ul_to_d(runframe) * 1000.0), 3) + "ms").c_str());
-
 		const dvec1 percent = round((sim_time_aggregate / current_time) * 100.0);
 		ImGui::Text(("~GPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
 		ImGui::Text(("~CPU[" + to_str(percent, 0) + "]%%").c_str());
