@@ -13,16 +13,16 @@ Renderer::Renderer() {
 	SESSION_SET("PARTICLE_RADIUS", 0.01, dvec1);
 	SESSION_SET("PARTICLE_COUNT", 1024, uint64);
 
-	SESSION_SET("RENDER_SCALE", 0.25, dvec1);
+	SESSION_SET("RENDER_SCALE", 0.5, dvec1);
 	SESSION_SET("TIME_SCALE", 0.05, dvec1);
 
-	SESSION_SET("GRID_SIZE_X", 32, uint64);
-	SESSION_SET("GRID_SIZE_Y", 32, uint64);
-	SESSION_SET("GRID_SIZE_Z", 32, uint64);
+	SESSION_SET("GRID_SIZE_X", 16, uint64);
+	SESSION_SET("GRID_SIZE_Y", 16, uint64);
+	SESSION_SET("GRID_SIZE_Z", 16, uint64);
 	SESSION_SET("CELL_SIZE", 1.0 / max(max(SESSION_GET("GRID_SIZE_X", uint64), SESSION_GET("GRID_SIZE_Y", uint64)), SESSION_GET("GRID_SIZE_Z", uint64)), dvec1);
 
 	camera_transform = Transform(dvec3(0, 0, 4), dvec3(0));
-	camera_transform.orbit(dvec3(0), dvec3(0, 0, 0));
+	camera_transform.orbit(dvec3(0), dvec3(15, 15, 0));
 
 	frame_counter = 0;
 	frame_count = 0;

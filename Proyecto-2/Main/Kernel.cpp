@@ -74,8 +74,6 @@ GPU_Cell::GPU_Cell() {
 	a = 0;
 	pmax = vec3(0);
 	b = 0;
-	pointers_a = uvec4(0);
-	pointers_b = uvec4(0);
 }
 
 GPU_Cell::GPU_Cell(const CPU_Cell* cell) {

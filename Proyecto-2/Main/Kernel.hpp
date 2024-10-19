@@ -59,11 +59,18 @@ struct GPU_Cell {
 	uint a;
 	vec3 pmax;
 	uint b;
-	uvec4 pointers_a;
-	uvec4 pointers_b;
 
 	GPU_Cell();
 	GPU_Cell(const CPU_Cell* cell);
+};
+
+struct GPU_Octree {
+	uvec4 pointers_a;
+	uvec4 pointers_b;
+	vec3 pmin;
+	uint leaf;
+	vec3 pmax;
+	uint pad;
 };
 
 struct Flip {
@@ -77,6 +84,8 @@ struct Flip {
 	dvec3 HALF_SIZE;
 	dvec1 REST_DENSITY;
 	dvec1 DT;
+	uint  SAMPLES;
+	dvec1 SDT;
 
 	vector<CPU_Cell*> grid;
 	vector<CPU_Particle*> particles;
