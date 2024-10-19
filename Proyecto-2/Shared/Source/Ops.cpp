@@ -259,7 +259,14 @@ vec1 randF(const vec1& min, const vec1& max) {
 	return dis(gen);
 }
 
-bool insideAABB(const dvec3& point, dvec3& p_min, const dvec3& p_max) {
+vec1 randF(const dvec1& min, const dvec1& max) {
+	static std::random_device rd;
+	static std::mt19937 gen(rd());
+	uniform_real_distribution<vec1> dis(d_to_f(min), d_to_f(max));
+	return dis(gen);
+}
+
+bool insideAABB(const vec3& point, vec3& p_min, const vec3& p_max) {
 	return (point.x >= p_min.x && point.x <= p_max.x) &&
 		(point.y >= p_min.y && point.y <= p_max.y) &&
 		(point.z >= p_min.z && point.z <= p_max.z);

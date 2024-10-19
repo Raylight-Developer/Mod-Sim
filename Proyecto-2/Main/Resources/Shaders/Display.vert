@@ -6,6 +6,9 @@ layout(location = 1) in vec2 coords;
 uniform float display_aspect_ratio;
 uniform float render_aspect_ratio;
 
+uniform uvec2 display_resolution;
+uniform uvec2 render_resolution;
+
 out vec2 uv_coords;
 
 void main() {

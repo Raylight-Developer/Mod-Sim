@@ -5,7 +5,7 @@ float f_mapFloat(float from_min, float from_max, float to_min, float to_max, flo
 vec3 velocityToColor(vec3 velocity) {
 	vec3 color;
 	float speed = length(velocity);
-	float normalizedSpeed = clamp(f_mapFloat(0.0, 10.0, 0.0, 1.0, speed), 0.0, 1.0);
+	float normalizedSpeed = clamp(f_mapFloat(0.0, 1.0, 0.0, 1.0, speed), 0.0, 1.0);
 
 	if (normalizedSpeed <= 0.5) {
 		float t = normalizedSpeed * 2.0;
@@ -31,4 +31,22 @@ vec3 temperatureTocolor(float temp) {
 		color = mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), t);
 	}
 	return color;
+}
+
+vec3 particleColor(in Particle particle) {
+	switch (render_particle_color_mode) {
+		case 0: return temperatureTocolor(particle.temperature);
+		case 1: return velocityToColor(particle.velocity.xyz);
+	}
+
+	return temperatureTocolor(particle.temperature);
+}
+
+vec3 gridColor(in Cell cell) {
+	switch (render_grid_color_mode) {
+		case 0: return temperatureTocolor(cell.temperature);
+		case 1: return vec3(clamp(cell.density, 0, 1));
+	}
+
+	return temperatureTocolor(cell.temperature);
 }

@@ -4,15 +4,15 @@
 struct CPU_Cell;
 
 struct CPU_Particle {
-	dvec1 mass;
-	dvec1 density;
-	dvec1 humidity;
-	dvec1 pressure;
-	dvec1 temperature;
+	vec1 mass;
+	vec1 density;
+	vec1 humidity;
+	vec1 pressure;
+	vec1 temperature;
 
-	dvec3 position;
-	dvec3 velocity;
-	dvec3 acceleration;
+	vec3 position;
+	vec3 velocity;
+	vec3 acceleration;
 
 	bool  colliding;
 
@@ -32,19 +32,19 @@ struct alignas(16) GPU_Particle {
 };
 
 struct CPU_Cell {
-	dvec1 density;
-	dvec1 humidity;
-	dvec1 pressure;
-	dvec1 temperature;
+	vec1 density;
+	vec1 humidity;
+	vec1 pressure;
+	vec1 temperature;
 
 	vector<CPU_Particle*> particles;
 	uint  particle_count;
 
-	dvec3 pmin;
-	dvec3 pmax;
+	vec3 pmin;
+	vec3 pmax;
 
-	dvec3 velocity_field;
-	dvec3 acceleration_field;
+	vec3 velocity_field;
+	vec3 acceleration_field;
 
 	CPU_Cell();
 };
@@ -74,25 +74,25 @@ struct GPU_Octree {
 };
 
 struct Flip {
-	dvec1 PARTICLE_RADIUS;
+	vec1  PARTICLE_RADIUS;
 	uint  PARTICLE_COUNT;
 	uvec3 GRID_CELLS;
 	uint  GRID_COUNT;
-	dvec1 CELL_SIZE;
-	dvec1 INV_CELL_SIZE;
-	dvec3 GRID_SIZE;
-	dvec3 HALF_SIZE;
-	dvec1 REST_DENSITY;
-	dvec1 DT;
+	vec1  CELL_SIZE;
+	vec1  INV_CELL_SIZE;
+	vec3  GRID_SIZE;
+	vec3  HALF_SIZE;
+	vec1  REST_DENSITY;
+	vec1  DT;
 	uint  SAMPLES;
-	dvec1 SDT;
+	vec1  SDT;
 
 	vector<CPU_Cell*> grid;
 	vector<CPU_Particle*> particles;
 
 	Flip();
 
-	void init();
+	void init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uvec3& GRID_CELLS);
 	void initGrid();
 	void initParticles();
 
@@ -127,5 +127,5 @@ struct Flip {
 	void resolveCollision(CPU_Particle* particle_a, CPU_Particle* particle_b);
 };
 
-dvec1 calculateAirDensity(const dvec1& pressure, const dvec1& temperature);
-dvec1 calculateInterpolationWeight(const CPU_Particle* particle, const CPU_Cell* cell);
+vec1 calculateAirDensity(const vec1& pressure, const vec1& temperature);
+vec1 calculateInterpolationWeight(const CPU_Particle* particle, const CPU_Cell* cell);

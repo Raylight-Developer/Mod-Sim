@@ -36,3 +36,6 @@ uniform uint  render_grid_surface;
 
 uniform float render_grid_opacity;
 uniform float render_grid_density_mul;
+
+uniform int   render_grid_color_mode;
+uniform int   render_particle_color_mode;

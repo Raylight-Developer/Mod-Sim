@@ -38,12 +38,7 @@ void main() {
 									t_length = t_dist;
 									uint index = x * (grid_size.y * grid_size.z) + y * grid_size.z + z;
 									Cell cell = grid[index];
-									if (render_grid_density == 1) {
-										color = vec4(temperatureTocolor(cell.temperature), 0.0) * cell.density * render_grid_density_mul;
-									}
-									else {
-										color = vec4(temperatureTocolor(cell.temperature), 0.0) ;
-									}
+									color = vec4(gridColor(cell), 1.0);
 								}
 							}
 						}
@@ -51,7 +46,7 @@ void main() {
 				}
 			}
 			else {
-				float color_step = (1.0 / (max(max(grid_size.x, grid_size.y), grid_size.z))) * render_grid_opacity;
+				float color_step = (1.0 / (max(max(grid_size.x, grid_size.y), grid_size.z))) * render_grid_opacity * 0.5;
 				for (uint x = 0; x < grid_size.x; ++x) {
 					for (uint y = 0; y < grid_size.y; ++y) {
 						for (uint z = 0; z < grid_size.z; ++z) {
@@ -62,10 +57,10 @@ void main() {
 								uint index = x * (grid_size.y * grid_size.z) + y * grid_size.z + z;
 								Cell cell = grid[index];
 								if (render_grid_density == 1) {
-									color += vec4(temperatureTocolor(cell.temperature), 0.0) * cell.density * render_grid_density_mul;
+									color += vec4(gridColor(cell), 0.0) * cell.density * render_grid_density_mul;
 								}
 								else {
-									color += vec4(temperatureTocolor(cell.temperature), 0.0) * color_step;
+									color += vec4(gridColor(cell), 0.0) * color_step;
 								}
 							}
 						}
@@ -80,7 +75,7 @@ void main() {
 				if (f_raySphereIntersection(ray, point_cloud[i].position.xyz, t_dist)) {
 					if (t_dist < t_length && t_dist > EPSILON) {
 						t_length = t_dist;
-						color = vec4(temperatureTocolor(point_cloud[i].temperature), 1.0);
+						color = vec4(particleColor(point_cloud[i]), 1.0);
 					}
 				}
 			}

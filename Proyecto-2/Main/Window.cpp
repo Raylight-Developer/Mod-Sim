@@ -9,18 +9,6 @@
 Renderer::Renderer() {
 	window = nullptr;
 
-	SESSION_SET("PARTICLE_DISPLAY_RADIUS", 0.01, dvec1);
-	SESSION_SET("PARTICLE_RADIUS", 0.01, dvec1);
-	SESSION_SET("PARTICLE_COUNT", 1024, uint64);
-
-	SESSION_SET("RENDER_SCALE", 0.5, dvec1);
-	SESSION_SET("TIME_SCALE", 0.05, dvec1);
-
-	SESSION_SET("GRID_SIZE_X", 16, uint64);
-	SESSION_SET("GRID_SIZE_Y", 16, uint64);
-	SESSION_SET("GRID_SIZE_Z", 16, uint64);
-	SESSION_SET("CELL_SIZE", 1.0 / max(max(SESSION_GET("GRID_SIZE_X", uint64), SESSION_GET("GRID_SIZE_Y", uint64)), SESSION_GET("GRID_SIZE_Z", uint64)), dvec1);
-
 	camera_transform = Transform(dvec3(0, 0, 4), dvec3(0));
 	camera_transform.orbit(dvec3(0), dvec3(-15, 15, 0));
 
@@ -37,9 +25,6 @@ Renderer::Renderer() {
 	display_resolution = uvec2(3840U, 2160U);
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
 
-	render_resolution = d_to_u(u_to_d(display_resolution) * SESSION_GET("RENDER_SCALE", dvec1));
-	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
-
 	recompile = false;
 
 	camera_zoom_sensitivity = 0.1;
@@ -55,15 +40,33 @@ Renderer::Renderer() {
 	sim_delta = FPS_60 / 2.0;
 	last_time = 0.0;
 
-	start_sim = false;
+	run_sim = false;
+
+	TIME_SCALE       = 0.1f;
+	RENDER_SCALE     = 0.5f;
+	PARTICLE_RADIUS  = 0.01f;
+	PARTICLE_COUNT   = 1024;
+	GRID_CELLS       = uvec3(16);
+	CELL_SIZE        = 1.0f / u_to_f(max(max(GRID_CELLS.x, GRID_CELLS.y), GRID_CELLS.z));
+	PARTICLE_DISPLAY = 1.0f;
+
+	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(RENDER_SCALE));
+	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
+
 	render_grid = new bool(true);
-	render_particles = new bool(true);
+	{
+		render_grid_surface = false;
+		render_grid_density = false;
 
-	render_grid_surface = new bool(false);
-	render_grid_density = new bool(false);
+		render_grid_opacity = 1.0f;
+		render_grid_density_mul = 1.0f;
 
-	render_grid_opacity = new vec1(1.0f);
-	render_grid_density_mul = new vec1(1.0f);
+		render_grid_color_mode = 0;
+	}
+	render_particles = true;
+	{
+		render_particle_color_mode = 0;
+	}
 }
 
 Renderer::~Renderer() {
@@ -73,6 +76,12 @@ Renderer::~Renderer() {
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
+
+	glDeleteProgram(buffers["compute"]);
+	glDeleteProgram(buffers["display"]);
+	glDeleteTextures(1, &buffers["raw"]);
+	glDeleteBuffers (1, &buffers["cells"]);
+	glDeleteBuffers (1, &buffers["particles"]);
 }
 
 void Renderer::init() {
@@ -228,13 +237,18 @@ void Renderer::f_pipeline() {
 	buffers["raw"] = renderLayer(render_resolution);
 
 	glBindVertexArray(VAO);
-	flip.init();
+	flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, GRID_CELLS);
+	compute_layout = uvec3(
+		d_to_u(ceil(u_to_d(render_resolution.x) / 32.0)),
+		d_to_u(ceil(u_to_d(render_resolution.y) / 32.0)),
+		1
+	);
 }
 
 void Renderer::f_tickUpdate() {
-	if (start_sim) {
+	if (run_sim) {
 		const dvec1 start = glfwGetTime();
-		const dvec1 delta = delta_time * SESSION_GET("TIME_SCALE", dvec1);
+		const dvec1 delta = delta_time * TIME_SCALE;
 		flip.simulate(delta);
 		sim_delta = glfwGetTime() - start;
 	}
@@ -245,7 +259,7 @@ void Renderer::f_tickUpdate() {
 	glDeleteBuffers(1, &buffers["particles"]);
 	vector<GPU_Particle> gpu_point_cloud = flip.gpuParticles();
 	buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
-	
+
 	glDeleteBuffers(1, &buffers["cells"]);
 	vector<GPU_Cell> gpu_grid = flip.gpuGrid();
 	buffers["cells"] = ssboBinding(2, ul_to_u(gpu_grid.size() * sizeof(GPU_Cell)), gpu_grid.data());
@@ -261,16 +275,17 @@ void Renderer::guiLoop() {
 	ImGui::Begin("Info");
 
 	{
-		ImGui::Text(("Avg. Frame Delta: " + to_str((current_time / ul_to_d(runframe) * 1000.0), 3) + "ms").c_str());
-		ImGui::Text(("Avg. Sim   Delta: " + to_str((sim_time_aggregate / ul_to_d(runframe) * 1000.0), 3) + "ms").c_str());
+		ImGui::SeparatorText("Average Stats");
+		ImGui::Text(("Frame Delta: " + to_str((current_time / ul_to_d(runframe) * 1000.0), 3) + "ms").c_str());
+		ImGui::Text(("Sim   Delta: " + to_str((sim_time_aggregate / ul_to_d(runframe) * 1000.0), 3) + "ms").c_str());
 
 		const dvec1 percent = round((sim_time_aggregate / current_time) * 100.0);
-		ImGui::Text(("Avg. ~GPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
-		ImGui::Text(("Avg. ~CPU[" + to_str(percent, 0) + "]%%").c_str());
+		ImGui::Text(("~GPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
+		ImGui::Text(("~CPU[" + to_str(percent, 0) + "]%%").c_str());
 
-		ImGui::Text(("Avg. Fps: " + to_str(ul_to_d(runframe) / current_time, 0)).c_str());
+		ImGui::Text(("Fps: " + to_str(ul_to_d(runframe) / current_time, 0)).c_str());
 	}
-	ImGui::Separator();
+	ImGui::SeparatorText("Stats");
 	{
 		const dvec1 percent = round((sim_time / frame_time) * 100.0);
 		ImGui::Text(("~GPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
@@ -278,27 +293,71 @@ void Renderer::guiLoop() {
 
 		ImGui::Text(("Fps: " + to_str(frame_count, 0)).c_str());
 	}
-	ImGui::Separator();
-
-	ImGui::Checkbox("Render Grid", render_grid);
-	if (*render_grid) {
-		ImGui::Separator();
-		ImGui::Checkbox("Render Surface", render_grid_surface);
-		ImGui::Checkbox("Render Density", render_grid_density);
-		if (*render_grid_density) {
-			ImGui::SliderFloat("Density Mul", render_grid_density_mul, 0.05f, 2.0f, "%.4f");
-		}
-		else {
-			ImGui::SliderFloat("Opacity Mul", render_grid_opacity, 0.05f, 2.0f, "%.4f");
-		}
-		ImGui::Separator();
+	ImGui::SeparatorText("General Settings");
+	ImGui::SliderFloat("Time Scale", &TIME_SCALE, 0.01f, 2.0f, "%.4f");
+	if (ImGui::SliderFloat("Render Scale", &RENDER_SCALE, 0.1f, 1.0f, "%.3f")) {
+		resize();
 	}
-	ImGui::Checkbox("Render Particles", render_particles);
-
-	if (not start_sim) {
-		if (ImGui::Button("Start")) {
-			start_sim = true;
+	ImGui::SeparatorText("Play / Pause");
+	if (run_sim) {
+		if (ImGui::Button("Stop")) {
+			run_sim = false;
 		}
+		if (ImGui::Button("Restart")) {
+			run_sim = false;
+			flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, GRID_CELLS);
+		}
+	}
+	else {
+		if (ImGui::Button("Start")) {
+			run_sim = true;
+		}
+		ImGui::SeparatorText("Init Settings");
+		if (ImGui::SliderFloat("Particle Radius", &PARTICLE_RADIUS, 0.001f, 1.0f, "%.5f")) {
+			flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, GRID_CELLS);
+		}
+
+		if (ImGui::SliderFloat("Display Mult", &PARTICLE_DISPLAY, 0.05f, 5.0f, "%.3f")) {
+			flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, GRID_CELLS);
+		}
+
+		if (ImGui::SliderInt("Particle Count", &PARTICLE_COUNT, 128, 4096)) {
+			flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, GRID_CELLS);
+		}
+
+		int grid_size[3] = { int(GRID_CELLS.x), int(GRID_CELLS.y), int(GRID_CELLS.z) };
+		if (ImGui::SliderInt3("Grid Size", grid_size, 2, 64)) {
+			flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, GRID_CELLS);
+			GRID_CELLS.x = grid_size[0];
+			GRID_CELLS.y = grid_size[1];
+			GRID_CELLS.z = grid_size[2];
+			CELL_SIZE    = 1.0f / u_to_f(max(max(GRID_CELLS.x, GRID_CELLS.y), GRID_CELLS.z));
+		}
+	}
+	ImGui::SeparatorText("Grid Settings");
+	ImGui::Checkbox("Render Grid", &render_grid);
+	if (render_grid) {
+		const char* items_a[] = { "Temperature", "Density" };
+		ImGui::Combo("Cell Color Mode", &render_grid_color_mode, items_a, IM_ARRAYSIZE(items_a));
+		if (not render_grid_density) {
+			ImGui::Checkbox("Render Surface", &render_grid_surface);
+		}
+		if (not render_grid_surface) {
+			ImGui::Checkbox("Render Density", &render_grid_density);
+			if (render_grid_density) {
+				ImGui::SliderFloat("Density Mul", &render_grid_density_mul, 0.05f, 2.0f, "%.4f");
+			}
+			else {
+				ImGui::SliderFloat("Opacity Mul", &render_grid_opacity, 0.05f, 2.0f, "%.4f");
+			}
+			render_grid_surface = false;
+		}
+	}
+	ImGui::SeparatorText("Particle Settings");
+	ImGui::Checkbox("Render Particles", &render_particles);
+	if (render_particles) {
+		const char* items_b[] = { "Temperature", "Velocity" };
+		ImGui::Combo("Particle Color Mode", &render_particle_color_mode, items_b, IM_ARRAYSIZE(items_b));
 	}
 
 	ImGui::End();
@@ -328,12 +387,6 @@ void Renderer::gameLoop() {
 }
 
 void Renderer::displayLoop() {
-	const uvec3 compute_layout = uvec3(
-		d_to_u(ceil(u_to_d(render_resolution.x) / 32.0)),
-		d_to_u(ceil(u_to_d(render_resolution.y) / 32.0)),
-		1
-	);
-
 	while (!glfwWindowShouldClose(window)) {
 		current_time = glfwGetTime();
 		delta_time = current_time - last_time;
@@ -367,19 +420,23 @@ void Renderer::displayLoop() {
 		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_u"), 1, value_ptr(projection_u));
 		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"), 1, value_ptr(projection_v));
 
-		glUniform3ui (glGetUniformLocation(compute_program, "grid_size"), ul_to_u(SESSION_GET("GRID_SIZE_X", uint64)), ul_to_u(SESSION_GET("GRID_SIZE_Y", uint64)), ul_to_u(SESSION_GET("GRID_SIZE_Z", uint64)));
-		glUniform1f  (glGetUniformLocation(compute_program, "cell_size"), d_to_f(SESSION_GET("CELL_SIZE", dvec1)));
-		glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), d_to_f(SESSION_GET("PARTICLE_RADIUS", dvec1)));
-		glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), d_to_f(SESSION_GET("PARTICLE_DISPLAY_RADIUS", dvec1)));
+		glUniform3ui (glGetUniformLocation(compute_program, "grid_size"), GRID_CELLS.x, GRID_CELLS.y, GRID_CELLS.z);
+		glUniform1f  (glGetUniformLocation(compute_program, "cell_size"), CELL_SIZE);
+		glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), PARTICLE_RADIUS);
+		glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), PARTICLE_DISPLAY * PARTICLE_RADIUS);
 
-		glUniform1ui (glGetUniformLocation(compute_program, "render_grid"), *render_grid);
-		glUniform1ui (glGetUniformLocation(compute_program, "render_particles"), *render_particles);
-
-		glUniform1ui (glGetUniformLocation(compute_program, "render_grid_surface"), *render_grid_surface);
-		glUniform1ui (glGetUniformLocation(compute_program, "render_grid_density"), *render_grid_density);
-
-		glUniform1f  (glGetUniformLocation(compute_program, "render_grid_opacity"), *render_grid_opacity);
-		glUniform1f  (glGetUniformLocation(compute_program, "render_grid_density_mul"), *render_grid_density_mul);
+		glUniform1ui (glGetUniformLocation(compute_program, "render_grid"), render_grid);
+		{
+			glUniform1ui(glGetUniformLocation(compute_program, "render_grid_surface"), render_grid_surface);
+			glUniform1ui(glGetUniformLocation(compute_program, "render_grid_density"), render_grid_density);
+			glUniform1f (glGetUniformLocation(compute_program, "render_grid_opacity"), render_grid_opacity);
+			glUniform1f (glGetUniformLocation(compute_program, "render_grid_density_mul"), render_grid_density_mul);
+			glUniform1i (glGetUniformLocation(compute_program, "render_grid_color_mode"), render_grid_color_mode);
+		}
+		glUniform1ui (glGetUniformLocation(compute_program, "render_particles"), render_particles);
+		{
+			glUniform1i(glGetUniformLocation(compute_program, "render_particle_color_mode"), render_particle_color_mode);
+		}
 
 		glBindImageTexture(0, buffers["raw"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
@@ -391,8 +448,10 @@ void Renderer::displayLoop() {
 
 		glUseProgram(display_program);
 		glClear(GL_COLOR_BUFFER_BIT);
-		glUniform1f (glGetUniformLocation(display_program, "display_aspect_ratio"), d_to_f(display_aspect_ratio));
-		glUniform1f (glGetUniformLocation(display_program, "render_aspect_ratio") , d_to_f(render_aspect_ratio));
+		glUniform1f  (glGetUniformLocation(display_program, "display_aspect_ratio"), d_to_f(display_aspect_ratio));
+		glUniform1f  (glGetUniformLocation(display_program, "render_aspect_ratio") , d_to_f(render_aspect_ratio));
+		glUniform2uiv(glGetUniformLocation(display_program, "display_resolution"), 1, value_ptr(display_resolution));
+		glUniform2uiv(glGetUniformLocation(display_program, "render_resolution") , 1, value_ptr(render_resolution));
 		bindRenderLayer(display_program, 0, buffers["raw"], "raw_render_layer");
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
@@ -429,6 +488,15 @@ void Renderer::displayLoop() {
 
 void Renderer::resize() {
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
+	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(RENDER_SCALE));
+	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
+	glDeleteTextures(1, &buffers["raw"]);
+	buffers["raw"] = renderLayer(render_resolution);
+	compute_layout = uvec3(
+		d_to_u(ceil(u_to_d(render_resolution.x) / 32.0)),
+		d_to_u(ceil(u_to_d(render_resolution.y) / 32.0)),
+		1
+	);
 }
 
 void Renderer::framebufferSize(GLFWwindow* window, int width, int height) {
