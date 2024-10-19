@@ -21,15 +21,21 @@ struct Renderer {
 	uvec2 display_resolution;
 	uvec2 render_resolution;
 
-	uint   frame_counter;
-	uint   frame_count;
 	uint64 runframe;
+
+	uint   frame_counter;
+	dvec1  frame_timer;
+	dvec1  sim_timer;
+
+	uint   frame_count;
+	dvec1  frame_time;
+	dvec1  sim_time;
 
 	bool recompile;
 
 	dvec1 camera_zoom_sensitivity;
 	dvec1 camera_orbit_sensitivity;
-	vector<bool> keys;
+	vector<bool> inputs;
 
 	dvec2 current_mouse;
 	dvec2 last_mouse;
@@ -43,6 +49,10 @@ struct Renderer {
 	dvec1 last_time;
 
 	unordered_map<string, GLuint> buffers;
+
+	bool start_sim;
+	bool* render_grid;
+	bool* render_particles;
 
 	Renderer();
 	~Renderer();

@@ -22,11 +22,17 @@ Renderer::Renderer() {
 	SESSION_SET("CELL_SIZE", 1.0 / max(max(SESSION_GET("GRID_SIZE_X", uint64), SESSION_GET("GRID_SIZE_Y", uint64)), SESSION_GET("GRID_SIZE_Z", uint64)), dvec1);
 
 	camera_transform = Transform(dvec3(0, 0, 4), dvec3(0));
-	camera_transform.orbit(dvec3(0), dvec3(15, 15, 0));
+	camera_transform.orbit(dvec3(0), dvec3(-15, 15, 0));
+
+	runframe = 0;
 
 	frame_counter = 0;
+	frame_timer = 0;
+	sim_timer = 0;
+
 	frame_count = 0;
-	runframe = 0;
+	frame_time = 0;
+	sim_time = 0;
 
 	display_resolution = uvec2(3840U, 2160U);
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
@@ -38,7 +44,7 @@ Renderer::Renderer() {
 
 	camera_zoom_sensitivity = 0.1;
 	camera_orbit_sensitivity = 5.0;
-	keys = vector(348, false);
+	inputs = vector(348, false);
 	current_mouse = dvec2(display_resolution) / 2.0;
 	last_mouse = current_mouse;
 
@@ -50,6 +56,10 @@ Renderer::Renderer() {
 	delta_time = FPS_60;
 	sim_delta = FPS_60 / 2.0;
 	last_time = 0.0;
+
+	start_sim = false;
+	render_grid = new bool(true);
+	render_particles = new bool(true);
 }
 
 Renderer::~Renderer() {
@@ -124,7 +134,7 @@ void Renderer::initImGui() {
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	io.FontGlobalScale = 1.75f;
+	io.FontGlobalScale = 2.5f;
 	io.IniFilename = nullptr;
 
 	ImGui::StyleColorsDark();
@@ -220,12 +230,15 @@ void Renderer::f_pipeline() {
 }
 
 void Renderer::f_tickUpdate() {
-	const dvec1 start = glfwGetTime();
-
-	const dvec1 delta = delta_time * SESSION_GET("TIME_SCALE", dvec1);
-	flip.simulate(delta);
-
-	sim_delta = glfwGetTime() - start;
+	if (start_sim) {
+		const dvec1 start = glfwGetTime();
+		const dvec1 delta = delta_time * SESSION_GET("TIME_SCALE", dvec1);
+		flip.simulate(delta);
+		sim_delta = glfwGetTime() - start;
+	}
+	else {
+		sim_delta = 0.0;
+	}
 
 	glDeleteBuffers(1, &buffers["particles"]);
 	vector<GPU_Particle> gpu_point_cloud = flip.gpuParticles();
@@ -243,28 +256,58 @@ void Renderer::guiLoop() {
 	ImGui::NewFrame();
 
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
-
 	ImGui::Begin("Info");
-	ImGui::Text(("Avg. Frame Delta: " + to_str(current_time / ul_to_d(runframe), 5) + "ms").c_str());
-	ImGui::Text(("Avg. Sim Delta: " + to_str(sim_deltas / ul_to_d(runframe), 5) + "ms").c_str());
 
-	const dvec1 percent = (sim_deltas / current_time) * 100.0;
-	ImGui::Text(("~CPU[" + to_str(percent, 2) + "]%%").c_str());
-	ImGui::Text(("~GPU[" + to_str(100.0 - percent, 2) + "]%%").c_str());
+	{
+		ImGui::Text(("Avg. Frame Delta: " + to_str((current_time / ul_to_d(runframe) * 1000.0), 3) + "ms").c_str());
+		ImGui::Text(("Avg. Sim   Delta: " + to_str((sim_deltas / ul_to_d(runframe) * 1000.0), 3) + "ms").c_str());
 
-	ImGui::Text(("Avg. Fps: " + to_str(ul_to_d(runframe) / current_time, 1)).c_str());
+		const dvec1 percent = round((sim_deltas / current_time) * 100.0);
+		ImGui::Text(("Avg. ~GPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
+		ImGui::Text(("Avg. ~CPU[" + to_str(percent, 0) + "]%%").c_str());
+
+		ImGui::Text(("Avg. Fps: " + to_str(ul_to_d(runframe) / current_time, 0)).c_str());
+	}
+	ImGui::Separator();
+	{
+		const dvec1 percent = round((sim_time / frame_time) * 100.0);
+		ImGui::Text(("~GPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
+		ImGui::Text(("~CPU[" + to_str(percent, 0) + "]%%").c_str());
+
+		ImGui::Text(("Fps: " + to_str(frame_count, 0)).c_str());
+	}
+	ImGui::Separator();
+
+	ImGui::Checkbox("Render Grid", render_grid);
+	ImGui::Checkbox("Render Particles", render_particles);
+
+	if (ImGui::Button("Start")) {
+		start_sim = true;
+	};
+
 	ImGui::End();
-
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 void Renderer::gameLoop() {
-	if (keys[GLFW_MOUSE_BUTTON_RIGHT] or keys[GLFW_MOUSE_BUTTON_LEFT]) {
-		const dvec1 xoffset = (last_mouse.x - current_mouse.x) * delta_time * camera_orbit_sensitivity;
-		const dvec1 yoffset = (last_mouse.y - current_mouse.y) * delta_time * camera_orbit_sensitivity;
-		camera_transform.orbit(dvec3(0.0), dvec2(yoffset, xoffset));
-		last_mouse = current_mouse;
+	//if (inputs[GLFW_MOUSE_BUTTON_RIGHT] or inputs[GLFW_MOUSE_BUTTON_LEFT]) {
+	//	const dvec1 xoffset = (last_mouse.x - current_mouse.x) * delta_time * camera_orbit_sensitivity;
+	//	const dvec1 yoffset = (last_mouse.y - current_mouse.y) * delta_time * camera_orbit_sensitivity;
+	//	camera_transform.orbit(dvec3(0.0), dvec2(yoffset, xoffset));
+	//	last_mouse = current_mouse;
+	//}
+	if (inputs[GLFW_KEY_W]) {
+		camera_transform.orbit(dvec3(0.0), dvec2(-25, 0) * delta_time);
+	}
+	if (inputs[GLFW_KEY_A]) {
+		camera_transform.orbit(dvec3(0.0), dvec2(0, -25) * delta_time);
+	}
+	if (inputs[GLFW_KEY_S]) {
+		camera_transform.orbit(dvec3(0.0), dvec2(25, 0) * delta_time);
+	}
+	if (inputs[GLFW_KEY_D]) {
+		camera_transform.orbit(dvec3(0.0), dvec2(0, 25) * delta_time);
 	}
 }
 
@@ -313,6 +356,9 @@ void Renderer::displayLoop() {
 		glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), d_to_f(SESSION_GET("PARTICLE_RADIUS", dvec1)));
 		glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), d_to_f(SESSION_GET("PARTICLE_DISPLAY_RADIUS", dvec1)));
 
+		glUniform1ui (glGetUniformLocation(compute_program, "render_grid"), *render_grid);
+		glUniform1ui (glGetUniformLocation(compute_program, "render_particles"), *render_particles);
+
 		glBindImageTexture(0, buffers["raw"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
 		glDispatchCompute(compute_layout.x, compute_layout.y, compute_layout.z);
@@ -340,12 +386,20 @@ void Renderer::displayLoop() {
 
 		if (window_time > 1.0) {
 			frame_count = frame_counter;
-			window_time -= 1.0;
+			frame_time = frame_timer;
+			sim_time = sim_timer;
+
 			frame_counter = 0;
+			frame_timer = 0.0;
+			sim_timer = 0.0;
+			window_time -= 1.0;
 		}
 
 		guiLoop();
 		sim_deltas += sim_delta;
+
+		frame_timer += delta_time;
+		sim_timer += sim_delta;
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -375,7 +429,7 @@ void Renderer::cursorPos(GLFWwindow* window, double xpos, double ypos) {
 void Renderer::mouseButton(GLFWwindow* window, int button, int action, int mods) {
 	Renderer* instance = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
 	if (action == GLFW_PRESS) {
-		instance->keys[button] = true;
+		instance->inputs[button] = true;
 		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
 			double xpos, ypos;
 			glfwGetCursorPos(window, &xpos, &ypos);
@@ -385,7 +439,7 @@ void Renderer::mouseButton(GLFWwindow* window, int button, int action, int mods)
 		}
 	}
 	else if (action == GLFW_RELEASE) {
-		instance->keys[button] = false;
+		instance->inputs[button] = false;
 		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		}
@@ -412,9 +466,9 @@ void Renderer::key(GLFWwindow* window, int key, int scancode, int action, int mo
 		glfwSetWindowShouldClose(window, GLFW_TRUE);
 	}
 	if (action == GLFW_PRESS) {
-		instance->keys[key] = true;
+		instance->inputs[key] = true;
 	}
 	else if (action == GLFW_RELEASE) {
-		instance->keys[key] = false;
+		instance->inputs[key] = false;
 	}
 }

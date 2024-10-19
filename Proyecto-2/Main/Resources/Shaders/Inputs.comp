@@ -26,3 +26,6 @@ uniform uvec3 grid_size;
 uniform float cell_size;
 uniform float sphere_radius;
 uniform float sphere_display_radius;
+
+uniform uint render_grid;
+uniform uint render_particles;
