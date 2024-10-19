@@ -37,15 +37,12 @@ struct Renderer {
 	dvec1 camera_orbit_sensitivity;
 	vector<bool> inputs;
 
-	dvec2 current_mouse;
-	dvec2 last_mouse;
+	dvec1 sim_time_aggregate;
 
-	dvec1 sim_deltas;
-
-	dvec1 sim_delta;
 	dvec1 current_time;
 	dvec1 window_time;
 	dvec1 delta_time;
+	dvec1 sim_delta;
 	dvec1 last_time;
 
 	unordered_map<string, GLuint> buffers;
@@ -53,6 +50,12 @@ struct Renderer {
 	bool start_sim;
 	bool* render_grid;
 	bool* render_particles;
+
+	bool* render_grid_surface;
+	bool* render_grid_density;
+
+	vec1* render_grid_opacity;
+	vec1* render_grid_density_mul;
 
 	Renderer();
 	~Renderer();
@@ -73,7 +76,6 @@ struct Renderer {
 	void resize();
 
 	static void framebufferSize(GLFWwindow* window, int width, int height);
-	static void cursorPos(GLFWwindow* window, double xpos, double ypos);
 	static void mouseButton(GLFWwindow* window, int button, int action, int mods);
 	static void scroll(GLFWwindow* window, double xoffset, double yoffset);
 	static void key(GLFWwindow* window, int key, int scancode, int action, int mods);

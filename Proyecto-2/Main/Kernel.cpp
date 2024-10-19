@@ -203,7 +203,7 @@ void Flip::scatter() {
 			}
 		}
 
-		cell->density     = 0.0;
+		cell->density     = u_to_d(cell->particle_count) / 10.0;
 		cell->humidity    = 0.0;
 		cell->pressure    = 0.0;
 		cell->temperature = 0.0;
@@ -214,8 +214,6 @@ void Flip::scatter() {
 	for (CPU_Cell* cell : grid) {
 		for (CPU_Particle* particle: cell->particles) {
 			const dvec1 weight = calculateInterpolationWeight(particle, cell) / u_to_d(cell->particle_count);
-
-			cell->density     += particle->density     * weight;
 			cell->humidity    += particle->humidity    * weight;
 			cell->pressure    += particle->pressure    * weight;
 			cell->temperature += particle->temperature * weight;

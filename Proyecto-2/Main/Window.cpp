@@ -45,10 +45,8 @@ Renderer::Renderer() {
 	camera_zoom_sensitivity = 0.1;
 	camera_orbit_sensitivity = 5.0;
 	inputs = vector(348, false);
-	current_mouse = dvec2(display_resolution) / 2.0;
-	last_mouse = current_mouse;
 
-	sim_deltas = 0.0;
+	sim_time_aggregate = 0.0;
 	flip = Flip();
 
 	current_time = 0.0;
@@ -60,6 +58,12 @@ Renderer::Renderer() {
 	start_sim = false;
 	render_grid = new bool(true);
 	render_particles = new bool(true);
+
+	render_grid_surface = new bool(false);
+	render_grid_density = new bool(false);
+
+	render_grid_opacity = new vec1(1.0f);
+	render_grid_density_mul = new vec1(1.0f);
 }
 
 Renderer::~Renderer() {
@@ -93,8 +97,6 @@ void Renderer::initGlfw() {
 
 	display_resolution = uvec2(mode->width, mode->height);
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
-	current_mouse = glm::dvec2(display_resolution) / 2.0;
-	last_mouse = current_mouse;
 
 	window = glfwCreateWindow(display_resolution.x, display_resolution.y, "Screensaver", NULL, NULL);
 
@@ -125,7 +127,6 @@ void Renderer::initGlfw() {
 
 	glfwSetFramebufferSizeCallback(window, framebufferSize);
 	glfwSetMouseButtonCallback(window, mouseButton);
-	glfwSetCursorPosCallback(window, cursorPos);
 	glfwSetScrollCallback(window, scroll);
 	glfwSetKeyCallback(window, key);
 }
@@ -134,8 +135,9 @@ void Renderer::initImGui() {
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	io.FontGlobalScale = 2.5f;
 	io.IniFilename = nullptr;
+	io.Fonts->AddFontFromFileTTF("./Resources/RobotoMono-Medium.ttf", 16.0f);
+	io.FontGlobalScale = 2.5f;
 
 	ImGui::StyleColorsDark();
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -260,9 +262,9 @@ void Renderer::guiLoop() {
 
 	{
 		ImGui::Text(("Avg. Frame Delta: " + to_str((current_time / ul_to_d(runframe) * 1000.0), 3) + "ms").c_str());
-		ImGui::Text(("Avg. Sim   Delta: " + to_str((sim_deltas / ul_to_d(runframe) * 1000.0), 3) + "ms").c_str());
+		ImGui::Text(("Avg. Sim   Delta: " + to_str((sim_time_aggregate / ul_to_d(runframe) * 1000.0), 3) + "ms").c_str());
 
-		const dvec1 percent = round((sim_deltas / current_time) * 100.0);
+		const dvec1 percent = round((sim_time_aggregate / current_time) * 100.0);
 		ImGui::Text(("Avg. ~GPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
 		ImGui::Text(("Avg. ~CPU[" + to_str(percent, 0) + "]%%").c_str());
 
@@ -279,11 +281,25 @@ void Renderer::guiLoop() {
 	ImGui::Separator();
 
 	ImGui::Checkbox("Render Grid", render_grid);
+	if (*render_grid) {
+		ImGui::Separator();
+		ImGui::Checkbox("Render Surface", render_grid_surface);
+		ImGui::Checkbox("Render Density", render_grid_density);
+		if (*render_grid_density) {
+			ImGui::SliderFloat("Density Mul", render_grid_density_mul, 0.05f, 2.0f, "%.4f");
+		}
+		else {
+			ImGui::SliderFloat("Opacity Mul", render_grid_opacity, 0.05f, 2.0f, "%.4f");
+		}
+		ImGui::Separator();
+	}
 	ImGui::Checkbox("Render Particles", render_particles);
 
-	if (ImGui::Button("Start")) {
-		start_sim = true;
-	};
+	if (not start_sim) {
+		if (ImGui::Button("Start")) {
+			start_sim = true;
+		}
+	}
 
 	ImGui::End();
 	ImGui::Render();
@@ -359,6 +375,12 @@ void Renderer::displayLoop() {
 		glUniform1ui (glGetUniformLocation(compute_program, "render_grid"), *render_grid);
 		glUniform1ui (glGetUniformLocation(compute_program, "render_particles"), *render_particles);
 
+		glUniform1ui (glGetUniformLocation(compute_program, "render_grid_surface"), *render_grid_surface);
+		glUniform1ui (glGetUniformLocation(compute_program, "render_grid_density"), *render_grid_density);
+
+		glUniform1f  (glGetUniformLocation(compute_program, "render_grid_opacity"), *render_grid_opacity);
+		glUniform1f  (glGetUniformLocation(compute_program, "render_grid_density_mul"), *render_grid_density_mul);
+
 		glBindImageTexture(0, buffers["raw"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
 		glDispatchCompute(compute_layout.x, compute_layout.y, compute_layout.z);
@@ -374,8 +396,6 @@ void Renderer::displayLoop() {
 		bindRenderLayer(display_program, 0, buffers["raw"], "raw_render_layer");
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-		frame_counter++;
-		runframe++;
 		if (recompile) {
 			glDeleteProgram(buffers["compute"]);
 			glDeleteProgram(buffers["display"]);
@@ -396,10 +416,11 @@ void Renderer::displayLoop() {
 		}
 
 		guiLoop();
-		sim_deltas += sim_delta;
-
+		sim_time_aggregate += sim_delta;
 		frame_timer += delta_time;
 		sim_timer += sim_delta;
+		frame_counter++;
+		runframe++;
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -408,9 +429,6 @@ void Renderer::displayLoop() {
 
 void Renderer::resize() {
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
-
-	current_mouse = dvec2(display_resolution) / 2.0;
-	last_mouse = current_mouse;
 }
 
 void Renderer::framebufferSize(GLFWwindow* window, int width, int height) {
@@ -421,28 +439,13 @@ void Renderer::framebufferSize(GLFWwindow* window, int width, int height) {
 	instance->resize();
 }
 
-void Renderer::cursorPos(GLFWwindow* window, double xpos, double ypos) {
-	Renderer* instance = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
-	instance->current_mouse = dvec2(xpos, ypos);
-}
-
 void Renderer::mouseButton(GLFWwindow* window, int button, int action, int mods) {
 	Renderer* instance = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
 	if (action == GLFW_PRESS) {
 		instance->inputs[button] = true;
-		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-			double xpos, ypos;
-			glfwGetCursorPos(window, &xpos, &ypos);
-			instance->current_mouse = dvec2(xpos, ypos);
-			instance->last_mouse = instance->current_mouse;
-			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-		}
 	}
 	else if (action == GLFW_RELEASE) {
 		instance->inputs[button] = false;
-		if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-		}
 	}
 }
 

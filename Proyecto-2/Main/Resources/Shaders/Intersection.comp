@@ -26,3 +26,20 @@ bool f_rayAABBIntersection(in Ray ray, in vec3 pmin, in vec3 pmax) {
 	}
 	return true;
 }
+
+bool f_rayAABBIntersection(in Ray ray, in vec3 pmin, in vec3 pmax, out float t) {
+	vec3 tMin = (pmin - ray.origin) * ray.direction;
+	vec3 tMax = (pmax - ray.origin) * ray.direction;
+
+	vec3 t1 = min(tMin, tMax);
+	vec3 t2 = max(tMin, tMax);
+
+	float tNear = max(max(t1.x, t1.y), t1.z);
+	float tFar = min(min(t2.x, t2.y), t2.z);
+
+	if (tNear > tFar || tFar < 0.0) {
+		return false;
+	}
+	t = tNear;
+	return true;
+}

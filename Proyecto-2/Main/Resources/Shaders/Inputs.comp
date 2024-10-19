@@ -27,5 +27,12 @@ uniform float cell_size;
 uniform float sphere_radius;
 uniform float sphere_display_radius;
 
-uniform uint render_grid;
-uniform uint render_particles;
+
+uniform uint  render_grid;
+uniform uint  render_particles;
+
+uniform uint  render_grid_density;
+uniform uint  render_grid_surface;
+
+uniform float render_grid_opacity;
+uniform float render_grid_density_mul;
