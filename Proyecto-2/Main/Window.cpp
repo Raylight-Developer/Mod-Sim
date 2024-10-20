@@ -342,7 +342,7 @@ void Renderer::guiLoop() {
 		if (not render_grid_surface) {
 			ImGui::Checkbox("Render Density", &render_grid_density);
 			if (render_grid_density) {
-				ImGui::SliderFloat("Density Mul", &render_grid_density_mul, 0.05f, 2.0f, "%.4f");
+				ImGui::SliderFloat("Density Mul", &render_grid_density_mul, 0.0005f, 2.0f, "%.4f");
 			}
 			else {
 				ImGui::SliderFloat("Opacity Mul", &render_grid_opacity, 0.05f, 2.0f, "%.4f");

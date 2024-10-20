@@ -6,8 +6,6 @@ struct CPU_Cell;
 struct CPU_Particle {
 	vec1 mass;
 	vec1 density;
-	vec1 humidity;
-	vec1 pressure;
 	vec1 temperature;
 
 	vec3 position;
@@ -28,7 +26,12 @@ struct alignas(16) GPU_Particle {
 	vec4 velocity;
 
 	GPU_Particle();
-	GPU_Particle(const CPU_Particle* particle);
+	GPU_Particle(const CPU_Particle& particle);
+};
+
+enum struct Cell_Type {
+	AIR,
+	FLUID
 };
 
 struct CPU_Cell {
@@ -37,14 +40,17 @@ struct CPU_Cell {
 	vec1 pressure;
 	vec1 temperature;
 
+	vec3 pmin;
+	vec3 pmax;
+	vec3 center;
+
+	vec3 velocity_field;
+	Cell_Type type;
+
 	vector<CPU_Particle*> particles;
 	uint  particle_count;
 
-	vec3 pmin;
-	vec3 pmax;
-
-	vec3 velocity_field;
-	vec3 acceleration_field;
+	array<CPU_Cell*, 26> neighbors;
 
 	CPU_Cell();
 };
@@ -61,16 +67,7 @@ struct GPU_Cell {
 	uint b;
 
 	GPU_Cell();
-	GPU_Cell(const CPU_Cell* cell);
-};
-
-struct GPU_Octree {
-	uvec4 pointers_a;
-	uvec4 pointers_b;
-	vec3 pmin;
-	uint leaf;
-	vec3 pmax;
-	uint pad;
+	GPU_Cell(const CPU_Cell& cell);
 };
 
 struct Flip {
@@ -83,12 +80,15 @@ struct Flip {
 	vec3  GRID_SIZE;
 	vec3  HALF_SIZE;
 	vec1  REST_DENSITY;
+	vec1  SMOOTH_RADIUS;
 	vec1  DT;
+	uint  RUNFRAME;
 	uint  SAMPLES;
 	vec1  SDT;
 
-	vector<CPU_Cell*> grid;
-	vector<CPU_Particle*> particles;
+	vector<CPU_Cell> grid;
+	vector<CPU_Particle> particles;
+	vector<CPU_Cell> temp_grid;
 
 	Flip();
 
@@ -108,13 +108,10 @@ struct Flip {
 	void gather();
 
 	void computeGrid();
-
-	void navierStokes();
-	void computeCoriolis();
-	void computePressure();
-	void computeTemperature();
+	void computeParticles();
 
 	CPU_Cell* getGrid(const uint64& x, const uint64& y, const uint64& z);
+	CPU_Cell* getGrid(vector<CPU_Cell>& grid, const uint64& x, const uint64& y, const uint64& z);
 
 	vector<GPU_Particle> gpuParticles() const;
 	vector<GPU_Cell> gpuGrid() const;
@@ -125,6 +122,11 @@ struct Flip {
 
 	bool resolveOverlap(CPU_Particle* particle_a, CPU_Particle* particle_b);
 	void resolveCollision(CPU_Particle* particle_a, CPU_Particle* particle_b);
+
+	vec1 sampleDensity(const CPU_Cell* cell) const;
+	vec1 sampleTemperature(const CPU_Cell* cell) const;
+
+	vec1 smoothWeight(const vec1& distance) const;
 };
 
 vec1 calculateAirDensity(const vec1& pressure, const vec1& temperature);
