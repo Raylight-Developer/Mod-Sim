@@ -20,7 +20,7 @@ vec3 velocityToColor(vec3 velocity) {
 
 vec3 temperatureTocolor(float temp) {
 	vec3 color;
-	float t = clamp(f_mapFloat(0.0, 30.0, 1.0, 0.0, temp), 0.0, 1.0);
+	float t = clamp(f_mapFloat(5.5, 28.5, 1.0, 0.0, temp), 0.0, 1.0);
 
 	if (t < 0.25) {
 		// Interpolate from Red to Yellow

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Shared.hpp"
+#include "Fluid.hpp"
+
 struct CPU_Cell;
 
 struct CPU_Particle {
@@ -72,6 +74,7 @@ struct GPU_Cell {
 
 struct Flip {
 	vec1  PARTICLE_RADIUS;
+	vec1  PARTICLE_AREA;
 	uint  PARTICLE_COUNT;
 	uvec3 GRID_CELLS;
 	uint  GRID_COUNT;
@@ -125,6 +128,7 @@ struct Flip {
 
 	vec1 sampleDensity(const CPU_Cell* cell) const;
 	vec1 sampleTemperature(const CPU_Cell* cell) const;
+	vec1 sampleTemperature(const CPU_Particle* particle) const;
 
 	vec1 smoothWeight(const vec1& distance) const;
 };

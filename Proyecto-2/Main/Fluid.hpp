@@ -1,19 +1,18 @@
-#pragma once
+﻿#pragma once
 
 #include "Shared.hpp"
 
-vec1 calculateHeatRate(vec1 massFlowRate, vec1 specificHeatCapacity, vec1 tempIn, vec1 tempOut) {
-	return massFlowRate * specificHeatCapacity * (tempIn - tempOut);
-}
+vec1 calculateHeatRate(const vec1& massFlowRate, const vec1& specificHeatCapacity, const vec1& tempIn, const vec1& tempOut);
+vec1 calculateMassFlowRate(const vec1& density, const vec1& area, const vec1& velocity);
+vec3 coriolisForce(const vec3& velocity, const vec1& mass);
+vec1 densityToPresure(const vec1& density, const vec1& target_density);
 
-vec1 calculateMassFlowRate(vec1 density, vec1 area, vec1 velocity) {
-	return density * area * velocity;
-}
+#define WATER_EMISSIVITY 0.9f
+#define ICE_CRYSTAL_EMISSIVITY 0.7f
 
-vec3 coriolisForce(vec3 velocity, vec1 mass) {
-	return glm::cross(vec3(0.0, 0.0, 7.2921159e-5f), velocity) * (-2.0f * mass) ;
-}
+#define STEFAN_BOLTZMANN_CONSTANT             5.67e-8f // W/m²·K⁴
+#define Convective_Heat_Transfer_Coefficient  10.0f // W/m²·K⁴
 
-vec1 densityToPresure(vec1 density, vec1 target_density) {
-	return density - target_density;
-}
+vec1 calculateConvectiveHeatTransfer(const vec1& surface_area, const vec1& surrounding_temperature, const vec1& particle_temperature);
+vec1 calculateRadiativeHeatTransfer(const vec1& emissivity, const vec1& surface_area, const vec1& surrounding_temperature, const vec1& particle_temperature);
+vec1 calculateTotalHeatAbsorption(const vec1& surface_area, const vec1& emissivity, const vec1& surrounding_temperature, const vec1& particle_temperature);

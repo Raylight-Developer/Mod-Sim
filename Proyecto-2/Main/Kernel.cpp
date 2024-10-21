@@ -1,10 +1,13 @@
 ﻿#include "Kernel.hpp"
 
+#define WARM_REGION        0.8f    // Bottom 1-N of half simulation_height
+#define COLD_REGION        0.8f    // Bottom N of half simulation_height
+
 #define AIR_GAS_CONSTANT   287.05f // J/(kg·K)
 #define AIR_DENSITY        1.225f  // kg/m^3 (at sea level)
 
 #define PARTICLE_RESTITUTION       0.95f
-#define RESTITUTION                0.25f
+#define RESTITUTION                0.95f
 #define GRAVITY                    vec3(0.0)
 
 #define ATMOSPHERE_TEMP    5.5f        // C
@@ -17,7 +20,7 @@
 #define CORIOLIS           vec3(15.0f, 0, 0)
 
 #define CELL_HEAT_GAIN             1.0f
-#define CELL_AMBIENT_HEAT_TRANSFER 0.15f
+#define CELL_AMBIENT_HEAT_TRANSFER 0.05f
 #define HEAT_TRANSFER_COEFFICIENT  0.05f
 
 CPU_Particle::CPU_Particle() {
@@ -55,11 +58,16 @@ CPU_Cell::CPU_Cell() {
 	particles = {};
 	particle_count = 0;
 
-	pmin = vec3(0);
-	pmax = vec3(0);
+	pmin   = vec3(0);
+	pmax   = vec3(0);
+	center = vec3(0);
 
 	velocity_field = vec3(0);
 	type = Cell_Type::AIR;
+
+	for (uint i = 0; i < neighbors.size(); i++) {
+		neighbors[i] = nullptr;
+	}
 }
 
 GPU_Cell::GPU_Cell() {
@@ -93,13 +101,14 @@ void Flip::init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const u
 	this->PARTICLE_RADIUS = PARTICLE_RADIUS;
 	this->PARTICLE_COUNT  = PARTICLE_COUNT;
 	this->GRID_CELLS      = GRID_CELLS;
+	PARTICLE_AREA         = 4.0f * glm::pi<vec1>() * PARTICLE_RADIUS * PARTICLE_RADIUS;
 	GRID_COUNT            = GRID_CELLS.x * GRID_CELLS.y * GRID_CELLS.z;
 	CELL_SIZE             = 1.0f / u_to_f(max(max(GRID_CELLS.x, GRID_CELLS.y), GRID_CELLS.z));
 	INV_CELL_SIZE         = 1.0f / CELL_SIZE;
 	GRID_SIZE             = vec3(GRID_CELLS) * CELL_SIZE;
 	HALF_SIZE             = GRID_SIZE * 0.5f;
 	REST_DENSITY          = 0.0f;
-	SMOOTH_RADIUS         = CELL_SIZE * 1.5;
+	SMOOTH_RADIUS         = CELL_SIZE * 1.5f;
 	DT                    = 0.016f;
 	RUNFRAME              = 0;
 	SAMPLES               = 5;
@@ -133,7 +142,7 @@ void Flip::initParticles() {
 		const vec1 z = radius * sin(theta) * sin(phi);
 
 		particle.position = vec3(x, y, z);
-		particle.velocity = vec3(0);
+		particle.velocity = vec3(0, -1, 0);
 
 		particle.mass = randF(0.5, 1.0);
 		particle.temperature = AMBIENT_TEMP + randF(-1.0, 1.0);
@@ -201,30 +210,45 @@ void Flip::integrate() {
 		particle.velocity += particle.acceleration * DT;
 		particle.position += particle.velocity * DT;
 
-		seaThermalTransfer(&particle);
-		atmosphereThermalTransfer(&particle);
-
 		boundingCollisions(&particle);
 	}
 }
 
 void Flip::thermodynamics(CPU_Particle* particle) {
+	const vec1 ambient_temp = sampleTemperature(particle);
 
+	const vec1 warm = -HALF_SIZE.y * WARM_REGION;
+	const vec1 cold = HALF_SIZE.y * COLD_REGION;
+	if (particle->position.y <= warm) {
+		const vec1 temp = f_map(warm, -HALF_SIZE.y, ambient_temp, SEA_SURFACE_TEMP, clamp(particle->position.y, -HALF_SIZE.y, warm));
+		const vec1 temp_diff = calculateTotalHeatAbsorption(PARTICLE_AREA, WATER_EMISSIVITY, temp, particle->temperature) - particle->temperature;
+		particle->temperature += temp_diff * DT;
+	}
+	else if (particle->position.y >= cold) {
+		const vec1 temp = f_map(cold, HALF_SIZE.y, ambient_temp, ATMOSPHERE_TEMP, clamp(particle->position.y, cold, HALF_SIZE.y));
+		const vec1 temp_diff = calculateTotalHeatAbsorption(PARTICLE_AREA, WATER_EMISSIVITY, temp, particle->temperature) - particle->temperature;
+		particle->temperature += temp_diff * DT;
+	}
+	else {
+		particle->temperature += (ambient_temp - particle->temperature) * DT;
+	}
 }
 
 void Flip::seaThermalTransfer(CPU_Particle* particle) {
-	if (particle->position.y <= -HALF_SIZE.y * 0.25f) {
-		const vec1 t = f_map(-HALF_SIZE.y, -HALF_SIZE.y * 0.25f, 1.0f, 0.0f, clamp(particle->position.y, -HALF_SIZE.y, -HALF_SIZE.y * 0.25f));
-		const vec1 temp_diff = SEA_SURFACE_TEMP - particle->temperature;
-		particle->temperature += temp_diff * t * DT;
+	const vec1 start = -HALF_SIZE.y * WARM_REGION;
+	if (particle->position.y <= start) {
+		const vec1 temp = f_map(start, -HALF_SIZE.y, AMBIENT_TEMP, SEA_SURFACE_TEMP, clamp(particle->position.y, -HALF_SIZE.y, start));
+		const vec1 temp_diff = calculateTotalHeatAbsorption(PARTICLE_AREA, WATER_EMISSIVITY, temp, particle->temperature) - particle->temperature;
+		particle->temperature += temp_diff * DT;
 	}
 }
 
 void Flip::atmosphereThermalTransfer(CPU_Particle* particle) {
-	if (particle->position.y >= HALF_SIZE.y * 0.25f) {
-		const vec1 t = f_map(HALF_SIZE.y, HALF_SIZE.y * 0.25f, 1.0f, 0.0f, clamp(particle->position.y, HALF_SIZE.y * 0.52f, HALF_SIZE.y));
-		const vec1 temp_diff = ATMOSPHERE_TEMP - particle->temperature;
-		particle->temperature += temp_diff * t * DT;
+	const vec1 start = HALF_SIZE.y * COLD_REGION;
+	if (particle->position.y >= start) {
+		const vec1 temp = f_map(start, HALF_SIZE.y, AMBIENT_TEMP, ATMOSPHERE_TEMP, clamp(particle->position.y, start, HALF_SIZE.y));
+		const vec1 temp_diff = calculateTotalHeatAbsorption(PARTICLE_AREA, WATER_EMISSIVITY, temp, particle->temperature) - particle->temperature;
+		particle->temperature += temp_diff * DT;
 	}
 }
 
@@ -237,26 +261,28 @@ void Flip::scatter() {
 			if (insideAABB(particle.position, cell.pmin, cell.pmax)) {
 				cell.particle_count++;
 				cell.particles.push_back(&particle);
+				particle.cell = &cell;
 			}
 		}
 		if (cell.particle_count > 0) {
 			cell.type = Cell_Type::FLUID;
 		}
 		cell.density = sampleDensity(&cell);// u_to_f(cell.particle_count) / 10.0f;
-	}
-	for (CPU_Cell& cell : grid) {
-		for (CPU_Particle* particle: cell.particles) {
-			vec1 temp_diff = particle->temperature - cell.temperature;
-			vec1 weight = calculateInterpolationWeight(particle, &cell) / u_to_f(cell.particle_count);
-			weight *= CELL_HEAT_GAIN * DT;
 
-			cell.temperature += temp_diff * weight;
-		}
+		cell.temperature += sampleTemperature(&cell) * CELL_HEAT_GAIN * DT;
 	}
 }
 
 void Flip::gather() {
-
+	for (CPU_Particle& particle : particles) {
+		thermodynamics(&particle);
+		for (CPU_Cell& cell : grid) {
+			if (insideAABB(particle.position, cell.pmin, cell.pmax)) {
+				particle.cell = &cell;
+				break;
+			}
+		}
+	}
 }
 
 void Flip::computeGrid() {
@@ -296,7 +322,9 @@ void Flip::computeGrid() {
 
 void Flip::computeParticles() {
 	for (CPU_Particle& particle : particles) {
-		vec1 temp_diff = particle.cell->temperature - particle.temperature;
+		const vec1 ambient_temp_diff = AMBIENT_TEMP - particle.temperature;
+		const vec1 ambient_heat_transfer = CELL_AMBIENT_HEAT_TRANSFER * ambient_temp_diff * DT;
+		particle.temperature += ambient_heat_transfer;
 	}
 }
 
@@ -496,10 +524,28 @@ vec1 Flip::sampleTemperature(const CPU_Cell* cell) const {
 			for (const CPU_Particle* particle : neighbor->particles) {
 				const vec1 distance = glm::length(particle->position - cell->center);
 				const vec1 weight = smoothWeight(distance);
-				temperature += particle->temperature * weight;
+				temperature += (particle->temperature - cell->temperature) * weight;
 			}
 		}
 	}
+	return temperature;
+}
+
+vec1 Flip::sampleTemperature(const CPU_Particle* particle) const {
+	vec1 temperature = 0.0f;
+
+	const vec1 distance = glm::length(particle->position - particle->cell->center);
+	const vec1 weight = smoothWeight(distance);
+	temperature += (particle->cell->temperature - particle->temperature) * weight;
+
+	for (const CPU_Cell* neighbor : particle->cell->neighbors) {
+		if (neighbor) {
+			const vec1 distance = glm::length(particle->position - particle->cell->center);
+			const vec1 weight = smoothWeight(distance);
+			temperature += (particle->cell->temperature - particle->temperature) * weight;
+		}
+	}
+	temperature = particle->cell->temperature;
 	return temperature;
 }
 
@@ -523,5 +569,5 @@ vec1 Flip::smoothWeight(const vec1& distance) const {
 	//return value * value * value
 	const vec1 value = glm::max(0.0f, SMOOTH_RADIUS - distance);
 	const vec1 volume = glm::pi<vec1>() * pow(SMOOTH_RADIUS, 3.0f) /3.0f;
-	return value / volume;
+	return value;
 }
