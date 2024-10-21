@@ -6,27 +6,6 @@ struct Particle {
 	vec4  velocity;
 };
 
-struct Cell {
-	float density;
-	float humidity;
-	float pressure;
-	float temperature;
-
-	vec3 pmin;
-	uint a;
-	vec3 pmax;
-	uint b;
-};
-
-struct Octree {
-	uvec4 pointers_a;
-	uvec4 pointers_b;
-	vec3 pmin;
-	uint leaf;
-	vec3 pmax;
-	uint pad;
-};
-
 // INTERNAL ---------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 struct AABB {

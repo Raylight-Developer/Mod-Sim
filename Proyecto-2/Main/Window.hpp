@@ -53,21 +53,12 @@ struct Renderer {
 	vec1  RENDER_SCALE;
 	vec1  PARTICLE_RADIUS;
 	vec1  PARTICLE_DISPLAY;
-	vec1  CELL_SIZE;
 	int   PARTICLE_COUNT;
-	uvec3 GRID_CELLS;
+	int   LAYER_COUNT;
 
 	uvec3 compute_layout;
 
-	bool render_grid;
 	bool render_particles;
-
-	bool render_grid_surface;
-	bool render_grid_density;
-	vec1 render_grid_opacity;
-	vec1 render_grid_density_mul;
-	int  render_grid_color_mode;
-
 	int  render_particle_color_mode;
 
 	Renderer();

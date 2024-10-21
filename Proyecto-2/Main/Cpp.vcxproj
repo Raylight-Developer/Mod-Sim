@@ -92,7 +92,6 @@
     <ClCompile Include="..\Shared\Source\OpenGl.cpp" />
     <ClCompile Include="..\Shared\Source\Ops.cpp" />
     <ClCompile Include="..\Shared\Source\Session.cpp" />
-    <ClCompile Include="Fluid.cpp" />
     <ClCompile Include="Kernel.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Window.cpp" />
@@ -109,7 +108,6 @@
     <ClInclude Include="..\Shared\Include\Shared.hpp" />
     <ClInclude Include="..\Shared\Include\String.hpp" />
     <ClInclude Include="..\Shared\Include\Types.hpp" />
-    <ClInclude Include="Fluid.hpp" />
     <ClInclude Include="Kernel.hpp" />
     <ClInclude Include="Window.hpp" />
   </ItemGroup>

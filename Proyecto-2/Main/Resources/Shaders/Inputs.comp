@@ -8,10 +8,6 @@ layout(std430, binding = 1) buffer PointDataBuffer {
 	Particle point_cloud[];
 };
 
-layout(std430, binding = 2) buffer CellDataBuffer {
-	Cell grid[];
-};
-
 uniform uint  frame_count;
 uniform float aspect_ratio;
 uniform float current_time;
@@ -22,20 +18,8 @@ uniform vec3 camera_p_uv;
 uniform vec3 camera_p_u;
 uniform vec3 camera_p_v;
 
-uniform uvec3 grid_size;
-uniform float cell_size;
 uniform float sphere_radius;
 uniform float sphere_display_radius;
 
-
-uniform uint  render_grid;
 uniform uint  render_particles;
-
-uniform uint  render_grid_density;
-uniform uint  render_grid_surface;
-
-uniform float render_grid_opacity;
-uniform float render_grid_density_mul;
-
-uniform int   render_grid_color_mode;
 uniform int   render_particle_color_mode;

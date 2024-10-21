@@ -47,9 +47,6 @@
     <ClCompile Include="Kernel.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Fluid.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Shared\Include\Glm.hpp">
@@ -89,9 +86,6 @@
       <Filter>Shared\External</Filter>
     </ClInclude>
     <ClInclude Include="Kernel.hpp">
-      <Filter>Include</Filter>
-    </ClInclude>
-    <ClInclude Include="Fluid.hpp">
       <Filter>Include</Filter>
     </ClInclude>
   </ItemGroup>
