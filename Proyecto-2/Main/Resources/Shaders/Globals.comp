@@ -14,12 +14,19 @@ struct Texture {
 	uint format;
 	// 16
 };
+
+struct Bvh {
+	vec3 p_min;
+	uint particle_count; // If == 0, pointer leads to other Bvh Node, else leads to End Index
+	vec3 p_max;
+	uint pointer_particle;
+	uint pointer_a;
+	uint pointer_b;
+	uvec2 padding;
+	// 48
+};
 // INTERNAL ---------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-struct AABB {
-	vec3 pmin;
-	vec3 pmax;
-};
 
 struct Ray {
 	vec3  origin;

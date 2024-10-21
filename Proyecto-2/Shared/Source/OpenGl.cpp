@@ -59,6 +59,13 @@ vector<uint> Texture::toRgba8Texture() const {
 	return packedData;
 }
 
+GPU_Texture::GPU_Texture(const uint& start, const uint& width, const uint& height, const uint& format) :
+	start(start),
+	width(width),
+	height(height),
+	format(format)
+{}
+
 GLuint fragmentShaderProgram(const string& file_path) {
 	GLuint shader_program = glCreateShader(GL_VERTEX_SHADER);
 

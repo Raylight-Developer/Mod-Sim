@@ -63,6 +63,8 @@ struct Renderer {
 	bool render_particles;
 	int  render_particle_color_mode;
 
+	int  render_planet_texture;
+
 	Renderer();
 	~Renderer();
 
@@ -74,6 +76,8 @@ struct Renderer {
 
 	void f_pipeline();
 	void f_tickUpdate();
+
+	void initKernel();
 
 	void guiLoop();
 	void gameLoop();

@@ -20,33 +20,47 @@ void main() {
 	Ray ray = f_cameraRay(uv);
 
 	vec4 color = vec4(0,0,0,1);
-	if (render_particles == 1) {
-		float t_length = MAX_DIST;
-		float t_dist = MAX_DIST;
-		vec2 earth_uv = vec2(0.5);
-		if (f_raySphereIntersection(ray, vec3(0), 6.371, t_dist, earth_uv)) {
-			if (t_dist < t_length && t_dist > EPSILON) {
-				t_length = t_dist;
-				color = sampleTextureRgba8u(textures[0], earth_uv);
-			}
-		}
-		for (uint i = 0; i < point_cloud.length(); i++) {
-			if (f_raySphereIntersection(ray, point_cloud[i].position.xyz, t_dist)) {
+	uint bvh_depth = 0;
+	float bvh_t_length = MAX_DIST;
+	Ray bvh_ray = Ray(ray.origin, 1.0 / ray.direction);
+
+	if (f_rayBvhIntersection(bvh_ray, root_bvh, bvh_t_length)) {
+		bvh_depth++;
+		if (render_particles == 1) {
+			float t_length = MAX_DIST;
+			float t_dist = MAX_DIST;
+			vec2 earth_uv = vec2(0.5);
+			if (f_EarthIntersection(ray, t_dist, earth_uv)) {
 				if (t_dist < t_length && t_dist > EPSILON) {
 					t_length = t_dist;
-					color = vec4(particleColor(point_cloud[i], t_dist), 1.0);
+					color = sampleTextureRgba8u(textures[render_planet_texture], earth_uv);
+				}
+			}
+			uvec2 pointers = f_visitBvh(bvh_ray, root_bvh, bvh_depth);
+			//for (uint i = pointers.x; i < pointers.y; i++) {
+			for (uint i = 0; i < point_cloud.length(); i++) {
+				if (f_raySphereIntersection(ray, point_cloud[i].position.xyz, t_dist)) {
+					if (t_dist < t_length && t_dist > EPSILON) {
+						t_length = t_dist;
+						color = vec4(particleColor(point_cloud[i], t_dist), 1.0);
+					}
 				}
 			}
 		}
-	}
-	else {
-		float earth_dist = MAX_DIST;
-		vec2 earth_uv = vec2(0.5);
-		if (f_raySphereIntersection(ray, vec3(0), 6.371, earth_dist, earth_uv)) {
-			color = sampleTextureRgba8u(textures[0], earth_uv);
+		else {
+			float earth_dist = MAX_DIST;
+			vec2 earth_uv = vec2(0.5);
+			if (f_EarthIntersection(ray, earth_dist, earth_uv)) {
+				color = sampleTextureRgba8u(textures[render_planet_texture], earth_uv);
+			}
 		}
 	}
 
-	color = clamp(color, 0.0, 1.0);
+	float bvh_alpha = 1.0;
+	for (int i = 0; i < bvh_depth; i++) {
+		bvh_alpha *= 0.95;
+	}
+
+	color = clamp(mix(vec4(1), color, bvh_alpha), 0.0, 1.0);
 	imageStore(raw_render_layer, pixel_id, color);
 }

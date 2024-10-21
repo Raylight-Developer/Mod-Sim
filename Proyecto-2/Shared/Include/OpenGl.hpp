@@ -16,6 +16,20 @@ struct Texture {
 	vector<uint> toRgba8Texture() const;
 };
 
+struct alignas(16) GPU_Texture {
+	uint start;
+	uint width;
+	uint height;
+	uint format;
+
+	GPU_Texture(
+		const uint& start = 0U,
+		const uint& width = 0U,
+		const uint& height = 0U,
+		const uint& format = 0U
+	);
+};
+
 GLuint fragmentShaderProgram(const string& file_path);
 GLuint computeShaderProgram(const string& file_path);
 GLuint renderLayer(const uvec2& resolution);

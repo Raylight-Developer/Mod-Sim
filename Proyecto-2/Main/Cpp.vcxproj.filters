@@ -47,6 +47,12 @@
     <ClCompile Include="Kernel.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="Bvh.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Particle.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Shared\Include\Glm.hpp">
@@ -86,6 +92,12 @@
       <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="Lut.hpp">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Bvh.hpp">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Particle.hpp">
       <Filter>Include</Filter>
     </ClInclude>
   </ItemGroup>

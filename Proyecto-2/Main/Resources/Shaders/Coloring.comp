@@ -46,7 +46,7 @@ vec3 particleColor(in Particle particle, in float dist) {
 	float distance_factor = clamp(f_mapFloat(39.0, 32.0, 0.0, 1.0, dist), 0, 1);
 	switch (render_particle_color_mode) {
 		case 0: return temperatureTocolor(particle.temperature) * distance_factor;
-		case 1: return particle.velocity.xyz;
+		case 1: return particle.velocity.xyz;//velocityToColor(particle.velocity.xyz) * distance_factor;
 	}
 
 	return temperatureTocolor(particle.temperature) * distance_factor;

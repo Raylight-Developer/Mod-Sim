@@ -92,8 +92,10 @@
     <ClCompile Include="..\Shared\Source\OpenGl.cpp" />
     <ClCompile Include="..\Shared\Source\Ops.cpp" />
     <ClCompile Include="..\Shared\Source\Session.cpp" />
+    <ClCompile Include="Bvh.cpp" />
     <ClCompile Include="Kernel.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Particle.cpp" />
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -107,8 +109,10 @@
     <ClInclude Include="..\Shared\Include\Shared.hpp" />
     <ClInclude Include="..\Shared\Include\String.hpp" />
     <ClInclude Include="..\Shared\Include\Types.hpp" />
+    <ClInclude Include="Bvh.hpp" />
     <ClInclude Include="Kernel.hpp" />
     <ClInclude Include="Lut.hpp" />
+    <ClInclude Include="Particle.hpp" />
     <ClInclude Include="Window.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

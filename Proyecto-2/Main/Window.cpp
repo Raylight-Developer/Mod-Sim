@@ -27,7 +27,7 @@ Renderer::Renderer() {
 
 	recompile = false;
 
-	camera_zoom_sensitivity = 1.0;
+	camera_zoom_sensitivity = 2.0;
 	camera_orbit_sensitivity = 5.0;
 	inputs = vector(348, false);
 
@@ -45,7 +45,7 @@ Renderer::Renderer() {
 	TIME_SCALE       = 0.1f;
 	RENDER_SCALE     = 0.5f;
 	PARTICLE_RADIUS  = 0.065f;
-	PARTICLE_COUNT   = 2148;
+	PARTICLE_COUNT   = 2048;
 	LAYER_COUNT      = 1;
 	PARTICLE_DISPLAY = 1.0f;
 
@@ -56,6 +56,7 @@ Renderer::Renderer() {
 	{
 		render_particle_color_mode = 0;
 	}
+	render_planet_texture = 0;
 }
 
 Renderer::~Renderer() {
@@ -69,6 +70,7 @@ Renderer::~Renderer() {
 	glDeleteProgram(buffers["compute"]);
 	glDeleteProgram(buffers["display"]);
 	glDeleteBuffers(1, &buffers["particles"]);
+	glDeleteBuffers(1, &buffers["bvh_nodes"]);
 	glDeleteBuffers(1, &buffers["textures"]);
 	glDeleteBuffers(1, &buffers["texture_data"]);
 	glDeleteTextures(1, &buffers["raw"]);
@@ -119,7 +121,7 @@ void Renderer::initGlfw() {
 	}
 
 	glfwMakeContextCurrent(window);
-	glfwSwapInterval(false); // V-Sync
+	glfwSwapInterval(true);
 	gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
 	glfwSetWindowUserPointer(window, this);
@@ -227,18 +229,23 @@ void Renderer::f_pipeline() {
 	buffers["raw"] = renderLayer(render_resolution);
 
 	glBindVertexArray(VAO);
-	flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT);
+	initKernel();
 	compute_layout = uvec3(
 		d_to_u(ceil(u_to_d(render_resolution.x) / 32.0)),
 		d_to_u(ceil(u_to_d(render_resolution.y) / 32.0)),
 		1
 	);
 
-	Texture texture = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature.png");
-	vector<uint> texture_data = texture.toRgba8Texture();
-	textures.push_back(GPU_Texture(0, texture.resolution.x, texture.resolution.y, 0));
-	buffers["textures"] = ssboBinding(2, ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
-	buffers["texture_data"] = ssboBinding(3, ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
+	vector<uint> texture_data;
+	vector<string> texture_names = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature" };
+	for (const string& tex : texture_names) {
+		Texture texture = Texture::fromFile("./Resources/Nasa Earth Data/" + tex + ".png");
+		textures.push_back(GPU_Texture(ul_to_u(texture_data.size()), texture.resolution.x, texture.resolution.y, 0));
+		auto data = texture.toRgba8Texture();
+		texture_data.insert(texture_data.end(), data.begin(), data.end());
+	}
+	buffers["textures"] = ssboBinding(3, ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
+	buffers["texture_data"] = ssboBinding(4, ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
 }
 
 void Renderer::f_tickUpdate() {
@@ -255,6 +262,13 @@ void Renderer::f_tickUpdate() {
 	glDeleteBuffers(1, &buffers["particles"]);
 	vector<GPU_Particle> gpu_point_cloud = flip.gpuParticles();
 	buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
+}
+
+void Renderer::initKernel() {
+	flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT);
+
+	glDeleteBuffers(1, &buffers["bvh_nodes"]);
+	buffers["bvh_nodes"] = ssboBinding(2, ul_to_u(flip.bvh_nodes.size() * sizeof(GPU_Bvh)), flip.bvh_nodes.data());
 }
 
 void Renderer::guiLoop() {
@@ -287,6 +301,9 @@ void Renderer::guiLoop() {
 	if (ImGui::SliderFloat("Render Scale", &RENDER_SCALE, 0.1f, 1.0f, "%.3f")) {
 		resize();
 	}
+	const char* items_b[] = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature" };
+	ImGui::Combo("Planet Texture", &render_planet_texture, items_b, IM_ARRAYSIZE(items_b));
+
 	ImGui::SeparatorText("Play / Pause");
 	if (run_sim) {
 		if (ImGui::Button("Stop")) {
@@ -294,7 +311,7 @@ void Renderer::guiLoop() {
 		}
 		if (ImGui::Button("Restart")) {
 			run_sim = false;
-			flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT);
+			initKernel();
 		}
 	}
 	else {
@@ -303,19 +320,19 @@ void Renderer::guiLoop() {
 		}
 		ImGui::SeparatorText("Init Settings");
 		if (ImGui::SliderFloat("Particle Radius", &PARTICLE_RADIUS, 0.001f, 1.0f, "%.5f")) {
-			flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT);
+			initKernel();
 		}
 
 		if (ImGui::SliderFloat("Display Mult", &PARTICLE_DISPLAY, 0.05f, 5.0f, "%.3f")) {
-			flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT);
+			initKernel();
 		}
 
 		if (ImGui::SliderInt("Particle Count", &PARTICLE_COUNT, 128, 4096 * 4)) {
-			flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT);
+			initKernel();
 		}
 
 		if (ImGui::SliderInt("Layer Count", &LAYER_COUNT, 1, 16)) {
-			flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT);
+			initKernel();
 		}
 	}
 	ImGui::SeparatorText("Particle Settings");
@@ -385,6 +402,13 @@ void Renderer::displayLoop() {
 		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_u"), 1, value_ptr(projection_u));
 		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"), 1, value_ptr(projection_v));
 
+		glUniform3fv (glGetUniformLocation(compute_program, "root_bvh.p_min"), 1, value_ptr(flip.root_node.p_min));
+		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_count"), flip.root_node.particle_count);
+		glUniform3fv (glGetUniformLocation(compute_program, "root_bvh.p_max"), 1, value_ptr(flip.root_node.p_max));
+		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.pointer_particle"), flip.root_node.pointer_particle);
+		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.pointer_a"), flip.root_node.pointer_a);
+		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.pointer_b"), flip.root_node.pointer_b);
+
 		glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), PARTICLE_RADIUS);
 		glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), PARTICLE_DISPLAY * PARTICLE_RADIUS);
 
@@ -392,6 +416,7 @@ void Renderer::displayLoop() {
 		{
 			glUniform1i(glGetUniformLocation(compute_program, "render_particle_color_mode"), render_particle_color_mode);
 		}
+		glUniform1i(glGetUniformLocation(compute_program, "render_planet_texture"), render_planet_texture);
 
 		glBindImageTexture(0, buffers["raw"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 

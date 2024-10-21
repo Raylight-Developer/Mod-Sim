@@ -25,36 +25,6 @@
 #define CELL_AMBIENT_HEAT_TRANSFER 0.05f
 #define HEAT_TRANSFER_COEFFICIENT  0.05f
 
-CPU_Particle::CPU_Particle() {
-	mass = 0;
-	density = 0;
-	temperature = 0;
-
-	position = vec3(0);
-	velocity = vec3(0);
-	acceleration = vec3(0);
-}
-
-GPU_Particle::GPU_Particle() {
-	position = vec3(0);
-	temperature = 0;
-	velocity = vec3(0);
-}
-
-GPU_Particle::GPU_Particle(const CPU_Particle& particle) {
-	position = particle.position;
-	temperature = particle.temperature;
-	velocity = particle.velocity;
-	sea_surface_temperature = particle.sea_surface_temperature;
-}
-
-GPU_Texture::GPU_Texture(const uint& start, const uint& width, const uint& height, const uint& format) :
-	start(start),
-	width(width),
-	height(height),
-	format(format)
-{}
-
 Flip::Flip() {
 	textures[Texture_Field::SST] = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature.png");
 }
@@ -71,6 +41,7 @@ void Flip::init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const u
 	SDT                   = 0.016f / u_to_f(SAMPLES);
 
 	initParticles();
+	initBvh();
 }
 
 void Flip::initParticles() {
@@ -106,6 +77,15 @@ void Flip::initParticles() {
 			particles.push_back(particle);
 		}
 	}
+}
+
+void Flip::initBvh() {
+	const uint bvh_depth = d_to_u(glm::log2(ul_to_d(particles.size()) / 64.0));
+
+	Builder bvh_build = Builder(particles, PARTICLE_RADIUS, bvh_depth);
+	root_node = bvh_build.root_node;
+	bvh_nodes = bvh_build.node_list;
+	particles = bvh_build.particles; // Reorder for GPU Align
 }
 
 void Flip::simulate(const dvec1& delta_time) {
