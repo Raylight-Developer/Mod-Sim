@@ -3,6 +3,19 @@
 #include "Include.hpp"
 #include "Ops.hpp"
 
+struct Texture {
+	uvec2 resolution;
+	vector<uint> data;
+
+	Texture();
+
+	bool loadFromFile(const string& file_path);
+	static Texture fromFile(const string& file_path);
+	vec4 sampleTexture(const vec2& uv) const;
+
+	vector<uint> toRgba8Texture() const;
+};
+
 GLuint fragmentShaderProgram(const string& file_path);
 GLuint computeShaderProgram(const string& file_path);
 GLuint renderLayer(const uvec2& resolution);

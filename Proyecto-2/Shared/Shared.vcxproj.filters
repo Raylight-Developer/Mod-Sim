@@ -31,9 +31,7 @@
     <ClInclude Include="Include\Types.hpp">
       <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="Include\External\stb_image.h">
-      <Filter>External</Filter>
-    </ClInclude>
+    <ClInclude Include="Include\External\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Session.cpp">
@@ -48,9 +46,7 @@
     <ClCompile Include="Source\Ops.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Include\External\glad.c">
-      <Filter>External</Filter>
-    </ClCompile>
+    <ClCompile Include="Include\External\glad.c" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Include">

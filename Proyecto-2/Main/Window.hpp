@@ -37,6 +37,8 @@ struct Renderer {
 	dvec1 camera_orbit_sensitivity;
 	vector<bool> inputs;
 
+	vector<GPU_Texture> textures;
+
 	dvec1 sim_time_aggregate;
 
 	dvec1 current_time;

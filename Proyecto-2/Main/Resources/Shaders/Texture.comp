@@ -1,0 +1,17 @@
+vec4 sampleTextureRgba8u(in Texture tex, in vec2 uv) {
+	uint x = uint(uv.x * float(tex.width));
+	uint y = uint(uv.y * float(tex.height));
+
+	x = clamp(x, 0, tex.width - 1);
+	y = clamp(y, 0, tex.height - 1);
+
+	uint index = tex.start + y * tex.width + x;
+	uint color = texture_data[index];
+
+	return vec4(
+		float((color >> 24) & 0xFF) / 255.0,
+		float((color >> 16) & 0xFF) / 255.0,
+		float((color >> 8) & 0xFF) / 255.0,
+		float(color & 0xFF) / 255.0
+	);
+}

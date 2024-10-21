@@ -3,9 +3,17 @@
 struct Particle {
 	vec3  position;
 	float temperature;
-	vec4  velocity;
+	vec3  velocity;
+	float sea_surface_temperature;
 };
 
+struct Texture {
+	uint start;
+	uint width;
+	uint height;
+	uint format;
+	// 16
+};
 // INTERNAL ---------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 struct AABB {

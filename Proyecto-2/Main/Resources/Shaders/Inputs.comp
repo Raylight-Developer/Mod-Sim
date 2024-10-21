@@ -8,6 +8,14 @@ layout(std430, binding = 1) buffer PointDataBuffer {
 	Particle point_cloud[];
 };
 
+layout(std430, binding = 2) buffer TextureBuffer {
+	Texture textures[];
+};
+
+layout(std430, binding = 3) buffer TextureDataBuffer {
+	uint texture_data[];
+};
+
 uniform uint  frame_count;
 uniform float aspect_ratio;
 uniform float current_time;

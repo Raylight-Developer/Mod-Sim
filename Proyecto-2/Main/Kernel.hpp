@@ -2,12 +2,16 @@
 
 #include "Shared.hpp"
 
-struct CPU_Cell;
+#include "OpenGl.hpp"
+
+enum struct Texture_Field;
 
 struct CPU_Particle {
 	vec1 mass;
 	vec1 density;
 	vec1 temperature;
+
+	vec1 sea_surface_temperature;
 
 	vec3 position;
 	vec3 velocity;
@@ -19,10 +23,25 @@ struct CPU_Particle {
 struct alignas(16) GPU_Particle {
 	vec3 position;
 	vec1 temperature;
-	vec4 velocity;
+	vec3 velocity;
+	vec1 sea_surface_temperature;
 
 	GPU_Particle();
 	GPU_Particle(const CPU_Particle& particle);
+};
+
+struct alignas(16) GPU_Texture {
+	uint start;
+	uint width;
+	uint height;
+	uint format;
+
+	GPU_Texture(
+		const uint& start = 0U,
+		const uint& width = 0U,
+		const uint& height = 0U,
+		const uint& format = 0U
+	);
 };
 
 struct Flip {
@@ -37,6 +56,7 @@ struct Flip {
 	vec1  SDT;
 
 	vector<CPU_Particle> particles;
+	unordered_map<Texture_Field, Texture> textures;
 
 	Flip();
 
@@ -47,4 +67,6 @@ struct Flip {
 
 	vector<GPU_Particle> gpuParticles() const;
 	vec1 smoothWeight(const vec1& distance) const;
+
+	void traceProperties(CPU_Particle* particle);
 };

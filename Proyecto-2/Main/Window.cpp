@@ -43,16 +43,16 @@ Renderer::Renderer() {
 	run_sim = false;
 
 	TIME_SCALE       = 0.1f;
-	RENDER_SCALE     = 0.125f;
-	PARTICLE_RADIUS  = 0.0625f;
-	PARTICLE_COUNT   = 8192;
-	LAYER_COUNT      = 4;
+	RENDER_SCALE     = 0.5f;
+	PARTICLE_RADIUS  = 0.065f;
+	PARTICLE_COUNT   = 2148;
+	LAYER_COUNT      = 1;
 	PARTICLE_DISPLAY = 1.0f;
 
 	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(RENDER_SCALE));
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
 
-	render_particles = true;
+	render_particles = false;
 	{
 		render_particle_color_mode = 0;
 	}
@@ -68,8 +68,10 @@ Renderer::~Renderer() {
 
 	glDeleteProgram(buffers["compute"]);
 	glDeleteProgram(buffers["display"]);
+	glDeleteBuffers(1, &buffers["particles"]);
+	glDeleteBuffers(1, &buffers["textures"]);
+	glDeleteBuffers(1, &buffers["texture_data"]);
 	glDeleteTextures(1, &buffers["raw"]);
-	glDeleteBuffers (1, &buffers["particles"]);
 }
 
 void Renderer::init() {
@@ -231,6 +233,12 @@ void Renderer::f_pipeline() {
 		d_to_u(ceil(u_to_d(render_resolution.y) / 32.0)),
 		1
 	);
+
+	Texture texture = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature.png");
+	vector<uint> texture_data = texture.toRgba8Texture();
+	textures.push_back(GPU_Texture(0, texture.resolution.x, texture.resolution.y, 0));
+	buffers["textures"] = ssboBinding(2, ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
+	buffers["texture_data"] = ssboBinding(3, ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
 }
 
 void Renderer::f_tickUpdate() {

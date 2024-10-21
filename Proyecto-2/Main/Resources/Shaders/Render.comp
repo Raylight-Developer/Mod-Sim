@@ -3,6 +3,7 @@
 #version 460
 #include "Globals.comp"
 #include "Inputs.comp"
+#include "Texture.comp"
 #include "Coloring.comp"
 #include "Intersection.comp"
 //-------------------------------------------------------------------------------------------------
@@ -19,14 +20,30 @@ void main() {
 	Ray ray = f_cameraRay(uv);
 
 	vec4 color = vec4(0,0,0,1);
-	float t_length = MAX_DIST;
-	float t_dist = MAX_DIST;
-	for (uint i = 0; i < point_cloud.length(); i++) {
-		if (f_raySphereIntersection(ray, point_cloud[i].position.xyz, t_dist)) {
+	if (render_particles == 1) {
+		float t_length = MAX_DIST;
+		float t_dist = MAX_DIST;
+		vec2 earth_uv = vec2(0.5);
+		if (f_raySphereIntersection(ray, vec3(0), 6.371, t_dist, earth_uv)) {
 			if (t_dist < t_length && t_dist > EPSILON) {
 				t_length = t_dist;
-				color = vec4(particleColor(point_cloud[i], t_dist), 1.0);
+				color = sampleTextureRgba8u(textures[0], earth_uv);
 			}
+		}
+		for (uint i = 0; i < point_cloud.length(); i++) {
+			if (f_raySphereIntersection(ray, point_cloud[i].position.xyz, t_dist)) {
+				if (t_dist < t_length && t_dist > EPSILON) {
+					t_length = t_dist;
+					color = vec4(particleColor(point_cloud[i], t_dist), 1.0);
+				}
+			}
+		}
+	}
+	else {
+		float earth_dist = MAX_DIST;
+		vec2 earth_uv = vec2(0.5);
+		if (f_raySphereIntersection(ray, vec3(0), 6.371, earth_dist, earth_uv)) {
+			color = sampleTextureRgba8u(textures[0], earth_uv);
 		}
 	}
 

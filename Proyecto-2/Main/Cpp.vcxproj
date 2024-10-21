@@ -97,7 +97,6 @@
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\Shared\Include\External\stb_image.h" />
     <ClInclude Include="..\Shared\Include\Glm.hpp" />
     <ClInclude Include="..\Shared\Include\Include.hpp" />
     <ClInclude Include="..\Shared\Include\Lace.hpp" />
@@ -109,6 +108,7 @@
     <ClInclude Include="..\Shared\Include\String.hpp" />
     <ClInclude Include="..\Shared\Include\Types.hpp" />
     <ClInclude Include="Kernel.hpp" />
+    <ClInclude Include="Lut.hpp" />
     <ClInclude Include="Window.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

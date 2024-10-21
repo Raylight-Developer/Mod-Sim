@@ -2,6 +2,63 @@
 
 #include "Session.hpp"
 
+Texture::Texture() {
+	resolution = uvec2(0, 0);
+	data = {};
+}
+
+#include "External/stb_image.h"
+
+bool Texture::loadFromFile(const string& file_path) { // TODO handle different formats
+	int width, height, channels;
+	unsigned char* tex_data = stbi_load(file_path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+	if (tex_data == nullptr) {
+		cerr << " Failed to load image: " << file_path << " " << stbi_failure_reason() << endl;
+		return false;
+	}
+	uint64 totalPixels = width * height * 4;
+	data = vector<uint>(totalPixels);
+	for (uint64 i = 0; i < totalPixels; ++i) {
+		data[i] = static_cast<uint>(tex_data[i]);
+	}
+
+	resolution = uvec2(i_to_u(width), i_to_u(height));
+	stbi_image_free(tex_data);
+	return true;
+}
+
+Texture Texture::fromFile(const string& file_path) {
+	Texture tex;
+	tex.loadFromFile(file_path);
+	return tex;
+}
+
+vec4 Texture::sampleTexture(const vec2& uv) const {
+	const uint x = clamp(uint(uv.x * vec1(resolution.x)), 0u, resolution.x - 1);
+	const uint y = clamp(uint(uv.y * vec1(resolution.y)), 0u, resolution.y - 1);
+	const uint index = y * resolution.x + x;
+	const vec4 rgba = vec4(
+		vec1(data[index*4]) / 255.0f,
+		vec1(data[index*4+1]) / 255.0f,
+		vec1(data[index*4+2]) / 255.0f,
+		vec1(data[index*4+3]) / 255.0f
+	);
+	return clamp(rgba, 0.0f, 1.0f);
+}
+
+vector<uint> Texture::toRgba8Texture() const {
+	vector<uint> packedData;
+	for (uint i = 0; i < resolution.x * resolution.y; i++) {
+		uint r = data[i * 4 + 0];
+		uint g = data[i * 4 + 1];
+		uint b = data[i * 4 + 2];
+		uint a = data[i * 4 + 3];
+		uint rgba = (r << 24) | (g << 16) | (b << 8) | a;
+		packedData.push_back(rgba);
+	}
+	return packedData;
+}
+
 GLuint fragmentShaderProgram(const string& file_path) {
 	GLuint shader_program = glCreateShader(GL_VERTEX_SHADER);
 

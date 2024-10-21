@@ -1,5 +1,7 @@
 ﻿#include "Kernel.hpp"
 
+#include "Lut.hpp"
+
 #define WARM_REGION        0.8f    // Bottom 1-N of half simulation_height
 #define COLD_REGION        0.8f    // Bottom N of half simulation_height
 
@@ -36,16 +38,25 @@ CPU_Particle::CPU_Particle() {
 GPU_Particle::GPU_Particle() {
 	position = vec3(0);
 	temperature = 0;
-	velocity = vec4(0);
+	velocity = vec3(0);
 }
 
 GPU_Particle::GPU_Particle(const CPU_Particle& particle) {
 	position = particle.position;
 	temperature = particle.temperature;
-	velocity = vec4(particle.velocity, 1);
+	velocity = particle.velocity;
+	sea_surface_temperature = particle.sea_surface_temperature;
 }
 
+GPU_Texture::GPU_Texture(const uint& start, const uint& width, const uint& height, const uint& format) :
+	start(start),
+	width(width),
+	height(height),
+	format(format)
+{}
+
 Flip::Flip() {
+	textures[Texture_Field::SST] = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature.png");
 }
 
 void Flip::init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT) {
@@ -91,6 +102,7 @@ void Flip::initParticles() {
 			else {
 				particle.temperature = AMBIENT_TEMP;
 			}
+			traceProperties(&particle);
 			particles.push_back(particle);
 		}
 	}
@@ -115,4 +127,30 @@ vec1 Flip::smoothWeight(const vec1& distance) const {
 	const vec1 value = glm::max(0.0f, SMOOTH_RADIUS - distance);
 	const vec1 volume = glm::pi<vec1>() * pow(SMOOTH_RADIUS, 3.0f) /3.0f;
 	return value;
+}
+
+void Flip::traceProperties(CPU_Particle* particle) {
+	const vec3 ray_direction = glm::normalize(vec3(0) - particle->position);
+
+	const vec1 a = glm::dot(ray_direction, ray_direction);
+	const vec1 b = 2.0f * dot(ray_direction, particle->position);
+	const vec1 c = dot(particle->position, particle->position) - 40.589641f; // Earth Radius ^2
+	const vec1 delta = b * b - 4.0f * a * c;
+	if (delta < 0.0f) {
+		return;
+	}
+
+	const vec3 intersectionPoint = particle->position + ((-b - sqrt(delta)) / (2.0f * a)) * ray_direction;
+	const vec3 normal = glm::normalize(intersectionPoint);
+
+	const vec1 theta = acos(normal.y);
+	const vec1 phi = glm::atan(normal.z, normal.x);
+
+	const vec2 uv = vec2(
+		1.0 - ((phi + 3.14159265358979323846) / (2.0 * 3.14159265358979323846)),
+		(theta) / 3.14159265358979323846);
+
+	vec4 sst = textures[Texture_Field::SST].sampleTexture(uv);
+	particle->velocity = vec3(sst);
+	particle->sea_surface_temperature = lut(Texture_Field::SST, sst);
 }

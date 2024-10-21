@@ -11,6 +11,32 @@ bool f_raySphereIntersection(in Ray ray, in vec3 sphere, out float t) {
 	return true;
 }
 
+bool f_raySphereIntersection(in Ray ray, in vec3 pos, in float radius, out float t, out vec2 uv) {
+	vec3 CO = ray.origin - pos;
+	float a = dot(ray.direction, ray.direction);
+	float b = 2.0*dot(ray.direction, CO);
+	float c = dot(CO, CO) - radius*radius;
+	float delta = b*b - 4.0*a*c;
+	if(delta < 0.0) {
+		return false;
+	}
+	t = (-b-sqrt(delta)) / (2.0 * a);
+
+	vec3 intersectionPoint = ray.origin + t * ray.direction;
+	vec3 normal = normalize(intersectionPoint - pos);
+	
+	// Map the intersection point to UV coordinates
+	// U is the azimuthal angle (longitude), ranging from -π to π
+	// V is the polar angle (latitude), ranging from -π/2 to π/2
+	float theta = acos(normal.y); // polar angle (latitude)
+	float phi = atan(normal.z, normal.x); // azimuthal angle (longitude)
+	
+	// Map the angles to UV space
+	uv.x = 1.0 - ((phi + 3.14159265358979323846) / (2.0 * 3.14159265358979323846)); // U [0, 1]
+	uv.y = (theta) / 3.14159265358979323846; // V [0, 1]
+	return true;
+}
+
 bool f_rayAABBIntersection(in Ray ray, in vec3 pmin, in vec3 pmax) {
 	vec3 tMin = (pmin - ray.origin) * ray.direction;
 	vec3 tMax = (pmax - ray.origin) * ray.direction;
