@@ -70,7 +70,7 @@ bool f_EarthIntersection(in Ray ray, out float t, out vec2 uv) {
 	return true;
 }
 
-int f_visitBvh(in Ray ray, in Bvh node, inout uint bvh_depth, inout float result_raylength) {
+int f_visitBvh(in Ray ray, in Bvh node, inout float result_raylength) {
 	Ray bvh_ray = Ray(ray.origin, normalize(1.0 / ray.direction));
 	
 	float t_length = MAX_DIST;

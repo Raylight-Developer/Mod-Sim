@@ -52,6 +52,8 @@ Renderer::Renderer() {
 	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(RENDER_SCALE));
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
 
+	render_planet = true;
+	render_octree = false;
 	render_particles = false;
 	{
 		render_particle_color_mode = 0;
@@ -301,8 +303,12 @@ void Renderer::guiLoop() {
 	if (ImGui::SliderFloat("Render Scale", &RENDER_SCALE, 0.1f, 1.0f, "%.3f")) {
 		resize();
 	}
-	const char* items_b[] = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature" };
-	ImGui::Combo("Planet Texture", &render_planet_texture, items_b, IM_ARRAYSIZE(items_b));
+	ImGui::Checkbox("Render Planet", &render_planet);
+	if (render_planet) {
+		const char* items_b[] = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature" };
+		ImGui::Combo("Planet Texture", &render_planet_texture, items_b, IM_ARRAYSIZE(items_b));
+	}
+	ImGui::Checkbox("Render Octree", &render_octree);
 
 	ImGui::SeparatorText("Play / Pause");
 	if (run_sim) {
@@ -412,6 +418,8 @@ void Renderer::displayLoop() {
 		glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), PARTICLE_RADIUS);
 		glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), PARTICLE_DISPLAY * PARTICLE_RADIUS);
 
+		glUniform1ui (glGetUniformLocation(compute_program, "render_planet"), render_planet);
+		glUniform1ui (glGetUniformLocation(compute_program, "render_octree"), render_octree);
 		glUniform1ui (glGetUniformLocation(compute_program, "render_particles"), render_particles);
 		{
 			glUniform1i(glGetUniformLocation(compute_program, "render_particle_color_mode"), render_particle_color_mode);

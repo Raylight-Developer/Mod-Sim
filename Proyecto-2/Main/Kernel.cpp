@@ -137,5 +137,7 @@ void Flip::traceProperties(CPU_Particle* particle) {
 }
 
 void Flip::debug() {
+#ifdef _DEBUG
 	auto temp = GPU_Debug(particles, bvh_nodes, root_node, PARTICLE_RADIUS);
+#endif
 }

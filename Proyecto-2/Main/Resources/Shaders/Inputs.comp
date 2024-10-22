@@ -35,6 +35,9 @@ uniform Bvh  root_bvh;
 uniform float sphere_radius;
 uniform float sphere_display_radius;
 
+uniform uint  render_planet;
+uniform uint  render_octree;
+
 uniform uint  render_particles;
 uniform int   render_particle_color_mode;
 

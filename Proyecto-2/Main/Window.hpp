@@ -60,6 +60,8 @@ struct Renderer {
 
 	uvec3 compute_layout;
 
+	bool render_planet;
+	bool render_octree;
 	bool render_particles;
 	int  render_particle_color_mode;
 
