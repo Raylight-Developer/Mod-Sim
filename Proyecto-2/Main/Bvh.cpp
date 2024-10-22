@@ -2,16 +2,47 @@
 
 #include "Kernel.hpp"
 
-GPU_Bvh::GPU_Bvh(const vec3& p_min, const vec3& p_max, const uint& pointer_a, const uint& pointer_b, const uint& pointer_particle, const uint& particle_count) :
-	p_min(p_min),
-	p_max(p_max),
-	pointer_a(pointer_a),
-	pointer_b(pointer_b),
-	pointer_particle(pointer_particle),
-	particle_count(particle_count)
+CPU_Bvh::CPU_Bvh():
+	p_min(vec3(MAX_VEC1)),
+	p_max(vec3(MIN_VEC1))
 {}
 
-void GPU_Bvh::growToInclude(const vec3& min, const vec3& max) {
+CPU_Bvh::CPU_Bvh(const vec3& pmin, const vec3& pmax) :
+	p_min(pmin),
+	p_max(pmax)
+{
+	if (p_min.x > p_max.x) {
+		auto temp = p_min.x;
+		p_min.x = p_max.x;
+		p_max.x = temp;
+	}
+	if (p_min.y > p_max.y) {
+		auto temp = p_min.y;
+		p_min.y = p_max.y;
+		p_max.y = temp;
+	}
+	if (p_min.z > p_max.z) {
+		auto temp = p_min.z;
+		p_min.z = p_max.z;
+		p_max.z = temp;
+	}
+	discard = true;
+}
+
+GPU_Bvh::GPU_Bvh() :
+	p_min(vec3(MAX_VEC1)),
+	p_max(vec3(MIN_VEC1)),
+	pointers_a(ivec4(-1)),
+	pointers_b(ivec4(-1)),
+	particle_pointer(0),
+	particle_count(0)
+{}
+
+void CPU_Bvh::growToInclude(const CPU_Particle& particle, const vec1& radius) {
+	growToInclude(particle.position - radius, particle.position + radius);
+}
+
+void CPU_Bvh::growToInclude(const vec3& min, const vec3& max) {
 	p_min.x = min.x < p_min.x ? min.x : p_min.x;
 	p_min.y = min.y < p_min.y ? min.y : p_min.y;
 	p_min.z = min.z < p_min.z ? min.z : p_min.z;
@@ -20,147 +51,121 @@ void GPU_Bvh::growToInclude(const vec3& min, const vec3& max) {
 	p_max.z = max.z > p_max.z ? max.z : p_max.z;
 }
 
-vec3 GPU_Bvh::getSize() {
+vec3 CPU_Bvh::getSize() const {
 	return p_max - p_min;
 }
 
-vec3 GPU_Bvh::getCenter() {
+vec3 CPU_Bvh::getCenter() const {
 	return (p_min + p_max) / 2.0f;
+}
+
+bool CPU_Bvh::contains(const CPU_Particle& particle) {
+	const vec3 pos = particle.position;
+	return (pos.x >= p_min.x && pos.x <= p_max.x) &&
+		(pos.y >= p_min.y && pos.y <= p_max.y) &&
+		(pos.z >= p_min.z && pos.z <= p_max.z);
+}
+
+void CPU_Bvh::split() {
+	children.clear();
+
+	vec3 mid = getCenter();
+
+	children.push_back(CPU_Bvh(vec3(p_min.x, p_min.y, p_min.z), vec3(mid.x, mid.y, mid.z)));
+	children.push_back(CPU_Bvh(vec3(mid.x, p_min.y, p_min.z), vec3(p_max.x, mid.y, mid.z)));
+	children.push_back(CPU_Bvh(vec3(p_min.x, mid.y, p_min.z), vec3(mid.x, p_max.y, mid.z)));
+	children.push_back(CPU_Bvh(vec3(mid.x, mid.y, p_min.z), vec3(p_max.x, p_max.y, mid.z)));
+	children.push_back(CPU_Bvh(vec3(p_min.x, p_min.y, mid.z), vec3(mid.x, mid.y, p_max.z)));
+	children.push_back(CPU_Bvh(vec3(mid.x, p_min.y, mid.z), vec3(p_max.x, mid.y, p_max.z)));
+	children.push_back(CPU_Bvh(vec3(p_min.x, mid.y, mid.z), vec3(mid.x, p_max.y, p_max.z)));
+	children.push_back(CPU_Bvh(vec3(mid.x, mid.y, mid.z), vec3(p_max.x, p_max.y, p_max.z)));
 }
 
 
 Builder::Builder(const vector<CPU_Particle>& particles, const vec1& particle_radius, const uint& depth) :
-	particles(particles)
+	particles(particles),
+	particle_radius(particle_radius)
 {
 	for (uint i = 0; i < len32(particles); i++) {
 		const vec3 center = (particles[i].position);
 		const vec3 max = particles[i].position + particle_radius;
 		const vec3 min = particles[i].position - particle_radius;
-		bvh_particles.push_back(Bvh_Particle(min, max, center, i, particles[i]));
 		root_node.growToInclude(min, max);
 	}
+	root_node.discard = false;
+	max_depth = depth;
 
-	node_list.push_back(root_node);
-	splitBvh(0, 0, len32(particles), depth);
+	splitBvh(&root_node, 0);
 
 	this->particles.clear();
-	for (uint i = 0; i < len32(bvh_particles); i++) {
-		this->particles.push_back(bvh_particles[i].part);
-	}
+	convertBvh(&root_node);
 }
 
-void Builder::splitBvh(const uint& parentIndex, const uint& triGlobalStart, const uint& triNum, const uint& depth) {
-	GPU_Bvh& parent = node_list[parentIndex];
-	vec3 size = parent.getSize();
-	vec1 parentCost = nodeCost(size, triNum);
+void Builder::splitBvh(CPU_Bvh* parent, const uint& depth) {
+	parent->split();
 
-	uint8 split_axis;
-	vec1 splitPos;
-	vec1 cost;
-
-	splitAxis(parent, triGlobalStart, triNum, split_axis, splitPos, cost);
-
-	if (cost < parentCost && depth > 0) {
-		GPU_Bvh boundsLeft;
-		GPU_Bvh boundsRight;
-		uint numOnLeft = 0;
-
-		for (uint i = triGlobalStart; i < triGlobalStart + triNum; i++) {
-			Bvh_Particle part = bvh_particles[i];
-			if (part.center[split_axis] < splitPos) {
-				boundsLeft.growToInclude(part.p_min, part.p_max);
-
-				Bvh_Particle swap = bvh_particles[triGlobalStart + numOnLeft];
-				bvh_particles[triGlobalStart + numOnLeft] = part;
-				bvh_particles[i] = swap;
-				numOnLeft++;
+	for (auto it = parent->children.begin(); it != parent->children.end(); ) {
+		CPU_Bvh& child = *it;
+		for (const CPU_Particle& particle : particles) {
+			if (child.contains(particle)) {
+				child.discard = false;
+				break;
+			}
+		}
+		if (child.discard == false) {
+			if (depth < max_depth) {
+				splitBvh(&child, depth + 1);
 			}
 			else {
-				boundsRight.growToInclude(part.p_min, part.p_max);
+				for (const CPU_Particle& particle : particles) {
+					if (child.contains(particle)) {
+						child.particles.push_back(particle);
+						//child.growToInclude(particle, particle_radius);
+					}
+				}
+				child.p_min += 0.1;
+				child.p_max -= 0.1;
 			}
-		}
-
-		uint numOnRight = triNum - numOnLeft;
-		uint triStartLeft = triGlobalStart;
-		uint triStartRight = triGlobalStart + numOnLeft;
-
-		node_list.push_back(GPU_Bvh(boundsLeft.p_min, boundsLeft.p_max, triStartLeft));
-		uint childIndexRight = len32(node_list);
-		uint childIndexLeft = childIndexRight - 1;
-		node_list.push_back(GPU_Bvh(boundsRight.p_min, boundsRight.p_max, triStartRight));
-
-		parent.pointer_a = childIndexLeft;
-		parent.pointer_b = childIndexRight;
-
-		splitBvh(childIndexLeft, triGlobalStart, numOnLeft, depth - 1);
-		splitBvh(childIndexRight, triGlobalStart + numOnLeft, numOnRight, depth - 1);
-	}
-	else {
-		parent.pointer_a = 0;
-		parent.pointer_b = 0;
-		parent.pointer_particle = triGlobalStart;
-		parent.particle_count = triNum;
-	}
-}
-
-void Builder::splitAxis(const GPU_Bvh& node, const uint& start, const uint& count, uint8& axis, vec1& pos, vec1& cost) const {
-	if (count <= 1) {
-		axis = 0;
-		pos = 0.0f;
-		cost = MAX_VEC1;
-		return;
-	}
-
-	vec1 bestSplitPos = 0;
-	uint8 bestSplitAxis = 0;
-	const uint8 numSplitTests = 5;
-
-	vec1 bestCost = MAX_VEC1;
-
-	for (uint8 axis = 0; axis < 3; axis++) {
-		for (uint8 i = 0; i < numSplitTests; i++) {
-			vec1 splitT = (u_to_f(i) + 1.0f) / (u_to_f(numSplitTests) + 1.0f);
-			vec1 splitPos = glm::lerp(node.p_min[axis], node.p_max[axis], splitT);
-			vec1 cost = splitEval(axis, splitPos, start, count);
-			if (cost < bestCost) {
-				bestCost = cost;
-				bestSplitPos = splitPos;
-				bestSplitAxis = axis;
-			}
-		}
-	}
-
-	axis = bestSplitAxis;
-	pos = bestSplitPos;
-	cost = bestCost;
-}
-
-vec1 Builder::splitEval(const uint8& splitAxis, const vec1& splitPos, const uint& start, const uint& count) const {
-	GPU_Bvh boundsLeft = GPU_Bvh();
-	GPU_Bvh boundsRight;
-	uint numOnLeft = 0;
-	uint numOnRight = 0;
-
-	for (uint i = start; i < start + count; i++) {
-		Bvh_Particle tri = bvh_particles[i];
-		if (tri.center[splitAxis] < splitPos) {
-			boundsLeft.growToInclude(tri.p_min, tri.p_max);
-			numOnLeft++;
+			++it;
 		}
 		else {
-			boundsRight.growToInclude(tri.p_min, tri.p_max);
-			numOnRight++;
+			it = parent->children.erase(it);
+		}
+	}
+}
+
+void Builder::convertBvh(CPU_Bvh* node) {
+	auto bvh = GPU_Bvh();
+	bvh.p_min = node->p_min;
+	bvh.p_max = node->p_max;
+
+	uint index = nodes.size();
+	nodes.push_back(bvh);
+
+	if (node->particles.empty()) {
+		for (uint i = 0; i < node->children.size(); i++) {
+			CPU_Bvh& child = node->children[i];
+			if (i < 4) {
+				bvh.pointers_a[i] = index + i + 1;
+			}
+			else {
+				bvh.pointers_b[i - 4] = index + i + 1;
+			}
+			convertBvh(&child);
+		}
+	}
+	else {
+		bvh.particle_pointer = particles.size();
+		bvh.particle_count = node->particles.size();
+		for (const auto& particle : node->particles) {
+			particles.push_back(particle);
 		}
 	}
 
-	vec1 costA = nodeCost(boundsLeft.getSize(), numOnLeft);
-	vec1 costB = nodeCost(boundsRight.getSize(), numOnRight);
-	return costA + costB;
-}
-
-vec1 Builder::nodeCost(const vec3& size, const uint& numTriangles) {
-	const vec1 halfArea = size.x * size.y + size.x * size.z + size.y * size.z;
-	return halfArea * numTriangles;
+	nodes[index] = bvh;
+	if (node == &root_node) {
+		gpu_root_node = bvh;
+	}
 }
 
 Bvh_Particle::Bvh_Particle(const vec3& p_min, const vec3& p_max, const vec3& center, const uint64& index, const CPU_Particle& part) :
@@ -170,3 +175,7 @@ Bvh_Particle::Bvh_Particle(const vec3& p_min, const vec3& p_max, const vec3& cen
 	index(index),
 	part(part)
 {}
+
+bool CPU_Bvh::operator==(const CPU_Bvh & other) const {
+	return p_min == other.p_min && p_max == other.p_max && discard == other.discard;
+}

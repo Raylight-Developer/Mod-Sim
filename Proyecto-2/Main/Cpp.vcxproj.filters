@@ -53,6 +53,9 @@
     <ClCompile Include="Particle.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="GPU_Debug.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Shared\Include\Glm.hpp">
@@ -98,6 +101,9 @@
       <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="Particle.hpp">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU_Debug.hpp">
       <Filter>Include</Filter>
     </ClInclude>
   </ItemGroup>

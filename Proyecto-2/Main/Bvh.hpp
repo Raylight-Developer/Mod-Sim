@@ -3,20 +3,36 @@
 #include "Shared.hpp"
 #include "Particle.hpp"
 
+struct CPU_Bvh;
+
+struct CPU_Bvh {
+	vec3 p_min;
+	vec3 p_max;
+	vector<CPU_Particle> particles;
+	vector<CPU_Bvh> children;
+	bool discard;
+
+	CPU_Bvh();
+	CPU_Bvh(const vec3& pmin, const vec3& pmax);
+
+	void growToInclude(const CPU_Particle& particle, const vec1& radius);
+	void growToInclude(const vec3& min, const vec3& max);
+	vec3 getSize() const;
+	vec3 getCenter() const;
+	bool contains(const CPU_Particle& particle);
+	void split();
+	bool operator==(const CPU_Bvh& other) const;
+};
+
 struct alignas(16) GPU_Bvh {
 	vec3 p_min;
 	uint particle_count;
 	vec3 p_max;
-	uint pointer_particle;
-	uint pointer_a;
-	uint pointer_b;
-	uvec2 padding = uvec2(0);
+	uint particle_pointer;
+	ivec4 pointers_a;
+	ivec4 pointers_b;
 
-	GPU_Bvh(const vec3& p_min = vec3(MAX_VEC1), const vec3& p_max = vec3(MIN_VEC1), const uint& pointer_a = 0U, const uint& pointer_b = 0U, const uint& pointer_particle = 0U, const uint& particle_count = 0U );
-
-	void growToInclude(const vec3& min, const vec3& max);
-	vec3 getSize();
-	vec3 getCenter();
+	GPU_Bvh();
 };
 
 struct Bvh_Particle {
@@ -30,14 +46,16 @@ struct Bvh_Particle {
 
 struct Builder {
 	vector<CPU_Particle> particles;
-	vector<Bvh_Particle> bvh_particles;
-	vector<GPU_Bvh> node_list;
-	GPU_Bvh root_node;
+	CPU_Bvh root_node;
+	uint max_depth;
+	vec1 particle_radius;
+
+
+	GPU_Bvh gpu_root_node;
+	vector<GPU_Bvh> nodes;
 
 	Builder(const vector<CPU_Particle>& particles, const vec1& particle_radius, const uint& depth);
 
-	void splitBvh(const uint& parentIndex, const uint& particleGlobalStart, const uint& triNum, const uint& depth);
-	void splitAxis(const GPU_Bvh& node, const uint& start, const uint& count, uint8& axis, vec1& pos, vec1& cost) const;
-	float splitEval(const uint8& splitAxis, const vec1& splitPos, const uint& start, const uint& count) const;
-	static float nodeCost(const vec3& size, const uint& numParticles);
+	void splitBvh(CPU_Bvh* parent, const uint& depth);
+	void convertBvh(CPU_Bvh* parent);
 };

@@ -6,6 +6,7 @@
 
 #include "Particle.hpp"
 #include "Bvh.hpp"
+#include "GPU_Debug.hpp"
 
 enum struct Texture_Field;
 
@@ -37,4 +38,5 @@ struct Flip {
 	vec1 smoothWeight(const vec1& distance) const;
 
 	void traceProperties(CPU_Particle* particle);
+	void debug();
 };

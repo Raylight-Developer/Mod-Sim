@@ -403,11 +403,11 @@ void Renderer::displayLoop() {
 		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"), 1, value_ptr(projection_v));
 
 		glUniform3fv (glGetUniformLocation(compute_program, "root_bvh.p_min"), 1, value_ptr(flip.root_node.p_min));
-		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_count"), flip.root_node.particle_count);
+		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_pointer"), flip.root_node.particle_pointer);
 		glUniform3fv (glGetUniformLocation(compute_program, "root_bvh.p_max"), 1, value_ptr(flip.root_node.p_max));
-		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.pointer_particle"), flip.root_node.pointer_particle);
-		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.pointer_a"), flip.root_node.pointer_a);
-		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.pointer_b"), flip.root_node.pointer_b);
+		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_count"), flip.root_node.particle_count);
+		glUniform4iv (glGetUniformLocation(compute_program, "root_bvh.pointers_a"), 1, value_ptr(flip.root_node.pointers_a));
+		glUniform4iv (glGetUniformLocation(compute_program, "root_bvh.pointers_b"), 1, value_ptr(flip.root_node.pointers_b));
 
 		glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), PARTICLE_RADIUS);
 		glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), PARTICLE_DISPLAY * PARTICLE_RADIUS);

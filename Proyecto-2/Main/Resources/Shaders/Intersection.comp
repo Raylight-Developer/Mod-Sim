@@ -20,6 +20,22 @@ bool f_rayBvhIntersection(in Ray ray, in Bvh box, inout float ray_length) {
 	return false;
 }
 
+bool f_rayBvhIntersection(in Ray ray, in Bvh box) {
+	vec3 f = (box.p_min - ray.origin) * ray.direction;
+	vec3 n = (box.p_max - ray.origin) * ray.direction;
+
+	vec3 tmax = max(f, n);
+	vec3 tmin = min(f, n);
+
+	float t1 = min(tmax.x, min(tmax.y, tmax.z));
+	float t0 = max(tmin.x, max(tmin.y, tmin.z));
+
+	if (t1 >= t0) {
+		return true;
+	}
+	return false;
+}
+
 bool f_raySphereIntersection(in Ray ray, in vec3 sphere, out float t) {
 	vec3 CO = ray.origin - sphere;
 	float a = dot(ray.direction, ray.direction);
@@ -54,33 +70,53 @@ bool f_EarthIntersection(in Ray ray, out float t, out vec2 uv) {
 	return true;
 }
 
-uvec2 f_visitBvh(in Ray ray, in Bvh node, inout uint bvh_depth) {
-	float t_dist_a = MAX_DIST;
-	float t_dist_b = MAX_DIST;
-	Bvh node_a;
-	Bvh node_b;
-	Bvh current_node = node;
-	uint depth = 0;
+int f_visitBvh(in Ray ray, in Bvh node, inout uint bvh_depth, inout float result_raylength) {
+	Ray bvh_ray = Ray(ray.origin, normalize(1.0 / ray.direction));
+	
+	float t_length = MAX_DIST;
+	float t_dist = MAX_DIST;
 
-	while (current_node.particle_count == 0) {
-		depth++;
+	int closest_particle = -1;
+	int stack[64];
+	int stackSize = 0;
+	stack[stackSize++] = 0;
+
+	while (stackSize > 0) {
+		--stackSize;
 		bvh_depth++;
-		t_dist_a = MAX_DIST;
-		t_dist_b = MAX_DIST;
-		node_a = bvh_nodes[current_node.pointer_a];
-		node_b = bvh_nodes[current_node.pointer_b];
-		f_rayBvhIntersection(ray, node_a, t_dist_a);
-		f_rayBvhIntersection(ray, node_b, t_dist_b);
-		
-		if (t_dist_a < t_dist_b && t_dist_a < MAX_DIST) {
-			current_node = node_a;
+
+		int currentNode = stack[stackSize];
+		Bvh node = bvh_nodes[currentNode];
+
+		if (!f_rayBvhIntersection(bvh_ray, node)) {
+			continue;
 		}
-		else {
-			current_node = node_b;
-		}
-		if (depth > 64) {
-			break;
+		if (node.particle_count > 0) {
+			for (uint i = node.particle_pointer; i < node.particle_count; ++i) {
+				if (f_raySphereIntersection(ray, point_cloud[i].position.xyz, t_dist)) {
+					if (t_dist < t_length) {
+						t_length = t_dist;
+						result_raylength = t_dist;
+						closest_particle = int(i);
+					}
+				}
+			}
+		} else {
+			for (int i = 0; i < 8; ++i) {
+				if (i < 4) {
+					int childIndex = node.pointers_a[i];
+					if (childIndex >= 0) {
+						stack[stackSize++] = childIndex;
+					}
+				}
+				else {
+					int childIndex = node.pointers_b[i - 4];
+					if (childIndex >= 0) {
+						stack[stackSize++] = childIndex;
+					}
+				}
+			}
 		}
 	}
-	return uvec2(current_node.pointer_particle, current_node.particle_count);
+	return closest_particle;
 }

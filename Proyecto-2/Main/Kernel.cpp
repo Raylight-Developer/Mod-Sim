@@ -82,10 +82,11 @@ void Flip::initParticles() {
 void Flip::initBvh() {
 	const uint bvh_depth = d_to_u(glm::log2(ul_to_d(particles.size()) / 64.0));
 
-	Builder bvh_build = Builder(particles, PARTICLE_RADIUS, bvh_depth);
-	root_node = bvh_build.root_node;
-	bvh_nodes = bvh_build.node_list;
-	particles = bvh_build.particles; // Reorder for GPU Align
+	Builder bvh_build = Builder(particles, PARTICLE_RADIUS, 3);
+	particles = bvh_build.particles;
+	root_node = bvh_build.gpu_root_node;
+	bvh_nodes = bvh_build.nodes;
+	debug();
 }
 
 void Flip::simulate(const dvec1& delta_time) {
@@ -133,4 +134,8 @@ void Flip::traceProperties(CPU_Particle* particle) {
 	vec4 sst = textures[Texture_Field::SST].sampleTexture(uv);
 	particle->velocity = vec3(sst);
 	particle->sea_surface_temperature = lut(Texture_Field::SST, sst);
+}
+
+void Flip::debug() {
+	auto temp = GPU_Debug(particles, bvh_nodes, root_node, PARTICLE_RADIUS);
 }

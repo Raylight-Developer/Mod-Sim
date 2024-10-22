@@ -36,16 +36,10 @@ void main() {
 					color = sampleTextureRgba8u(textures[render_planet_texture], earth_uv);
 				}
 			}
-			uvec2 pointers = f_visitBvh(bvh_ray, root_bvh, bvh_depth);
-			//for (uint i = pointers.x; i < pointers.y; i++) {
-			for (uint i = 0; i < point_cloud.length(); i++) {
-				if (f_raySphereIntersection(ray, point_cloud[i].position.xyz, t_dist)) {
-					if (t_dist < t_length && t_dist > EPSILON) {
-						t_length = t_dist;
-						color = vec4(particleColor(point_cloud[i], t_dist), 1.0);
-					}
-				}
-			}
+			//int closest_particle_index = f_visitBvh(ray, root_bvh, bvh_depth, t_dist);
+			//if (closest_particle_index != -1) {
+			//	color = vec4(particleColor(point_cloud[closest_particle_index], t_dist), 1.0);
+			//}
 		}
 		else {
 			float earth_dist = MAX_DIST;
@@ -55,7 +49,11 @@ void main() {
 			}
 		}
 	}
-
+	for (int i = 0; i < bvh_nodes.length(); i++) {
+		if (f_rayBvhIntersection(bvh_ray, bvh_nodes[i])) {
+			bvh_depth++;
+		}
+	}
 	float bvh_alpha = 1.0;
 	for (int i = 0; i < bvh_depth; i++) {
 		bvh_alpha *= 0.95;
