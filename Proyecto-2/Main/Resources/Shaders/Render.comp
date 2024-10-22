@@ -38,7 +38,7 @@ void main() {
 					}
 				}
 			}
-			int closest_particle_index = f_visitBvh(ray, root_bvh, t_dist);
+			int closest_particle_index = f_visitBvh(ray, bvh_depth, t_dist);
 			if (closest_particle_index != -1) {
 				color = vec4(particleColor(point_cloud[closest_particle_index], t_dist), 1.0);
 			}

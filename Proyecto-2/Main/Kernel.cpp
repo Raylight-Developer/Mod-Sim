@@ -82,7 +82,7 @@ void Flip::initParticles() {
 void Flip::initBvh() {
 	const uint bvh_depth = d_to_u(glm::log2(ul_to_d(particles.size()) / 64.0));
 
-	Builder bvh_build = Builder(particles, PARTICLE_RADIUS, 3);
+	Builder bvh_build = Builder(particles, PARTICLE_RADIUS, 0);
 	particles = bvh_build.particles;
 	root_node = bvh_build.gpu_root_node;
 	bvh_nodes = bvh_build.nodes;

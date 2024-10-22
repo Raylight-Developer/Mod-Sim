@@ -70,7 +70,7 @@ bool f_EarthIntersection(in Ray ray, out float t, out vec2 uv) {
 	return true;
 }
 
-int f_visitBvh(in Ray ray, in Bvh node, inout float result_raylength) {
+int f_visitBvh(in Ray ray, inout uint bvh_depth, inout float result_raylength) {
 	Ray bvh_ray = Ray(ray.origin, normalize(1.0 / ray.direction));
 	
 	float t_length = MAX_DIST;
@@ -92,7 +92,7 @@ int f_visitBvh(in Ray ray, in Bvh node, inout float result_raylength) {
 			continue;
 		}
 		if (node.particle_count > 0) {
-			for (uint i = node.particle_pointer; i < node.particle_count; ++i) {
+			for (uint i = node.particle_pointer; i < node.particle_pointer + node.particle_count; ++i) {
 				if (f_raySphereIntersection(ray, point_cloud[i].position.xyz, t_dist)) {
 					if (t_dist < t_length) {
 						t_length = t_dist;
