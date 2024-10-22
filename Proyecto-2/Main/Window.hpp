@@ -59,6 +59,10 @@ struct Renderer {
 	int   LAYER_COUNT;
 	int   OCTREE_DEPTH;
 
+	vec1  POLE_BIAS;
+	vec1  POLE_BIAS_POWER;
+	vec2  POLE_GEOLOCATION;
+
 	uvec3 compute_layout;
 
 	bool render_planet;

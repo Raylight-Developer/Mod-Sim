@@ -39,7 +39,9 @@ void main() {
 		}
 		int closest_particle_index = f_visitBvh(ray, octree_depth, t_dist);
 		if (closest_particle_index != -1) {
-			color = vec4(particleColor(particles[closest_particle_index], t_dist), 1.0);
+			if (t_dist < t_length && t_dist > EPSILON) {
+				color = vec4(particleColor(particles[closest_particle_index], t_dist), 1.0);
+			}
 		}
 	}
 	else if (render_planet == 1) {

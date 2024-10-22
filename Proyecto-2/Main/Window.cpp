@@ -43,12 +43,16 @@ Renderer::Renderer() {
 	run_sim = false;
 
 	TIME_SCALE       = 0.1f;
-	RENDER_SCALE     = 0.5f;
+	RENDER_SCALE     = 0.25f;
 	PARTICLE_RADIUS  = 0.065f;
-	PARTICLE_COUNT   = 4096;
-	LAYER_COUNT      = 6;
+	PARTICLE_COUNT   = 1024;
+	LAYER_COUNT      = 1;
 	PARTICLE_DISPLAY = 1.0f;
-	OCTREE_DEPTH = 5;
+	OCTREE_DEPTH = 4;
+
+	POLE_BIAS = 0.95f;
+	POLE_BIAS_POWER = 2.5f;
+	POLE_GEOLOCATION = vec2(23.1510, 93.0422);
 
 	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(RENDER_SCALE));
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
@@ -141,7 +145,7 @@ void Renderer::initImGui() {
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.IniFilename = nullptr;
 	io.Fonts->AddFontFromFileTTF("./Resources/RobotoMono-Medium.ttf", 18.0f);
-	io.FontGlobalScale = 1.0f;
+	io.FontGlobalScale = f_map((1920.0f * 1080.0f), (3840.0f * 2160.0f), 1.0f, 2.25f, vec1(display_resolution . x * display_resolution.y));
 
 	ImGui::StyleColorsDark();
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -268,7 +272,7 @@ void Renderer::f_tickUpdate() {
 }
 
 void Renderer::initKernel() {
-	flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT, OCTREE_DEPTH);
+	flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT, OCTREE_DEPTH, POLE_BIAS, POLE_BIAS_POWER, POLE_GEOLOCATION);
 
 	glDeleteBuffers(1, &buffers["bvh_nodes"]);
 	buffers["bvh_nodes"] = ssboBinding(2, ul_to_u(flip.bvh_nodes.size() * sizeof(GPU_Bvh)), flip.bvh_nodes.data());
@@ -343,6 +347,21 @@ void Renderer::guiLoop() {
 		}
 
 		if (ImGui::SliderInt("Layer Count", &LAYER_COUNT, 1, 16)) {
+			initKernel();
+		}
+
+		if (ImGui::SliderFloat("Pole Bias", &POLE_BIAS, 0.0f, 1.0f, "%.5f")) {
+			initKernel();
+		}
+
+		if (ImGui::SliderFloat("Pole Power", &POLE_BIAS_POWER, 1.0f, 3.0f)) {
+			initKernel();
+		}
+
+		if (ImGui::SliderFloat("Latitude", &POLE_GEOLOCATION.x, -90.0f, 90.0f)) {
+			initKernel();
+		}
+		if (ImGui::SliderFloat("Longitude", &POLE_GEOLOCATION.y, -180.0f, 180.0f)) {
 			initKernel();
 		}
 	}

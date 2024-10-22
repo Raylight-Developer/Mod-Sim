@@ -12,10 +12,14 @@ enum struct Texture_Field;
 
 struct Flip {
 	vec1  PARTICLE_RADIUS;
-	vec1  PARTICLE_AREA;
 	uint  PARTICLE_COUNT;
 	uint  LAYER_COUNT;
 	uint  OCTREE_DEPTH;
+	vec1  POLE_BIAS;
+	vec1  POLE_BIAS_POWER;
+	vec2  POLE_GEOLOCATION;
+
+	vec1  PARTICLE_AREA;
 	vec1  SMOOTH_RADIUS;
 	vec1  DT;
 	uint  RUNFRAME;
@@ -29,7 +33,7 @@ struct Flip {
 
 	Flip();
 
-	void init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT, const uint& OCTREE_DEPTH);
+	void init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT, const uint& OCTREE_DEPTH, const vec1& POLE_BIAS, const vec1& POLE_BIAS_POWER, const vec2& POLE_GEOLOCATION);
 	void initParticles();
 	void initBvh();
 
@@ -41,3 +45,5 @@ struct Flip {
 	void traceProperties(CPU_Particle* particle);
 	void debug();
 };
+
+vec3 rotateGeoloc(const vec3& point, const vec2& geoloc);

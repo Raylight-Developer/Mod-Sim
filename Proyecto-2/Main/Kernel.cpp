@@ -29,11 +29,14 @@ Flip::Flip() {
 	textures[Texture_Field::SST] = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature.png");
 }
 
-void Flip::init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT, const uint& OCTREE_DEPTH) {
+void Flip::init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT, const uint& OCTREE_DEPTH, const vec1& POLE_BIAS, const vec1& POLE_BIAS_POWER, const vec2& POLE_GEOLOCATION) {
 	this->PARTICLE_RADIUS = PARTICLE_RADIUS;
 	this->PARTICLE_COUNT  = PARTICLE_COUNT;
 	this->LAYER_COUNT     = LAYER_COUNT;
 	this->OCTREE_DEPTH    = OCTREE_DEPTH;
+	this->POLE_BIAS = POLE_BIAS;
+	this->POLE_BIAS_POWER = POLE_BIAS_POWER;
+	this->POLE_GEOLOCATION = POLE_GEOLOCATION;
 	PARTICLE_AREA         = 4.0f * glm::pi<vec1>() * PARTICLE_RADIUS * PARTICLE_RADIUS;
 	SMOOTH_RADIUS         = 1.0f * 1.5f;
 	DT                    = 0.016f;
@@ -56,15 +59,16 @@ void Flip::initParticles() {
 		for (uint j = 0; j < PARTICLE_COUNT; j++) {
 			CPU_Particle particle = CPU_Particle();
 			const vec1 normalized_i = j / (vec1)(PARTICLE_COUNT - 1);
+			const vec1 biased_i = (1.0f - POLE_BIAS) * normalized_i + POLE_BIAS * pow(normalized_i, POLE_BIAS_POWER);
 
-			const vec1 theta = acos(1.0f - 2.0f * normalized_i);
+			const vec1 theta = acos(1.0f - 2.0f * biased_i);
 			const vec1 phi = vec1(j) * (glm::pi<vec1>() * (3.0f - sqrt(5.0f)));
 
 			const vec1 x = current_layer_radius * sin(theta) * cos(phi);
 			const vec1 y = current_layer_radius * cos(theta);
 			const vec1 z = current_layer_radius * sin(theta) * sin(phi);
 
-			particle.position = vec3(x, z, y);
+			particle.position = rotateGeoloc(vec3(x, y, z), POLE_GEOLOCATION);
 			particle.velocity = vec3(0, -1, 0);
 
 			particle.mass = randF(0.5, 1.0);
@@ -141,4 +145,27 @@ void Flip::debug() {
 #ifdef _DEBUG
 	auto temp = GPU_Debug(particles, bvh_nodes, root_node, PARTICLE_RADIUS);
 #endif
+}
+
+vec3 rotateGeoloc(const vec3& point, const vec2& geoloc) {
+	const vec1 phi = glm::radians(geoloc.x - 90.0f);
+	const vec1 theta = glm::radians(geoloc.y);
+
+	const mat3 rotationY = mat3(
+		vec3(cos(theta), 0, sin(theta)),
+		vec3(0, 1, 0),
+		vec3(-sin(theta), 0, cos(theta))
+	);
+
+	const mat3 rotationX = mat3(
+		vec3(1, 0, 0),
+		vec3(0, cos(phi), -sin(phi)),
+		vec3(0, sin(phi), cos(phi))
+	);
+
+	vec3 res = point;
+	res = rotationY * res;
+	res = rotationX * res;
+
+	return res;
 }
