@@ -1,10 +1,8 @@
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 struct Particle {
-	vec3  position;
-	float temperature;
-	vec3  velocity;
-	float sea_surface_temperature;
+	vec3 position;
+	uint pad;
 };
 
 struct Texture {

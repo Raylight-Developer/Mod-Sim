@@ -12,7 +12,7 @@
 
 struct Renderer {
 	GLFWwindow* window;
-	Flip flip;
+	Kernel kernel;
 
 	Transform camera_transform;
 
@@ -38,6 +38,7 @@ struct Renderer {
 	vector<bool> inputs;
 
 	vector<GPU_Texture> textures;
+	uint texture_size;
 
 	dvec1 sim_time_aggregate;
 
@@ -56,8 +57,9 @@ struct Renderer {
 	vec1  PARTICLE_RADIUS;
 	vec1  PARTICLE_DISPLAY;
 	int   PARTICLE_COUNT;
+	int   MAX_PARTICLES;
 	int   LAYER_COUNT;
-	int   OCTREE_DEPTH;
+	int   MAX_OCTREE_DEPTH;
 
 	vec1  POLE_BIAS;
 	vec1  POLE_BIAS_POWER;
@@ -68,9 +70,14 @@ struct Renderer {
 	bool render_planet;
 	bool render_octree;
 	bool render_particles;
-	int  render_particle_color_mode;
 
 	int  render_planet_texture;
+
+	bool render_octree_hue;
+	bool render_octree_debug;
+	int  render_octree_debug_index;
+
+	int  render_particle_color_mode;
 
 	Renderer();
 	~Renderer();

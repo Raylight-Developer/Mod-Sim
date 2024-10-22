@@ -23,7 +23,7 @@ def read_act_file(file_path):
 				})
 	return color_dict
 
-act_file_path = 'Nasa Earth Data/Sea Surface Temperature.act'
+act_file_path = 'Nasa Earth Data/Land Surface Temperature.act'
 
 color_table_dict = read_act_file(act_file_path)
 for color in color_table_dict:

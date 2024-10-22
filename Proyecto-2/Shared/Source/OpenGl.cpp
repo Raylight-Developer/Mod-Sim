@@ -123,11 +123,11 @@ GLuint computeShaderProgram(const string& file_path) {
 GLuint renderLayer(const uvec2& resolution) {
 	GLuint ID;
 	glCreateTextures(GL_TEXTURE_2D, 1, &ID);
-	glTextureParameteri(ID, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(ID, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTextureParameteri(ID, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // Bilinear
+	glTextureParameteri(ID, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Bilinear
 	glTextureParameteri(ID, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTextureParameteri(ID, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTextureStorage2D (ID, 1, GL_RGBA32F, resolution.x,resolution.y);
+	glTextureStorage2D (ID, 1, GL_RGBA8, resolution.x,resolution.y);
 	return ID;
 }
 

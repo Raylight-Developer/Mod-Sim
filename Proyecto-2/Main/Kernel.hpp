@@ -10,11 +10,11 @@
 
 enum struct Texture_Field;
 
-struct Flip {
+struct Kernel {
 	vec1  PARTICLE_RADIUS;
 	uint  PARTICLE_COUNT;
 	uint  LAYER_COUNT;
-	uint  OCTREE_DEPTH;
+	uint  MAX_OCTREE_DEPTH;
 	vec1  POLE_BIAS;
 	vec1  POLE_BIAS_POWER;
 	vec2  POLE_GEOLOCATION;
@@ -31,9 +31,9 @@ struct Flip {
 	GPU_Bvh root_node;
 	unordered_map<Texture_Field, Texture> textures;
 
-	Flip();
+	Kernel();
 
-	void init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT, const uint& OCTREE_DEPTH, const vec1& POLE_BIAS, const vec1& POLE_BIAS_POWER, const vec2& POLE_GEOLOCATION);
+	void init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT, const uint& MAX_OCTREE_DEPTH, const vec1& POLE_BIAS, const vec1& POLE_BIAS_POWER, const vec2& POLE_GEOLOCATION);
 	void initParticles();
 	void initBvh();
 

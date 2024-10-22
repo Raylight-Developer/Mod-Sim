@@ -11,6 +11,7 @@ struct CPU_Bvh {
 	CPU_Bvh* parent;
 	vector<CPU_Particle> particles;
 	vector<CPU_Bvh> children;
+	uint particle_count;
 	bool discard;
 
 	CPU_Bvh();
@@ -48,14 +49,14 @@ struct Bvh_Particle {
 struct Builder {
 	vector<CPU_Particle> particles;
 	CPU_Bvh root_node;
-	uint max_depth;
+	uint depth_cutoff;
 	vec1 particle_radius;
 
 
 	GPU_Bvh gpu_root_node;
 	vector<GPU_Bvh> nodes;
 
-	Builder(const vector<CPU_Particle>& particles, const vec1& particle_radius, const uint& depth);
+	Builder(const vector<CPU_Particle>& particles, const vec1& particle_radius, const uint& max_depth);
 
 	void splitBvh(CPU_Bvh* parent, const uint& depth);
 	uint convertBvh(CPU_Bvh* parent);

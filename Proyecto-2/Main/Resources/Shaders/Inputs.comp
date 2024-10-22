@@ -2,7 +2,7 @@
 //-------------------------------------------------------------------------------------------------
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
-layout(rgba32f, binding = 0) writeonly uniform image2D raw_render_layer;
+layout(rgba8, binding = 0) writeonly uniform image2D raw_render_layer;
 
 layout(std430, binding = 1) buffer ParticleBuffer {
 	Particle particles[];
@@ -37,6 +37,9 @@ uniform float sphere_display_radius;
 
 uniform uint  render_planet;
 uniform uint  render_octree;
+uniform uint  render_octree_hue;
+uniform uint  render_octree_debug;
+uniform int   render_octree_debug_index;
 
 uniform uint  render_particles;
 uniform int   render_particle_color_mode;

@@ -5,13 +5,16 @@
 CPU_Bvh::CPU_Bvh():
 	p_min(vec3(MAX_VEC1)),
 	p_max(vec3(MIN_VEC1)),
-	parent(nullptr)
+	parent(nullptr),
+	particle_count(0),
+	discard(true)
 {}
 
 CPU_Bvh::CPU_Bvh(const vec3& pmin, const vec3& pmax) :
 	p_min(pmin),
 	p_max(pmax),
-	parent(nullptr)
+	parent(nullptr),
+	particle_count(0)
 {
 	if (p_min.x > p_max.x) {
 		auto temp = p_min.x;
@@ -88,7 +91,7 @@ void CPU_Bvh::split() {
 }
 
 
-Builder::Builder(const vector<CPU_Particle>& particles, const vec1& particle_radius, const uint& depth) :
+Builder::Builder(const vector<CPU_Particle>& particles, const vec1& particle_radius, const uint& max_depth) :
 	particles(particles),
 	particle_radius(particle_radius * 2.0f)
 {
@@ -99,7 +102,7 @@ Builder::Builder(const vector<CPU_Particle>& particles, const vec1& particle_rad
 		root_node.growToInclude(min, max);
 	}
 	root_node.discard = false;
-	max_depth = depth;
+	depth_cutoff = max_depth;
 
 	splitBvh(&root_node, 0);
 
@@ -107,20 +110,20 @@ Builder::Builder(const vector<CPU_Particle>& particles, const vec1& particle_rad
 	convertBvh(&root_node);
 }
 
-void Builder::splitBvh(CPU_Bvh* parent, const uint& depth) {
+void Builder::splitBvh(CPU_Bvh* parent, const uint& max_depth) {
 	parent->split();
 
 	for (auto it = parent->children.begin(); it != parent->children.end(); ) {
 		CPU_Bvh& child = *it;
 		for (const CPU_Particle& particle : particles) {
 			if (child.contains(particle)) {
+				child.particle_count++;
 				child.discard = false;
-				break;
 			}
 		}
 		if (child.discard == false) {
-			if (depth < max_depth) {
-				splitBvh(&child, depth + 1);
+			if (max_depth < depth_cutoff and child.particle_count > 16) {
+				splitBvh(&child, max_depth + 1);
 			}
 			else {
 				for (const CPU_Particle& particle : particles) {
@@ -129,13 +132,7 @@ void Builder::splitBvh(CPU_Bvh* parent, const uint& depth) {
 						child.growToInclude(particle, particle_radius);
 					}
 				}
-				CPU_Bvh* upper = parent;
-				while (upper) {
-					for (CPU_Bvh& sub_child : upper->children) {
-						upper->growToInclude(sub_child.p_min, sub_child.p_max);
-					}
-					upper = upper->parent;
-				}
+				parent->growToInclude(child.p_min, child.p_max);
 			}
 			++it;
 		}
@@ -143,6 +140,15 @@ void Builder::splitBvh(CPU_Bvh* parent, const uint& depth) {
 			it = parent->children.erase(it);
 		}
 	}
+
+	// TODO fix  380 361 342 314 312 307 304 295 271 All Stacking
+	//CPU_Bvh* upper = parent;
+	//while (upper) {
+	//	for (CPU_Bvh& child : upper->children) {
+	//		upper->growToInclude(child.p_min, child.p_max);
+	//	}
+	//	upper = upper->parent;
+	//}
 }
 
 uint Builder::convertBvh(CPU_Bvh* node) {

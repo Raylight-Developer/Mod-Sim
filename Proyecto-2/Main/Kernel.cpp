@@ -25,15 +25,15 @@
 #define CELL_AMBIENT_HEAT_TRANSFER 0.05f
 #define HEAT_TRANSFER_COEFFICIENT  0.05f
 
-Flip::Flip() {
+Kernel::Kernel() {
 	textures[Texture_Field::SST] = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature.png");
 }
 
-void Flip::init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT, const uint& OCTREE_DEPTH, const vec1& POLE_BIAS, const vec1& POLE_BIAS_POWER, const vec2& POLE_GEOLOCATION) {
+void Kernel::init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT, const uint& MAX_OCTREE_DEPTH, const vec1& POLE_BIAS, const vec1& POLE_BIAS_POWER, const vec2& POLE_GEOLOCATION) {
 	this->PARTICLE_RADIUS = PARTICLE_RADIUS;
 	this->PARTICLE_COUNT  = PARTICLE_COUNT;
 	this->LAYER_COUNT     = LAYER_COUNT;
-	this->OCTREE_DEPTH    = OCTREE_DEPTH;
+	this->MAX_OCTREE_DEPTH    = MAX_OCTREE_DEPTH;
 	this->POLE_BIAS = POLE_BIAS;
 	this->POLE_BIAS_POWER = POLE_BIAS_POWER;
 	this->POLE_GEOLOCATION = POLE_GEOLOCATION;
@@ -48,7 +48,7 @@ void Flip::init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const u
 	initBvh();
 }
 
-void Flip::initParticles() {
+void Kernel::initParticles() {
 	const vec1 radius = 6.371f;
 	const vec1 atmosphere_thickness = 0.35f;
 	const vec1 layer_distance = atmosphere_thickness / u_to_f(LAYER_COUNT);
@@ -84,22 +84,22 @@ void Flip::initParticles() {
 	}
 }
 
-void Flip::initBvh() {
+void Kernel::initBvh() {
 	const uint bvh_depth = d_to_u(glm::log2(ul_to_d(particles.size()) / 64.0));
 
-	Builder bvh_build = Builder(particles, PARTICLE_RADIUS, OCTREE_DEPTH);
+	Builder bvh_build = Builder(particles, PARTICLE_RADIUS, MAX_OCTREE_DEPTH);
 	particles = bvh_build.particles;
 	root_node = bvh_build.gpu_root_node;
 	bvh_nodes = bvh_build.nodes;
 	debug();
 }
 
-void Flip::simulate(const dvec1& delta_time) {
+void Kernel::simulate(const dvec1& delta_time) {
 	DT = d_to_f(delta_time);
 	SDT = DT / u_to_f(SAMPLES);
 }
 
-vector<GPU_Particle> Flip::gpuParticles() const {
+vector<GPU_Particle> Kernel::gpuParticles() const {
 	vector<GPU_Particle> gpu;
 	for (const CPU_Particle& particle : particles) {
 		gpu.push_back(GPU_Particle(particle));
@@ -107,7 +107,7 @@ vector<GPU_Particle> Flip::gpuParticles() const {
 	return gpu;
 }
 
-vec1 Flip::smoothWeight(const vec1& distance) const {
+vec1 Kernel::smoothWeight(const vec1& distance) const {
 	//vec1 value = glm::max(0.0f, radius * radius - distance * distance);
 	//return value * value * value
 	const vec1 value = glm::max(0.0f, SMOOTH_RADIUS - distance);
@@ -115,7 +115,7 @@ vec1 Flip::smoothWeight(const vec1& distance) const {
 	return value;
 }
 
-void Flip::traceProperties(CPU_Particle* particle) {
+void Kernel::traceProperties(CPU_Particle* particle) {
 	const vec3 ray_direction = glm::normalize(vec3(0) - particle->position);
 
 	const vec1 a = glm::dot(ray_direction, ray_direction);
@@ -141,7 +141,7 @@ void Flip::traceProperties(CPU_Particle* particle) {
 	particle->sea_surface_temperature = lut(Texture_Field::SST, sst);
 }
 
-void Flip::debug() {
+void Kernel::debug() {
 #ifdef _DEBUG
 	auto temp = GPU_Debug(particles, bvh_nodes, root_node, PARTICLE_RADIUS);
 #endif

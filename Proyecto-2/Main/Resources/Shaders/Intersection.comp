@@ -70,17 +70,19 @@ bool f_EarthIntersection(in Ray ray, out float t, out vec2 uv) {
 	return true;
 }
 
-int f_visitBvh(in Ray ray, inout uint octree_depth, inout float result_raylength) {
+int f_visitBvh(in Ray ray, inout float result_raylength) {
 	Ray bvh_ray = Ray(ray.origin, normalize(1.0 / ray.direction));
 
 	float t_length = MAX_DIST;
 	float t_dist = MAX_DIST;
 
 	int closest_particle = -1;
-	int stack[64];
+	int stack[32];
 	int stack_index = 0;
 	stack[stack_index++] = 0;
 
+
+	// TODO implement closest BVH First
 	while (stack_index > 0) {
 		--stack_index;
 
@@ -90,7 +92,6 @@ int f_visitBvh(in Ray ray, inout uint octree_depth, inout float result_raylength
 		if (!f_rayBvhIntersection(bvh_ray, node)) {
 			continue;
 		}
-		octree_depth++;
 		if (node.particle_end > 0) { // Leaf
 			for (uint i = node.particle_start; i < node.particle_end; ++i) {
 				if (f_raySphereIntersection(ray, particles[i].position, t_dist)) {

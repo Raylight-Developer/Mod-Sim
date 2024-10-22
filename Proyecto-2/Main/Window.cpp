@@ -31,8 +31,10 @@ Renderer::Renderer() {
 	camera_orbit_sensitivity = 5.0;
 	inputs = vector(348, false);
 
+	texture_size = 0;
+
 	sim_time_aggregate = 0.0;
-	flip = Flip();
+	kernel = Kernel();
 
 	current_time = 0.0;
 	window_time = 0.0;
@@ -45,20 +47,33 @@ Renderer::Renderer() {
 	TIME_SCALE       = 0.1f;
 	RENDER_SCALE     = 0.25f;
 	PARTICLE_RADIUS  = 0.065f;
-	PARTICLE_COUNT   = 1024;
+	PARTICLE_COUNT   = 2048;
+	MAX_PARTICLES    = 4096 * 4;
 	LAYER_COUNT      = 1;
 	PARTICLE_DISPLAY = 1.0f;
-	OCTREE_DEPTH = 4;
+	MAX_OCTREE_DEPTH = 7;
 
 	POLE_BIAS = 0.95f;
 	POLE_BIAS_POWER = 2.5f;
 	POLE_GEOLOCATION = vec2(23.1510, 93.0422);
 
+
 	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(RENDER_SCALE));
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
 
+	compute_layout = uvec3(
+		d_to_u(ceil(u_to_d(render_resolution.x) / 32.0)),
+		d_to_u(ceil(u_to_d(render_resolution.y) / 32.0)),
+		1
+	);
+
 	render_planet = true;
 	render_octree = false;
+	{
+		render_octree_hue = false;
+		render_octree_debug = false;
+		render_octree_debug_index = 0;
+	}
 	render_particles = true;
 	{
 		render_particle_color_mode = 0;
@@ -251,31 +266,38 @@ void Renderer::f_pipeline() {
 		auto data = texture.toRgba8Texture();
 		texture_data.insert(texture_data.end(), data.begin(), data.end());
 	}
+	texture_size = ul_to_u(texture_data.size());
 	buffers["textures"] = ssboBinding(3, ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
 	buffers["texture_data"] = ssboBinding(4, ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
+	vector<GPU_Particle> gpu_point_cloud = kernel.gpuParticles();
+	buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
 }
 
 void Renderer::f_tickUpdate() {
 	if (run_sim) {
 		const dvec1 start = glfwGetTime();
 		const dvec1 delta = delta_time * TIME_SCALE;
-		flip.simulate(delta);
+		kernel.simulate(delta);
 		sim_delta = glfwGetTime() - start;
 	}
 	else {
 		sim_delta = 0.0;
 	}
 
-	glDeleteBuffers(1, &buffers["particles"]);
-	vector<GPU_Particle> gpu_point_cloud = flip.gpuParticles();
-	buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
+	//glDeleteBuffers(1, &buffers["particles"]);
+	//vector<GPU_Particle> gpu_point_cloud = kernel.gpuParticles();
+	//buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
 }
 
 void Renderer::initKernel() {
-	flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT, OCTREE_DEPTH, POLE_BIAS, POLE_BIAS_POWER, POLE_GEOLOCATION);
+	kernel.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT, MAX_OCTREE_DEPTH, POLE_BIAS, POLE_BIAS_POWER, POLE_GEOLOCATION);
 
 	glDeleteBuffers(1, &buffers["bvh_nodes"]);
-	buffers["bvh_nodes"] = ssboBinding(2, ul_to_u(flip.bvh_nodes.size() * sizeof(GPU_Bvh)), flip.bvh_nodes.data());
+	buffers["bvh_nodes"] = ssboBinding(2, ul_to_u(kernel.bvh_nodes.size() * sizeof(GPU_Bvh)), kernel.bvh_nodes.data());
+
+	glDeleteBuffers(1, &buffers["particles"]);
+	vector<GPU_Particle> gpu_point_cloud = kernel.gpuParticles();
+	buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
 }
 
 void Renderer::guiLoop() {
@@ -314,6 +336,13 @@ void Renderer::guiLoop() {
 		ImGui::Combo("Planet Texture", &render_planet_texture, items_b, IM_ARRAYSIZE(items_b));
 	}
 	ImGui::Checkbox("Render Octree", &render_octree);
+	if (render_octree) {
+		ImGui::Checkbox("Hue", &render_octree_hue);
+		ImGui::Checkbox("Debug", &render_octree_debug);
+		if (render_octree_debug) {
+			ImGui::SliderInt("Index", &render_octree_debug_index, 0, ul_to_i(kernel.bvh_nodes.size()));
+		}
+	}
 
 	ImGui::SeparatorText("Play / Pause");
 	if (run_sim) {
@@ -338,11 +367,11 @@ void Renderer::guiLoop() {
 			initKernel();
 		}
 
-		if (ImGui::SliderInt("Particle Count", &PARTICLE_COUNT, 128, 4096 * 12)) {
+		if (ImGui::SliderInt("Particle Count", &PARTICLE_COUNT, 128, MAX_PARTICLES)) {
 			initKernel();
 		}
 
-		if (ImGui::SliderInt("Octree Depth", &OCTREE_DEPTH, 0, 7)) {
+		if (ImGui::SliderInt("Max Octree Depth", &MAX_OCTREE_DEPTH, 0, 10)) {
 			initKernel();
 		}
 
@@ -358,10 +387,10 @@ void Renderer::guiLoop() {
 			initKernel();
 		}
 
-		if (ImGui::SliderFloat("Latitude", &POLE_GEOLOCATION.x, -90.0f, 90.0f)) {
+		if (ImGui::SliderFloat("Latitude", &POLE_GEOLOCATION.x, -90.0f, 90.0f), "%.4f") {
 			initKernel();
 		}
-		if (ImGui::SliderFloat("Longitude", &POLE_GEOLOCATION.y, -180.0f, 180.0f)) {
+		if (ImGui::SliderFloat("Longitude", &POLE_GEOLOCATION.y, -180.0f, 180.0f, "%.4f")) {
 			initKernel();
 		}
 	}
@@ -371,6 +400,11 @@ void Renderer::guiLoop() {
 		const char* items_b[] = { "Temperature", "Velocity" };
 		ImGui::Combo("Particle Color Mode", &render_particle_color_mode, items_b, IM_ARRAYSIZE(items_b));
 	}
+	ImGui::SeparatorText("Theoretical Performance Stats");
+	//ImGui::Text(string("RAM: " + to_string((PARTICLE_COUNT * sizeof(CPU_Particle)) / 1024) + "mb ").c_str());
+	ImGui::Text(string("Octree VRAM: " + to_string((kernel.bvh_nodes.size() * sizeof(GPU_Bvh)) / 1024) + "mb ").c_str());
+	ImGui::Text(string("Texture VRAM: " + to_string((texture_size * sizeof(uint)) / 1024) + "mb ").c_str());
+	ImGui::Text(string("Particle VRAM: " + to_string((PARTICLE_COUNT * sizeof(GPU_Particle)) / 1024) + "mb ").c_str());
 
 	ImGui::End();
 	ImGui::Render();
@@ -432,25 +466,30 @@ void Renderer::displayLoop() {
 		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_u"), 1, value_ptr(projection_u));
 		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"), 1, value_ptr(projection_v));
 
-		glUniform3fv (glGetUniformLocation(compute_program, "root_bvh.p_min"), 1, value_ptr(flip.root_node.p_min));
-		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_start"), flip.root_node.particle_start);
-		glUniform3fv (glGetUniformLocation(compute_program, "root_bvh.p_max"), 1, value_ptr(flip.root_node.p_max));
-		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_end"), flip.root_node.particle_end);
-		glUniform4iv (glGetUniformLocation(compute_program, "root_bvh.pointers_a"), 1, value_ptr(flip.root_node.pointers_a));
-		glUniform4iv (glGetUniformLocation(compute_program, "root_bvh.pointers_b"), 1, value_ptr(flip.root_node.pointers_b));
+		glUniform3fv (glGetUniformLocation(compute_program, "root_bvh.p_min"), 1, value_ptr(kernel.root_node.p_min));
+		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_start"), kernel.root_node.particle_start);
+		glUniform3fv (glGetUniformLocation(compute_program, "root_bvh.p_max"), 1, value_ptr(kernel.root_node.p_max));
+		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_end"), kernel.root_node.particle_end);
+		glUniform4iv (glGetUniformLocation(compute_program, "root_bvh.pointers_a"), 1, value_ptr(kernel.root_node.pointers_a));
+		glUniform4iv (glGetUniformLocation(compute_program, "root_bvh.pointers_b"), 1, value_ptr(kernel.root_node.pointers_b));
 
 		glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), PARTICLE_RADIUS);
 		glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), PARTICLE_DISPLAY * PARTICLE_RADIUS);
 
 		glUniform1ui (glGetUniformLocation(compute_program, "render_planet"), render_planet);
 		glUniform1ui (glGetUniformLocation(compute_program, "render_octree"), render_octree);
+		{
+			glUniform1ui (glGetUniformLocation(compute_program, "render_octree_hue"), render_octree_hue);
+			glUniform1ui (glGetUniformLocation(compute_program, "render_octree_debug"), render_octree_debug);
+			glUniform1i  (glGetUniformLocation(compute_program, "render_octree_debug_index"), render_octree_debug_index);
+		}
 		glUniform1ui (glGetUniformLocation(compute_program, "render_particles"), render_particles);
 		{
 			glUniform1i(glGetUniformLocation(compute_program, "render_particle_color_mode"), render_particle_color_mode);
 		}
 		glUniform1i(glGetUniformLocation(compute_program, "render_planet_texture"), render_planet_texture);
 
-		glBindImageTexture(0, buffers["raw"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+		glBindImageTexture(0, buffers["raw"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
 		glDispatchCompute(compute_layout.x, compute_layout.y, compute_layout.z);
 		
