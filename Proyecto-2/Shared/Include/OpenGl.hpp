@@ -30,13 +30,13 @@ struct alignas(16) GPU_Texture {
 	);
 };
 
-GLuint fragmentShaderProgram(const string& file_path);
-GLuint computeShaderProgram(const string& file_path);
+Confirm<GLuint> fragmentShaderProgram(const string& vert_file_path, const string& frag_file_path);
+Confirm<GLuint> computeShaderProgram(const string& file_path);
 GLuint renderLayer(const uvec2& resolution);
 void   bindRenderLayer(const GLuint& program_id, const GLuint& unit, const GLuint& id, const string& name);
 
-void checkShaderCompilation(const GLuint& shader, const string& shader_code);
-void checkProgramLinking(const GLuint& program);
+bool checkShaderCompilation(const GLuint& shader, const string& shader_code);
+bool checkProgramLinking(const GLuint& program);
 void printShaderErrorWithContext(const string& shaderSource, const string& errorLog);
 
 template <typename T>

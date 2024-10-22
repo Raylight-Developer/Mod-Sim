@@ -91,20 +91,16 @@ void Kernel::initBvh() {
 	particles = bvh_build.particles;
 	root_node = bvh_build.gpu_root_node;
 	bvh_nodes = bvh_build.nodes;
-	debug();
+
+	gpu_particles.clear();
+	for (const CPU_Particle& particle : particles) {
+		gpu_particles.push_back(GPU_Particle(particle));
+	}
 }
 
 void Kernel::simulate(const dvec1& delta_time) {
 	DT = d_to_f(delta_time);
 	SDT = DT / u_to_f(SAMPLES);
-}
-
-vector<GPU_Particle> Kernel::gpuParticles() const {
-	vector<GPU_Particle> gpu;
-	for (const CPU_Particle& particle : particles) {
-		gpu.push_back(GPU_Particle(particle));
-	}
-	return gpu;
 }
 
 vec1 Kernel::smoothWeight(const vec1& distance) const {

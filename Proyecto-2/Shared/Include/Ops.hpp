@@ -330,3 +330,21 @@ To bits(From from) {
 	To to = *reinterpret_cast<To*>(&from);
 	return to;
 }
+
+template <typename T>
+struct Confirm {
+	bool confirmed;
+	T data;
+
+	Confirm() {
+		data = T();
+		confirmed = false;
+	}
+	Confirm(const T& data) {
+		confirmed = true;
+		this->data = data;
+	}
+	explicit operator bool() const {
+		return confirmed;
+	}
+};

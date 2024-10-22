@@ -10,9 +10,22 @@
 #include "OpenGL.hpp"
 #include "Kernel.hpp"
 
+#include "Rasterizer.hpp"
+#include "PathTracer.hpp"
+
+enum struct Mode {
+	PATHTRACING,
+	RASTERIZATION
+};
+
 struct Renderer {
 	GLFWwindow* window;
 	Kernel kernel;
+
+	Rasterizer rasterizer;
+	PathTracer pathtracer;
+
+	Mode render_mode;
 
 	Transform camera_transform;
 
@@ -31,14 +44,9 @@ struct Renderer {
 	dvec1  frame_time;
 	dvec1  sim_time;
 
-	bool recompile;
-
 	dvec1 camera_zoom_sensitivity;
 	dvec1 camera_orbit_sensitivity;
 	vector<bool> inputs;
-
-	vector<GPU_Texture> textures;
-	uint texture_size;
 
 	dvec1 sim_time_aggregate;
 
@@ -47,8 +55,6 @@ struct Renderer {
 	dvec1 delta_time;
 	dvec1 sim_delta;
 	dvec1 last_time;
-
-	unordered_map<string, GLuint> buffers;
 
 	bool  run_sim;
 
@@ -65,20 +71,6 @@ struct Renderer {
 	vec1  POLE_BIAS_POWER;
 	vec2  POLE_GEOLOCATION;
 
-	uvec3 compute_layout;
-
-	bool render_planet;
-	bool render_octree;
-	bool render_particles;
-
-	int  render_planet_texture;
-
-	bool render_octree_hue;
-	bool render_octree_debug;
-	int  render_octree_debug_index;
-
-	int  render_particle_color_mode;
-
 	Renderer();
 	~Renderer();
 
@@ -89,15 +81,19 @@ struct Renderer {
 	void systemInfo();
 
 	void f_pipeline();
+	void f_recompile();
 	void f_tickUpdate();
 
-	void initKernel();
+	void f_frameUpdate();
+	void f_inputLoop();
+	void f_timings();
 
-	void guiLoop();
-	void gameLoop();
-	void displayLoop();
+	void f_changeSettings();
 
-	void resize();
+	void f_guiLoop();
+	void f_displayLoop();
+
+	void f_resize();
 
 	static void framebufferSize(GLFWwindow* window, int width, int height);
 	static void mouseButton(GLFWwindow* window, int button, int action, int mods);

@@ -1,11 +1,11 @@
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 #version 460
-#include "Globals.comp"
-#include "Inputs.comp"
-#include "Texture.comp"
-#include "Coloring.comp"
-#include "Intersection.comp"
+#include "Compute/Globals.comp"
+#include "Compute/Inputs.comp"
+#include "Compute/Texture.comp"
+#include "Compute/Coloring.comp"
+#include "Compute/Intersection.comp"
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 

@@ -66,24 +66,28 @@ GPU_Texture::GPU_Texture(const uint& start, const uint& width, const uint& heigh
 	format(format)
 {}
 
-GLuint fragmentShaderProgram(const string& file_path) {
+Confirm<GLuint> fragmentShaderProgram(const string& vert_file_path, const string& frag_file_path) {
 	GLuint shader_program = glCreateShader(GL_VERTEX_SHADER);
 
 	GLuint vert_shader = glCreateShader(GL_VERTEX_SHADER);
-	const string vertex_code = loadFromFile("./Resources/Shaders/" + file_path + ".vert");
+	const string vertex_code = loadFromFile("./Resources/Shaders/" + vert_file_path + ".vert");
 	const char* vertex_code_cstr = vertex_code.c_str();
 	glShaderSource(vert_shader, 1, &vertex_code_cstr, NULL);
 	glCompileShader(vert_shader);
 
-	checkShaderCompilation(vert_shader, vertex_code);
+	if (!checkShaderCompilation(vert_shader, vertex_code)) {
+		return Confirm<GLuint>();
+	}
 
 	GLuint frag_shader = glCreateShader(GL_FRAGMENT_SHADER);
-	const string fragment_code = loadFromFile("./Resources/Shaders/" + file_path + ".frag");
+	const string fragment_code = loadFromFile("./Resources/Shaders/" + frag_file_path + ".frag");
 	const char* fragment_code_cstr = fragment_code.c_str();
 	glShaderSource(frag_shader, 1, &fragment_code_cstr, NULL);
 	glCompileShader(frag_shader);
 
-	checkShaderCompilation(frag_shader, fragment_code);
+	if (!checkShaderCompilation(frag_shader, fragment_code)) {
+		return  Confirm<GLuint>();
+	}
 
 	shader_program = glCreateProgram();
 	glAttachShader(shader_program, vert_shader);
@@ -95,19 +99,23 @@ GLuint fragmentShaderProgram(const string& file_path) {
 	glDeleteShader(vert_shader);
 	glDeleteShader(frag_shader);
 
-	return shader_program;
+	return Confirm(shader_program);
 }
 
-GLuint computeShaderProgram(const string& file_path) {
+Confirm<GLuint> computeShaderProgram(const string& file_path) {
 	GLuint shader_program;
 	string compute_code = preprocessShader("./Resources/Shaders/" + file_path + ".comp");
+#ifdef _DEBUG
 	writeToFile("./Resources/Shaders/" + file_path + "_Compiled.comp", compute_code);
+#endif
 	const char* compute_code_cstr = compute_code.c_str();
 	GLuint comp_shader = glCreateShader(GL_COMPUTE_SHADER);
 	glShaderSource(comp_shader, 1, &compute_code_cstr, NULL);
 	glCompileShader(comp_shader);
 
-	checkShaderCompilation(comp_shader, compute_code);
+	if (!checkShaderCompilation(comp_shader, compute_code)) {
+		return Confirm<GLuint>();
+	}
 
 	shader_program = glCreateProgram();
 	glAttachShader(shader_program, comp_shader);
@@ -117,7 +125,7 @@ GLuint computeShaderProgram(const string& file_path) {
 
 	glDeleteShader(comp_shader);
 
-	return shader_program;
+	return Confirm(shader_program);
 }
 
 GLuint renderLayer(const uvec2& resolution) {
@@ -136,7 +144,7 @@ void bindRenderLayer(const GLuint& program_id, const GLuint& unit, const GLuint&
 	glBindTextureUnit(unit, id);
 }
 
-void checkShaderCompilation(const GLuint& shader, const string& shader_code) {
+bool checkShaderCompilation(const GLuint& shader, const string& shader_code) {
 	GLint success;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
 	if (!success) {
@@ -144,20 +152,23 @@ void checkShaderCompilation(const GLuint& shader, const string& shader_code) {
 		glGetShaderInfoLog(shader, sizeof(infoLog), nullptr, infoLog);
 		LOG ENDL ENDL ANSI_R << "[OpenGL]" ANSI_RESET << " Shader Compilation Failed: "; FLUSH;
 		printShaderErrorWithContext(shader_code, infoLog);
-		exit(100);
+		return false;
 	}
+	return true;
 }
 
-void checkProgramLinking(const GLuint& program) {
+bool checkProgramLinking(const GLuint& program) {
 	GLint success;
 	glGetProgramiv(program, GL_LINK_STATUS, &success);
 	if (!success) {
 		GLchar infoLog[512];
 		glGetProgramInfoLog(program, sizeof(infoLog), nullptr, infoLog);
 		LOG ENDL ENDL ANSI_R << "[OpenGL]" ANSI_RESET << " Program Linking Failed: " << infoLog; FLUSH;
-		exit(101);
+		return false;
 	}
+	return true;
 }
+
 
 void printShaderErrorWithContext(const string& shaderSource, const string& errorLog) {
 	LOG += 1;

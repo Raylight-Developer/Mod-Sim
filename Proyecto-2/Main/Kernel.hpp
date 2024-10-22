@@ -27,9 +27,11 @@ struct Kernel {
 	vec1  SDT;
 
 	vector<CPU_Particle> particles;
+	unordered_map<Texture_Field, Texture> textures;
+
+	vector<GPU_Particle> gpu_particles;
 	vector<GPU_Bvh> bvh_nodes;
 	GPU_Bvh root_node;
-	unordered_map<Texture_Field, Texture> textures;
 
 	Kernel();
 
@@ -39,7 +41,6 @@ struct Kernel {
 
 	void simulate(const dvec1& delta_time);
 
-	vector<GPU_Particle> gpuParticles() const;
 	vec1 smoothWeight(const vec1& distance) const;
 
 	void traceProperties(CPU_Particle* particle);

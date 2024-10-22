@@ -228,6 +228,7 @@ string preprocessShader(const string& file_path) {
 		}
 		return output.str().substr(0, output.str().size() - 1);
 	}
+	cerr << file_path << endl;
 	throw runtime_error(to_string(errno));
 }
 

@@ -8,9 +8,15 @@
 
 Renderer::Renderer() {
 	window = nullptr;
+	kernel = Kernel();
+
+	rasterizer = Rasterizer(this);
+	pathtracer = PathTracer(this);
 
 	camera_transform = Transform(dvec3(0, 0, 37.5), dvec3(0));
 	camera_transform.orbit(dvec3(0), dvec3(-15, 15, 0));
+
+	render_mode = Mode::RASTERIZATION;
 
 	runframe = 0;
 
@@ -25,16 +31,11 @@ Renderer::Renderer() {
 	display_resolution = uvec2(3840U, 2160U);
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
 
-	recompile = false;
-
 	camera_zoom_sensitivity = 2.0;
 	camera_orbit_sensitivity = 5.0;
 	inputs = vector(348, false);
 
-	texture_size = 0;
-
 	sim_time_aggregate = 0.0;
-	kernel = Kernel();
 
 	current_time = 0.0;
 	window_time = 0.0;
@@ -47,38 +48,18 @@ Renderer::Renderer() {
 	TIME_SCALE       = 0.1f;
 	RENDER_SCALE     = 0.25f;
 	PARTICLE_RADIUS  = 0.065f;
-	PARTICLE_COUNT   = 2048;
+	PARTICLE_COUNT   = 1024;
 	MAX_PARTICLES    = 4096 * 4;
 	LAYER_COUNT      = 1;
 	PARTICLE_DISPLAY = 1.0f;
-	MAX_OCTREE_DEPTH = 7;
+	MAX_OCTREE_DEPTH = 2;
 
 	POLE_BIAS = 0.95f;
 	POLE_BIAS_POWER = 2.5f;
 	POLE_GEOLOCATION = vec2(23.1510, 93.0422);
 
-
 	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(RENDER_SCALE));
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
-
-	compute_layout = uvec3(
-		d_to_u(ceil(u_to_d(render_resolution.x) / 32.0)),
-		d_to_u(ceil(u_to_d(render_resolution.y) / 32.0)),
-		1
-	);
-
-	render_planet = true;
-	render_octree = false;
-	{
-		render_octree_hue = false;
-		render_octree_debug = false;
-		render_octree_debug_index = 0;
-	}
-	render_particles = true;
-	{
-		render_particle_color_mode = 0;
-	}
-	render_planet_texture = 0;
 }
 
 Renderer::~Renderer() {
@@ -88,14 +69,6 @@ Renderer::~Renderer() {
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
-
-	glDeleteProgram(buffers["compute"]);
-	glDeleteProgram(buffers["display"]);
-	glDeleteBuffers(1, &buffers["particles"]);
-	glDeleteBuffers(1, &buffers["bvh_nodes"]);
-	glDeleteBuffers(1, &buffers["textures"]);
-	glDeleteBuffers(1, &buffers["texture_data"]);
-	glDeleteTextures(1, &buffers["raw"]);
 }
 
 void Renderer::init() {
@@ -104,7 +77,7 @@ void Renderer::init() {
 	systemInfo();
 
 	f_pipeline();
-	displayLoop();
+	f_displayLoop();
 }
 
 void Renderer::initGlfw() {
@@ -210,67 +183,22 @@ void Renderer::systemInfo() {
 }
 
 void Renderer::f_pipeline() {
-	glViewport(0, 0, display_resolution.x , display_resolution.y);
-	
-	const GLfloat vertices[16] = {
-		-1.0f, -1.0f, 0.0f, 0.0f,
-		-1.0f,  1.0f, 0.0f, 1.0f,
-		 1.0f,  1.0f, 1.0f, 1.0f,
-		 1.0f, -1.0f, 1.0f, 0.0f,
-	};
-	const GLuint indices[6] = {
-		0, 1, 2,
-		2, 3, 0
-	};
-
-	// Display Quad
-	GLuint VAO, VBO, EBO;
-	glCreateVertexArrays(1, &VAO);
-	glCreateBuffers(1, &VBO);
-	glCreateBuffers(1, &EBO);
-
-	glNamedBufferData(VBO, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	glNamedBufferData(EBO, sizeof(indices), indices, GL_STATIC_DRAW);
-
-	glEnableVertexArrayAttrib (VAO, 0);
-	glVertexArrayAttribBinding(VAO, 0, 0);
-	glVertexArrayAttribFormat (VAO, 0, 2, GL_FLOAT, GL_FALSE, 0);
-
-	glEnableVertexArrayAttrib (VAO, 1);
-	glVertexArrayAttribBinding(VAO, 1, 0);
-	glVertexArrayAttribFormat (VAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat));
-
-	glVertexArrayVertexBuffer (VAO, 0, VBO, 0, 4 * sizeof(GLfloat));
-	glVertexArrayElementBuffer(VAO, EBO);
-
-	buffers["compute"] = computeShaderProgram("Render");
-	buffers["display"] = fragmentShaderProgram("Display");
-	FLUSH;
-
-	// Compute Output
-	buffers["raw"] = renderLayer(render_resolution);
-
-	glBindVertexArray(VAO);
-	initKernel();
-	compute_layout = uvec3(
-		d_to_u(ceil(u_to_d(render_resolution.x) / 32.0)),
-		d_to_u(ceil(u_to_d(render_resolution.y) / 32.0)),
-		1
-	);
-
-	vector<uint> texture_data;
-	vector<string> texture_names = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature" };
-	for (const string& tex : texture_names) {
-		Texture texture = Texture::fromFile("./Resources/Nasa Earth Data/" + tex + ".png");
-		textures.push_back(GPU_Texture(ul_to_u(texture_data.size()), texture.resolution.x, texture.resolution.y, 0));
-		auto data = texture.toRgba8Texture();
-		texture_data.insert(texture_data.end(), data.begin(), data.end());
+	if (render_mode == Mode::PATHTRACING) {
+		render_mode = Mode::RASTERIZATION;
+		pathtracer.f_cleanup();
+		rasterizer.f_initialize();
 	}
-	texture_size = ul_to_u(texture_data.size());
-	buffers["textures"] = ssboBinding(3, ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
-	buffers["texture_data"] = ssboBinding(4, ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
-	vector<GPU_Particle> gpu_point_cloud = kernel.gpuParticles();
-	buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
+	else if (render_mode == Mode::RASTERIZATION) {
+		render_mode = Mode::PATHTRACING;
+		rasterizer.f_cleanup();
+		pathtracer.f_initialize();
+	}
+	f_changeSettings();
+}
+
+void Renderer::f_recompile() {
+	pathtracer.f_recompile();
+	rasterizer.f_recompile();
 }
 
 void Renderer::f_tickUpdate() {
@@ -283,24 +211,20 @@ void Renderer::f_tickUpdate() {
 	else {
 		sim_delta = 0.0;
 	}
-
-	//glDeleteBuffers(1, &buffers["particles"]);
-	//vector<GPU_Particle> gpu_point_cloud = kernel.gpuParticles();
-	//buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
 }
 
-void Renderer::initKernel() {
+void Renderer::f_changeSettings() {
 	kernel.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT, MAX_OCTREE_DEPTH, POLE_BIAS, POLE_BIAS_POWER, POLE_GEOLOCATION);
 
-	glDeleteBuffers(1, &buffers["bvh_nodes"]);
-	buffers["bvh_nodes"] = ssboBinding(2, ul_to_u(kernel.bvh_nodes.size() * sizeof(GPU_Bvh)), kernel.bvh_nodes.data());
-
-	glDeleteBuffers(1, &buffers["particles"]);
-	vector<GPU_Particle> gpu_point_cloud = kernel.gpuParticles();
-	buffers["particles"] = ssboBinding(1, ul_to_u(gpu_point_cloud.size() * sizeof(GPU_Particle)), gpu_point_cloud.data());
+	if (render_mode == Mode::PATHTRACING) {
+		pathtracer.f_changeSettings();
+	}
+	else if (render_mode == Mode::RASTERIZATION) {
+		//rasterizer.f_resize();
+	}
 }
 
-void Renderer::guiLoop() {
+void Renderer::f_guiLoop() {
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
 
@@ -328,22 +252,8 @@ void Renderer::guiLoop() {
 	ImGui::SeparatorText("General Settings");
 	ImGui::SliderFloat("Time Scale", &TIME_SCALE, 0.01f, 2.0f, "%.4f");
 	if (ImGui::SliderFloat("Render Scale", &RENDER_SCALE, 0.1f, 1.0f, "%.3f")) {
-		resize();
+		f_resize();
 	}
-	ImGui::Checkbox("Render Planet", &render_planet);
-	if (render_planet) {
-		const char* items_b[] = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature" };
-		ImGui::Combo("Planet Texture", &render_planet_texture, items_b, IM_ARRAYSIZE(items_b));
-	}
-	ImGui::Checkbox("Render Octree", &render_octree);
-	if (render_octree) {
-		ImGui::Checkbox("Hue", &render_octree_hue);
-		ImGui::Checkbox("Debug", &render_octree_debug);
-		if (render_octree_debug) {
-			ImGui::SliderInt("Index", &render_octree_debug_index, 0, ul_to_i(kernel.bvh_nodes.size()));
-		}
-	}
-
 	ImGui::SeparatorText("Play / Pause");
 	if (run_sim) {
 		if (ImGui::Button("Stop")) {
@@ -351,7 +261,7 @@ void Renderer::guiLoop() {
 		}
 		if (ImGui::Button("Restart")) {
 			run_sim = false;
-			initKernel();
+			f_changeSettings();
 		}
 	}
 	else {
@@ -360,58 +270,73 @@ void Renderer::guiLoop() {
 		}
 		ImGui::SeparatorText("Init Settings");
 		if (ImGui::SliderFloat("Particle Radius", &PARTICLE_RADIUS, 0.001f, 1.0f, "%.5f")) {
-			initKernel();
+			f_changeSettings();
 		}
 
 		if (ImGui::SliderFloat("Display Mult", &PARTICLE_DISPLAY, 0.05f, 5.0f, "%.3f")) {
-			initKernel();
+			f_changeSettings();
 		}
 
 		if (ImGui::SliderInt("Particle Count", &PARTICLE_COUNT, 128, MAX_PARTICLES)) {
-			initKernel();
+			f_changeSettings();
 		}
 
 		if (ImGui::SliderInt("Max Octree Depth", &MAX_OCTREE_DEPTH, 0, 10)) {
-			initKernel();
+			f_changeSettings();
 		}
 
 		if (ImGui::SliderInt("Layer Count", &LAYER_COUNT, 1, 16)) {
-			initKernel();
+			f_changeSettings();
 		}
 
 		if (ImGui::SliderFloat("Pole Bias", &POLE_BIAS, 0.0f, 1.0f, "%.5f")) {
-			initKernel();
+			f_changeSettings();
 		}
 
 		if (ImGui::SliderFloat("Pole Power", &POLE_BIAS_POWER, 1.0f, 3.0f)) {
-			initKernel();
+			f_changeSettings();
 		}
 
 		if (ImGui::SliderFloat("Latitude", &POLE_GEOLOCATION.x, -90.0f, 90.0f), "%.4f") {
-			initKernel();
+			f_changeSettings();
 		}
 		if (ImGui::SliderFloat("Longitude", &POLE_GEOLOCATION.y, -180.0f, 180.0f, "%.4f")) {
-			initKernel();
+			f_changeSettings();
 		}
 	}
-	ImGui::SeparatorText("Particle Settings");
-	ImGui::Checkbox("Render Particles", &render_particles);
-	if (render_particles) {
-		const char* items_b[] = { "Temperature", "Velocity" };
-		ImGui::Combo("Particle Color Mode", &render_particle_color_mode, items_b, IM_ARRAYSIZE(items_b));
+
+	if (render_mode == Mode::PATHTRACING) {
+		pathtracer.f_guiUpdate();
 	}
-	ImGui::SeparatorText("Theoretical Performance Stats");
-	//ImGui::Text(string("RAM: " + to_string((PARTICLE_COUNT * sizeof(CPU_Particle)) / 1024) + "mb ").c_str());
-	ImGui::Text(string("Octree VRAM: " + to_string((kernel.bvh_nodes.size() * sizeof(GPU_Bvh)) / 1024) + "mb ").c_str());
-	ImGui::Text(string("Texture VRAM: " + to_string((texture_size * sizeof(uint)) / 1024) + "mb ").c_str());
-	ImGui::Text(string("Particle VRAM: " + to_string((PARTICLE_COUNT * sizeof(GPU_Particle)) / 1024) + "mb ").c_str());
+	else if (render_mode == Mode::RASTERIZATION) {
+		rasterizer.f_guiUpdate();
+	}
 
 	ImGui::End();
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-void Renderer::gameLoop() {
+void Renderer::f_frameUpdate() {
+	sim_time_aggregate += sim_delta;
+	frame_timer += delta_time;
+	sim_timer += sim_delta;
+	frame_counter++;
+	runframe++;
+
+	if (window_time > 1.0) {
+		frame_count = frame_counter;
+		frame_time = frame_timer;
+		sim_time = sim_timer;
+
+		frame_counter = 0;
+		frame_timer = 0.0;
+		sim_timer = 0.0;
+		window_time -= 1.0;
+	}
+}
+
+void Renderer::f_inputLoop() {
 	//if (inputs[GLFW_MOUSE_BUTTON_RIGHT] or inputs[GLFW_MOUSE_BUTTON_LEFT]) {
 	//	const dvec1 xoffset = (last_mouse.x - current_mouse.x) * delta_time * camera_orbit_sensitivity;
 	//	const dvec1 yoffset = (last_mouse.y - current_mouse.y) * delta_time * camera_orbit_sensitivity;
@@ -432,122 +357,47 @@ void Renderer::gameLoop() {
 	}
 }
 
-void Renderer::displayLoop() {
+void Renderer::f_timings() {
+	current_time = glfwGetTime();
+	delta_time = current_time - last_time;
+	last_time = current_time;
+	window_time += delta_time;
+}
+
+void Renderer::f_displayLoop() {
 	while (!glfwWindowShouldClose(window)) {
-		current_time = glfwGetTime();
-		delta_time = current_time - last_time;
-		last_time = current_time;
-		window_time += delta_time;
 
-		gameLoop();
-		const mat4 matrix = d_to_f(glm::yawPitchRoll(camera_transform.euler_rotation.y * DEG_RAD, camera_transform.euler_rotation.x * DEG_RAD, camera_transform.euler_rotation.z * DEG_RAD));
-		const vec3 y_vector = matrix[1];
-		const vec3 z_vector = -matrix[2];
-
-		const vec1 focal_length = 0.05f;
-		const vec1 sensor_size  = 0.036f;
-
-		const vec3 projection_center = d_to_f(camera_transform.position) + focal_length * z_vector;
-		const vec3 projection_u = normalize(cross(z_vector, y_vector)) * sensor_size;
-		const vec3 projection_v = normalize(cross(projection_u, z_vector)) * sensor_size;
-
-		f_tickUpdate();
-
-		GLuint compute_program = buffers["compute"];
-
-		glUseProgram(compute_program);
-		glUniform1ui (glGetUniformLocation(compute_program, "frame_count"), ul_to_u(runframe));
-		glUniform1f  (glGetUniformLocation(compute_program, "aspect_ratio"), d_to_f(render_aspect_ratio));
-		glUniform1f  (glGetUniformLocation(compute_program, "current_time"), d_to_f(current_time));
-		glUniform2ui (glGetUniformLocation(compute_program, "resolution"), render_resolution.x, render_resolution.y);
-
-		glUniform3fv (glGetUniformLocation(compute_program, "camera_pos"), 1, value_ptr(d_to_f(camera_transform.position)));
-		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_uv"),1, value_ptr(projection_center));
-		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_u"), 1, value_ptr(projection_u));
-		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"), 1, value_ptr(projection_v));
-
-		glUniform3fv (glGetUniformLocation(compute_program, "root_bvh.p_min"), 1, value_ptr(kernel.root_node.p_min));
-		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_start"), kernel.root_node.particle_start);
-		glUniform3fv (glGetUniformLocation(compute_program, "root_bvh.p_max"), 1, value_ptr(kernel.root_node.p_max));
-		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_end"), kernel.root_node.particle_end);
-		glUniform4iv (glGetUniformLocation(compute_program, "root_bvh.pointers_a"), 1, value_ptr(kernel.root_node.pointers_a));
-		glUniform4iv (glGetUniformLocation(compute_program, "root_bvh.pointers_b"), 1, value_ptr(kernel.root_node.pointers_b));
-
-		glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), PARTICLE_RADIUS);
-		glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), PARTICLE_DISPLAY * PARTICLE_RADIUS);
-
-		glUniform1ui (glGetUniformLocation(compute_program, "render_planet"), render_planet);
-		glUniform1ui (glGetUniformLocation(compute_program, "render_octree"), render_octree);
-		{
-			glUniform1ui (glGetUniformLocation(compute_program, "render_octree_hue"), render_octree_hue);
-			glUniform1ui (glGetUniformLocation(compute_program, "render_octree_debug"), render_octree_debug);
-			glUniform1i  (glGetUniformLocation(compute_program, "render_octree_debug_index"), render_octree_debug_index);
+		f_timings();
+		if (render_mode == Mode::PATHTRACING) {
+			f_inputLoop();
+			f_tickUpdate();
+			pathtracer.f_render();
 		}
-		glUniform1ui (glGetUniformLocation(compute_program, "render_particles"), render_particles);
-		{
-			glUniform1i(glGetUniformLocation(compute_program, "render_particle_color_mode"), render_particle_color_mode);
-		}
-		glUniform1i(glGetUniformLocation(compute_program, "render_planet_texture"), render_planet_texture);
-
-		glBindImageTexture(0, buffers["raw"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
-
-		glDispatchCompute(compute_layout.x, compute_layout.y, compute_layout.z);
-		
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-		GLuint display_program = buffers["display"];
-
-		glUseProgram(display_program);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glUniform1f  (glGetUniformLocation(display_program, "display_aspect_ratio"), d_to_f(display_aspect_ratio));
-		glUniform1f  (glGetUniformLocation(display_program, "render_aspect_ratio") , d_to_f(render_aspect_ratio));
-		glUniform2uiv(glGetUniformLocation(display_program, "display_resolution"), 1, value_ptr(display_resolution));
-		glUniform2uiv(glGetUniformLocation(display_program, "render_resolution") , 1, value_ptr(render_resolution));
-		bindRenderLayer(display_program, 0, buffers["raw"], "raw_render_layer");
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-		if (recompile) {
-			glDeleteProgram(buffers["compute"]);
-			glDeleteProgram(buffers["display"]);
-			buffers["compute"] = computeShaderProgram("Render");
-			buffers["display"] = fragmentShaderProgram("Display");
-			recompile = false;
+		else if (render_mode == Mode::RASTERIZATION) {
+			f_inputLoop();
+			f_tickUpdate();
+			rasterizer.f_render();
 		}
 
-		if (window_time > 1.0) {
-			frame_count = frame_counter;
-			frame_time = frame_timer;
-			sim_time = sim_timer;
 
-			frame_counter = 0;
-			frame_timer = 0.0;
-			sim_timer = 0.0;
-			window_time -= 1.0;
-		}
-
-		guiLoop();
-		sim_time_aggregate += sim_delta;
-		frame_timer += delta_time;
-		sim_timer += sim_delta;
-		frame_counter++;
-		runframe++;
+		f_frameUpdate();
+		f_guiLoop();
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 }
 
-void Renderer::resize() {
+void Renderer::f_resize() {
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
 	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(RENDER_SCALE));
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
-	glDeleteTextures(1, &buffers["raw"]);
-	buffers["raw"] = renderLayer(render_resolution);
-	compute_layout = uvec3(
-		d_to_u(ceil(u_to_d(render_resolution.x) / 32.0)),
-		d_to_u(ceil(u_to_d(render_resolution.y) / 32.0)),
-		1
-	);
+	if (render_mode == Mode::PATHTRACING) {
+		pathtracer.f_resize();
+	}
+	else if (render_mode == Mode::RASTERIZATION) {
+		rasterizer.f_resize();
+	}
 }
 
 void Renderer::framebufferSize(GLFWwindow* window, int width, int height) {
@@ -555,7 +405,7 @@ void Renderer::framebufferSize(GLFWwindow* window, int width, int height) {
 	glViewport(0, 0, width, height);
 	instance->display_resolution.x = width;
 	instance->display_resolution.y = height;
-	instance->resize();
+	instance->f_resize();
 }
 
 void Renderer::mouseButton(GLFWwindow* window, int button, int action, int mods) {
@@ -582,10 +432,13 @@ void Renderer::key(GLFWwindow* window, int key, int scancode, int action, int mo
 	Renderer* instance = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
 	// Input Handling
 	if (key == GLFW_KEY_F5 && action == GLFW_PRESS) {
-		instance->recompile = true;
+		instance->f_recompile();
 	}
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, GLFW_TRUE);
+	}
+	if (key == GLFW_KEY_M && action == GLFW_PRESS) {
+		instance->f_pipeline();
 	}
 	if (action == GLFW_PRESS) {
 		instance->inputs[key] = true;
