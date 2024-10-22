@@ -33,14 +33,14 @@ void main() {
 			if (f_EarthIntersection(ray, t_dist, earth_uv)) {
 				if (t_dist < t_length && t_dist > EPSILON) {
 					t_length = t_dist;
-					color = sampleTextureRgba8u(textures[render_planet_texture], earth_uv);
+					color = f_earthColor(earth_uv);
 				}
 			}
 		}
 		int closest_particle_index = f_visitBvh(ray, t_dist);
 		if (closest_particle_index != -1) {
 			if (t_dist < t_length && t_dist > EPSILON) {
-				color = vec4(particleColor(particles[closest_particle_index], t_dist), 1.0);
+				color = vec4(f_particleColor(particles[closest_particle_index], t_dist), 1.0);
 			}
 		}
 	}
@@ -49,7 +49,7 @@ void main() {
 			float earth_dist = MAX_DIST;
 			vec2 earth_uv = vec2(0.5);
 			if (f_EarthIntersection(ray, earth_dist, earth_uv)) {
-				color = sampleTextureRgba8u(textures[render_planet_texture], earth_uv);
+				color = f_earthColor(earth_uv);
 			}
 		}
 	}

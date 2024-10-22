@@ -147,7 +147,7 @@ string f_strip(const string& str) {
 
 string loadFromFile(const string& file_path) {
 	ifstream in(file_path, ios::binary);
-	if (in) {
+	if (in.is_open()) {
 		string contents;
 		in.seekg(0, ios::end);
 		contents.resize(in.tellg());

@@ -87,7 +87,7 @@ void PathTracer::f_initialize() {
 	vector<uint> texture_data;
 	vector<string> texture_names = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature" };
 	for (const string& tex : texture_names) {
-		Texture texture = Texture::fromFile("./Resources/Nasa Earth Data/" + tex + ".png");
+		Texture texture = Texture::fromFile("./Resources/Nasa Earth Data/" + tex + ".png", Texture_Format::RGBA_8);
 		textures.push_back(GPU_Texture(ul_to_u(texture_data.size()), texture.resolution.x, texture.resolution.y, 0));
 		auto data = texture.toRgba8Texture();
 		texture_data.insert(texture_data.end(), data.begin(), data.end());
@@ -127,7 +127,7 @@ void PathTracer::f_guiUpdate() {
 	ImGui::SeparatorText("Particle Settings");
 	ImGui::Checkbox("Render Particles", &params_bool["render_particles"]);
 	if (params_bool["render_particles"]) {
-		const char* items_b[] = { "Temperature", "Velocity" };
+		const char* items_b[] = { "Temperature" };
 		ImGui::Combo("Particle Color Mode", &params_int["render_particle_color_mode"], items_b, IM_ARRAYSIZE(items_b));
 	}
 	ImGui::SeparatorText("Theoretical Performance Stats");
@@ -219,6 +219,9 @@ void PathTracer::f_render() {
 	glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), renderer->PARTICLE_DISPLAY * renderer->PARTICLE_RADIUS);
 
 	glUniform1ui (glGetUniformLocation(compute_program, "render_planet"), params_bool["render_planet"]);
+	{
+		glUniform1i(glGetUniformLocation(compute_program, "render_planet_texture"), params_int["render_planet_texture"]);
+	}
 	glUniform1ui (glGetUniformLocation(compute_program, "render_octree"), params_bool["render_octree"]);
 	{
 		glUniform1ui (glGetUniformLocation(compute_program, "render_octree_hue"), params_bool["render_octree_hue"]);
@@ -229,7 +232,6 @@ void PathTracer::f_render() {
 	{
 		glUniform1i(glGetUniformLocation(compute_program, "render_particle_color_mode"), params_bool["render_particle_color_mode"]);
 	}
-	glUniform1i(glGetUniformLocation(compute_program, "render_planet_texture"), params_bool["render_planet_texture"]);
 
 	glBindImageTexture(0, data["raw_render_layer"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 

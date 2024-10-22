@@ -29,9 +29,9 @@ vec3 velocityToColor(vec3 velocity) {
 	return color;
 }
 
-vec3 temperatureTocolor(float temp) {
+vec3 f_temperatureToColor(float temp) {
 	vec3 color;
-	float t = clamp(f_mapFloat(5.5, 28.5, 1.0, 0.0, temp), 0.0, 1.0);
+	float t = clamp(f_mapFloat(0.0, 1.0, 1.0, 0.0, temp), 0.0, 1.0);
 
 	if (t < 0.25) {
 		// Interpolate from Red to Yellow
@@ -53,12 +53,20 @@ vec3 temperatureTocolor(float temp) {
 	return color;
 }
 
-vec3 particleColor(in Particle particle, in float dist) {
+vec3 f_particleColor(in Particle particle, in float dist) {
 	float distance_factor = clamp(f_mapFloat(39.0, 32.0, 0.0, 1.0, dist), 0, 1);
-	//switch (render_particle_color_mode) {
-	//	case 0: return temperatureTocolor(particle.temperature);// * distance_factor;
-	//	case 1: return particle.velocity.xyz;//velocityToColor(particle.velocity.xyz) * distance_factor;
-	//}
+	switch (render_particle_color_mode) {
+		case 0: return f_temperatureToColor(f_mapFloat(-25.0, 45.0, 0.0, 1.0, particle.temperature));
+	}
+	return vec3(1,0,1);
+}
 
-	return particle.position;//temperatureTocolor(particle.temperature);// * distance_factor;
+vec4 f_earthColor(in vec2 uv) {
+	vec4 color = sampleTextureRgba8u(textures[render_planet_texture], uv);
+	switch (render_planet_texture) {
+		case 0: return color;
+		case 1: return vec4(f_temperatureToColor(color.x), 1.0);
+		case 2: return vec4(f_temperatureToColor(color.x), 1.0);
+	}
+	return vec4(1,0,1, 1);
 }

@@ -93,24 +93,24 @@ void Rasterizer::f_guiUpdate() {
 }
 
 void Rasterizer::f_recompile() {
-	{
-		auto confirmation = fragmentShaderProgram("Raster/Display", "Raster/Display");
-		if (confirmation) {
-			data["display_program"] = confirmation.data;
-		}
-	}
-	{
-		auto confirmation = fragmentShaderProgram("Raster/Curve", "Raster/Curve");
-		if (confirmation) {
-			data["curve_program"] = confirmation.data;
-		}
-	}
-	{
-		auto confirmation = fragmentShaderProgram("Raster/Mesh", "Raster/Mesh");
-		if (confirmation) {
-			data["mesh_program"] = confirmation.data;
-		}
-	}
+	//{
+	//	auto confirmation = fragmentShaderProgram("Raster/Display", "Raster/Display");
+	//	if (confirmation) {
+	//		data["display_program"] = confirmation.data;
+	//	}
+	//}
+	//{
+	//	auto confirmation = fragmentShaderProgram("Raster/Curve", "Raster/Curve");
+	//	if (confirmation) {
+	//		data["curve_program"] = confirmation.data;
+	//	}
+	//}
+	//{
+	//	auto confirmation = fragmentShaderProgram("Raster/Mesh", "Raster/Mesh");
+	//	if (confirmation) {
+	//		data["mesh_program"] = confirmation.data;
+	//	}
+	//}
 }
 
 void Rasterizer::f_cleanup() {

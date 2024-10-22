@@ -26,7 +26,9 @@
 #define HEAT_TRANSFER_COEFFICIENT  0.05f
 
 Kernel::Kernel() {
-	textures[Texture_Field::SST] = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature.png");
+	textures[Texture_Field::TOPOGRAPHY] = Texture::fromFile("./Resources/Nasa Earth Data/Topography.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::SST] = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::LST] = Texture::fromFile("./Resources/Nasa Earth Data/Land Surface Temperature.png", Texture_Format::MONO_FLOAT);
 }
 
 void Kernel::init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT, const uint& MAX_OCTREE_DEPTH, const vec1& POLE_BIAS, const vec1& POLE_BIAS_POWER, const vec2& POLE_GEOLOCATION) {
@@ -129,18 +131,24 @@ void Kernel::traceProperties(CPU_Particle* particle) {
 	const vec1 phi = glm::atan(normal.z, normal.x);
 
 	const vec2 uv = vec2(
-		1.0 - ((phi + 3.14159265358979323846) / (2.0 * 3.14159265358979323846)),
-		(theta) / 3.14159265358979323846);
+		1.0 - ((phi + PI) / TWO_PI),
+		(theta) / PI);
 
-	vec4 sst = textures[Texture_Field::SST].sampleTexture(uv);
-	particle->velocity = vec3(sst);
-	particle->sea_surface_temperature = lut(Texture_Field::SST, sst);
-}
 
-void Kernel::debug() {
-#ifdef _DEBUG
-	auto temp = GPU_Debug(particles, bvh_nodes, root_node, PARTICLE_RADIUS);
-#endif
+	const vec1 topography_sample = textures[Texture_Field::TOPOGRAPHY].sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 sst_sample = textures[Texture_Field::SST].sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 lst_sample = textures[Texture_Field::LST].sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+
+	const vec1 topography =  lut(Texture_Field::TOPOGRAPHY, topography_sample);
+	const vec1 sst =         lut(Texture_Field::SST, sst_sample);
+	const vec1 lst =         lut(Texture_Field::LST, lst_sample);
+
+	if (topography == -1.0f) { // Is at sea
+		particle->temperature = sst;
+	}
+	else { // Is on Land
+		particle->temperature = lst;
+	}
 }
 
 vec3 rotateGeoloc(const vec3& point, const vec2& geoloc) {

@@ -3,15 +3,22 @@
 #include "Include.hpp"
 #include "Ops.hpp"
 
+enum struct Texture_Format {
+	RGBA_8,
+	MONO_FLOAT
+};
 struct Texture {
 	uvec2 resolution;
-	vector<uint> data;
+	vector<uint> uint_data;
+	vector<vec1> float_data;
+	Texture_Format format;
 
 	Texture();
 
-	bool loadFromFile(const string& file_path);
-	static Texture fromFile(const string& file_path);
-	vec4 sampleTexture(const vec2& uv) const;
+	bool loadFromFile(const string& file_path, const Texture_Format& format);
+	static Texture fromFile(const string& file_path, const Texture_Format& format);
+	vec4 sampleTexture(const vec2& uv, const Texture_Format& format) const;
+	vec1 sampleTextureMono(const vec2& uv, const Texture_Format& format) const;
 
 	vector<uint> toRgba8Texture() const;
 };

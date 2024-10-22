@@ -7,8 +7,6 @@ struct CPU_Particle {
 	vec1 density;
 	vec1 temperature;
 
-	vec1 sea_surface_temperature;
-
 	vec3 position;
 	vec3 velocity;
 	vec3 acceleration;
@@ -18,7 +16,7 @@ struct CPU_Particle {
 
 struct alignas(16) GPU_Particle {
 	vec3 position;
-	uint pad = 0;
+	vec1 temperature;
 
 	GPU_Particle();
 	GPU_Particle(const CPU_Particle& particle);

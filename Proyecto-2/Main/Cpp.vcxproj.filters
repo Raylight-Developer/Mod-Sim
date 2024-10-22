@@ -53,9 +53,6 @@
     <ClCompile Include="Particle.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="GPU_Debug.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="Pathtracer.cpp">
       <Filter>Source</Filter>
     </ClCompile>
@@ -107,9 +104,6 @@
       <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="Particle.hpp">
-      <Filter>Include</Filter>
-    </ClInclude>
-    <ClInclude Include="GPU_Debug.hpp">
       <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="Pathtracer.hpp">

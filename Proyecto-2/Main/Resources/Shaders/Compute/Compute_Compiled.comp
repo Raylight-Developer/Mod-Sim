@@ -4,8 +4,8 @@
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 struct Particle {
-	vec3 position;
-	uint pad;
+	vec3  position;
+	float temperature;
 };
 
 struct Texture {
@@ -29,11 +29,6 @@ struct Bvh {
 struct Ray {
 	vec3  origin;
 	vec3  direction;
-};
-struct StackNode {
-	int index;
-	float tmin;
-	float tmax;
 };
 // DEFINITIONS ------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
@@ -143,9 +138,9 @@ vec3 velocityToColor(vec3 velocity) {
 	return color;
 }
 
-vec3 temperatureTocolor(float temp) {
+vec3 f_temperatureToColor(float temp) {
 	vec3 color;
-	float t = clamp(f_mapFloat(5.5, 28.5, 1.0, 0.0, temp), 0.0, 1.0);
+	float t = clamp(f_mapFloat(0.0, 1.0, 1.0, 0.0, temp), 0.0, 1.0);
 
 	if (t < 0.25) {
 		// Interpolate from Red to Yellow
@@ -167,14 +162,22 @@ vec3 temperatureTocolor(float temp) {
 	return color;
 }
 
-vec3 particleColor(in Particle particle, in float dist) {
+vec3 f_particleColor(in Particle particle, in float dist) {
 	float distance_factor = clamp(f_mapFloat(39.0, 32.0, 0.0, 1.0, dist), 0, 1);
-	//switch (render_particle_color_mode) {
-	//	case 0: return temperatureTocolor(particle.temperature);// * distance_factor;
-	//	case 1: return particle.velocity.xyz;//velocityToColor(particle.velocity.xyz) * distance_factor;
-	//}
+	switch (render_particle_color_mode) {
+		case 0: return f_temperatureToColor(particle.temperature);
+	}
+	return vec3(1,0,1);
+}
 
-	return particle.position;//temperatureTocolor(particle.temperature);// * distance_factor;
+vec4 f_earthColor(in vec2 uv) {
+	vec4 color = sampleTextureRgba8u(textures[render_planet_texture], earth_uv);
+	switch (render_planet_texture) {
+		case 0: return color;
+		case 0: return vec4(f_temperatureToColor(length(color.xyz)), 1.0);
+		case 0: return vec4(f_temperatureToColor(length(color.xyz)), 1.0);
+	}
+	return vec4(1,0,1, 1);
 }
 bool f_rayBvhIntersection(in Ray ray, in Bvh box, inout float ray_length) {
 	vec3 f = (box.p_min - ray.origin) * ray.direction;
@@ -327,14 +330,14 @@ void main() {
 			if (f_EarthIntersection(ray, t_dist, earth_uv)) {
 				if (t_dist < t_length && t_dist > EPSILON) {
 					t_length = t_dist;
-					color = sampleTextureRgba8u(textures[render_planet_texture], earth_uv);
+					color = f_earthColor(earth_uv);
 				}
 			}
 		}
 		int closest_particle_index = f_visitBvh(ray, t_dist);
 		if (closest_particle_index != -1) {
 			if (t_dist < t_length && t_dist > EPSILON) {
-				color = vec4(particleColor(particles[closest_particle_index], t_dist), 1.0);
+				color = vec4(f_particleColor(particles[closest_particle_index], t_dist), 1.0);
 			}
 		}
 	}
@@ -343,7 +346,7 @@ void main() {
 			float earth_dist = MAX_DIST;
 			vec2 earth_uv = vec2(0.5);
 			if (f_EarthIntersection(ray, earth_dist, earth_uv)) {
-				color = sampleTextureRgba8u(textures[render_planet_texture], earth_uv);
+				color = f_earthColor(earth_uv);
 			}
 		}
 	}
