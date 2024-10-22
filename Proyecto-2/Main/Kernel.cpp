@@ -29,10 +29,11 @@ Flip::Flip() {
 	textures[Texture_Field::SST] = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature.png");
 }
 
-void Flip::init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT) {
+void Flip::init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT, const uint& OCTREE_DEPTH) {
 	this->PARTICLE_RADIUS = PARTICLE_RADIUS;
 	this->PARTICLE_COUNT  = PARTICLE_COUNT;
 	this->LAYER_COUNT     = LAYER_COUNT;
+	this->OCTREE_DEPTH    = OCTREE_DEPTH;
 	PARTICLE_AREA         = 4.0f * glm::pi<vec1>() * PARTICLE_RADIUS * PARTICLE_RADIUS;
 	SMOOTH_RADIUS         = 1.0f * 1.5f;
 	DT                    = 0.016f;
@@ -82,7 +83,7 @@ void Flip::initParticles() {
 void Flip::initBvh() {
 	const uint bvh_depth = d_to_u(glm::log2(ul_to_d(particles.size()) / 64.0));
 
-	Builder bvh_build = Builder(particles, PARTICLE_RADIUS, 0);
+	Builder bvh_build = Builder(particles, PARTICLE_RADIUS, OCTREE_DEPTH);
 	particles = bvh_build.particles;
 	root_node = bvh_build.gpu_root_node;
 	bvh_nodes = bvh_build.nodes;

@@ -8,6 +8,7 @@ struct CPU_Bvh;
 struct CPU_Bvh {
 	vec3 p_min;
 	vec3 p_max;
+	CPU_Bvh* parent;
 	vector<CPU_Particle> particles;
 	vector<CPU_Bvh> children;
 	bool discard;
@@ -26,9 +27,9 @@ struct CPU_Bvh {
 
 struct alignas(16) GPU_Bvh {
 	vec3 p_min;
-	uint particle_count;
+	uint particle_start;
 	vec3 p_max;
-	uint particle_pointer;
+	uint particle_end;
 	ivec4 pointers_a;
 	ivec4 pointers_b;
 
@@ -57,5 +58,5 @@ struct Builder {
 	Builder(const vector<CPU_Particle>& particles, const vec1& particle_radius, const uint& depth);
 
 	void splitBvh(CPU_Bvh* parent, const uint& depth);
-	void convertBvh(CPU_Bvh* parent);
+	uint convertBvh(CPU_Bvh* parent);
 };

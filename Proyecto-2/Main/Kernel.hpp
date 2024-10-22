@@ -15,6 +15,7 @@ struct Flip {
 	vec1  PARTICLE_AREA;
 	uint  PARTICLE_COUNT;
 	uint  LAYER_COUNT;
+	uint  OCTREE_DEPTH;
 	vec1  SMOOTH_RADIUS;
 	vec1  DT;
 	uint  RUNFRAME;
@@ -28,7 +29,7 @@ struct Flip {
 
 	Flip();
 
-	void init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT);
+	void init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT, const uint& OCTREE_DEPTH);
 	void initParticles();
 	void initBvh();
 

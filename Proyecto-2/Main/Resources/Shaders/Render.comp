@@ -20,30 +20,30 @@ void main() {
 	Ray ray = f_cameraRay(uv);
 
 	vec4 color = vec4(0,0,0,1);
-	uint bvh_depth = 0;
+	uint octree_view_depth = 0;
+	uint octree_depth = 0;
 	float bvh_t_length = MAX_DIST;
 	Ray bvh_ray = Ray(ray.origin, 1.0 / ray.direction);
 
-	if (f_rayBvhIntersection(bvh_ray, root_bvh, bvh_t_length)) {
-		bvh_depth++;
-		if (render_particles == 1) {
-			float t_length = MAX_DIST;
-			float t_dist = MAX_DIST;
-			vec2 earth_uv = vec2(0.5);
-			if (render_planet == 1) {
-				if (f_EarthIntersection(ray, t_dist, earth_uv)) {
-					if (t_dist < t_length && t_dist > EPSILON) {
-						t_length = t_dist;
-						color = sampleTextureRgba8u(textures[render_planet_texture], earth_uv);
-					}
+	if (render_particles == 1) {
+		float t_length = MAX_DIST;
+		float t_dist = MAX_DIST;
+		vec2 earth_uv = vec2(0.5);
+		if (render_planet == 1) {
+			if (f_EarthIntersection(ray, t_dist, earth_uv)) {
+				if (t_dist < t_length && t_dist > EPSILON) {
+					t_length = t_dist;
+					color = sampleTextureRgba8u(textures[render_planet_texture], earth_uv);
 				}
 			}
-			int closest_particle_index = f_visitBvh(ray, bvh_depth, t_dist);
-			if (closest_particle_index != -1) {
-				color = vec4(particleColor(point_cloud[closest_particle_index], t_dist), 1.0);
-			}
 		}
-		else if (render_planet == 1) {
+		int closest_particle_index = f_visitBvh(ray, octree_depth, t_dist);
+		if (closest_particle_index != -1) {
+			color = vec4(particleColor(particles[closest_particle_index], t_dist), 1.0);
+		}
+	}
+	else if (render_planet == 1) {
+		if (f_rayBvhIntersection(bvh_ray, root_bvh)) {
 			float earth_dist = MAX_DIST;
 			vec2 earth_uv = vec2(0.5);
 			if (f_EarthIntersection(ray, earth_dist, earth_uv)) {
@@ -57,15 +57,15 @@ void main() {
 			node.p_min += 0.1;
 			node.p_max -= 0.1;
 			if (f_rayBvhIntersection(bvh_ray, node)) {
-				bvh_depth++;
+				octree_view_depth++;
 			}
 		}
 	}
-	float bvh_alpha = 1.0;
-	for (int i = 0; i < bvh_depth; i++) {
-		bvh_alpha *= 0.95;
+	float octree_alpha = 1.0;
+	for (int i = 0; i < octree_view_depth; i++) {
+		octree_alpha *= 0.95;
 	}
 
-	color = clamp(mix(vec4(1), color, bvh_alpha), 0.0, 1.0);
+	color = clamp(mix(vec4(1), color, octree_alpha), 0.0, 1.0);
 	imageStore(raw_render_layer, pixel_id, color);
 }

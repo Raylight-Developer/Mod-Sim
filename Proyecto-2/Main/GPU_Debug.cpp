@@ -13,7 +13,7 @@ GPU_Debug::GPU_Debug(const vector<CPU_Particle>& particles, const vector<GPU_Bvh
 	vec1 t_length = MAX_DIST;
 	Ray ray = f_cameraRay(vec2(0.0));
 	int i = f_visitBvh(ray, root_node, bvh_depth, t_length);
-	cout << i << endl;
+	//cout << i << endl;
 }
 
 Ray GPU_Debug::f_cameraRay(const vec2& uv) {
@@ -50,13 +50,13 @@ bool GPU_Debug::f_rayBvhIntersection(const Ray& ray, const GPU_Bvh& box) {
 bool GPU_Debug::f_raySphereIntersection(const Ray& ray, const vec3& sphere, vec1& t) {
 	vec3 CO = ray.origin - sphere;
 	float a = dot(ray.direction, ray.direction);
-	float b = 2.0 * dot(ray.direction, CO);
+	float b = 2.0f * dot(ray.direction, CO);
 	float c = dot(CO, CO) - sphere_display_radius * sphere_display_radius;
-	float delta = b * b - 4.0 * a * c;
-	if (delta < 0.0) {
+	float delta = b * b - 4.0f * a * c;
+	if (delta < 0.0f) {
 		return false;
 	}
-	t = (-b - sqrt(delta)) / (2.0 * a);
+	t = (-b - sqrt(delta)) / (2.0f * a);
 	return true;
 }
 
@@ -81,8 +81,8 @@ int GPU_Debug::f_visitBvh(const Ray& ray, const GPU_Bvh& node, uint& bvh_depth, 
 		if (!f_rayBvhIntersection(bvh_ray, node)) {
 			continue;
 		}
-		if (node.particle_count > 0) { // Leaf
-			for (uint i = node.particle_pointer; i < node.particle_count; ++i) {
+		if (node.particle_end > 0) { // Leaf
+			for (uint i = node.particle_start; i < node.particle_end; ++i) {
 				if (f_raySphereIntersection(ray, particles[i].position, t_dist)) {
 					if (t_dist < t_length) {
 						t_length = t_dist;

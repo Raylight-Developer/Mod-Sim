@@ -57,6 +57,7 @@ struct Renderer {
 	vec1  PARTICLE_DISPLAY;
 	int   PARTICLE_COUNT;
 	int   LAYER_COUNT;
+	int   OCTREE_DEPTH;
 
 	uvec3 compute_layout;
 

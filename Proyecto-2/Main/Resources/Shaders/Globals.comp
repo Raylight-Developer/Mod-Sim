@@ -16,9 +16,9 @@ struct Texture {
 
 struct Bvh {
 	vec3 p_min;
-	uint particle_pointer;
+	uint particle_start;
 	vec3 p_max;
-	uint particle_count;
+	uint particle_end;
 	ivec4 pointers_a;
 	ivec4 pointers_b;
 };

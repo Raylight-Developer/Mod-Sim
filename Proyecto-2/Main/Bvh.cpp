@@ -4,12 +4,14 @@
 
 CPU_Bvh::CPU_Bvh():
 	p_min(vec3(MAX_VEC1)),
-	p_max(vec3(MIN_VEC1))
+	p_max(vec3(MIN_VEC1)),
+	parent(nullptr)
 {}
 
 CPU_Bvh::CPU_Bvh(const vec3& pmin, const vec3& pmax) :
 	p_min(pmin),
-	p_max(pmax)
+	p_max(pmax),
+	parent(nullptr)
 {
 	if (p_min.x > p_max.x) {
 		auto temp = p_min.x;
@@ -34,8 +36,8 @@ GPU_Bvh::GPU_Bvh() :
 	p_max(vec3(MIN_VEC1)),
 	pointers_a(ivec4(-1)),
 	pointers_b(ivec4(-1)),
-	particle_pointer(0),
-	particle_count(0)
+	particle_start(0),
+	particle_end(0)
 {}
 
 void CPU_Bvh::growToInclude(const CPU_Particle& particle, const vec1& radius) {
@@ -79,12 +81,16 @@ void CPU_Bvh::split() {
 	children.push_back(CPU_Bvh(vec3(mid.x, p_min.y, mid.z), vec3(p_max.x, mid.y, p_max.z)));
 	children.push_back(CPU_Bvh(vec3(p_min.x, mid.y, mid.z), vec3(mid.x, p_max.y, p_max.z)));
 	children.push_back(CPU_Bvh(vec3(mid.x, mid.y, mid.z), vec3(p_max.x, p_max.y, p_max.z)));
+
+	for (CPU_Bvh& child : children) {
+		child.parent = this;
+	}
 }
 
 
 Builder::Builder(const vector<CPU_Particle>& particles, const vec1& particle_radius, const uint& depth) :
 	particles(particles),
-	particle_radius(particle_radius)
+	particle_radius(particle_radius * 2.0f)
 {
 	for (uint i = 0; i < len32(particles); i++) {
 		const vec3 center = (particles[i].position);
@@ -120,11 +126,16 @@ void Builder::splitBvh(CPU_Bvh* parent, const uint& depth) {
 				for (const CPU_Particle& particle : particles) {
 					if (child.contains(particle)) {
 						child.particles.push_back(particle);
-						//child.growToInclude(particle, particle_radius);
+						child.growToInclude(particle, particle_radius);
 					}
 				}
-				child.p_min += 0.1;
-				child.p_max -= 0.1;
+				CPU_Bvh* upper = parent;
+				while (upper) {
+					for (CPU_Bvh& sub_child : upper->children) {
+						upper->growToInclude(sub_child.p_min, sub_child.p_max);
+					}
+					upper = upper->parent;
+				}
 			}
 			++it;
 		}
@@ -134,29 +145,28 @@ void Builder::splitBvh(CPU_Bvh* parent, const uint& depth) {
 	}
 }
 
-void Builder::convertBvh(CPU_Bvh* node) {
+uint Builder::convertBvh(CPU_Bvh* node) {
 	auto bvh = GPU_Bvh();
 	bvh.p_min = node->p_min;
 	bvh.p_max = node->p_max;
 
-	uint index = nodes.size();
+	uint index = ul_to_u(nodes.size());
 	nodes.push_back(bvh);
 
 	if (node->particles.empty()) {
 		for (uint i = 0; i < node->children.size(); i++) {
 			CPU_Bvh& child = node->children[i];
 			if (i < 4) {
-				bvh.pointers_a[i] = index + i + 1;
+				bvh.pointers_a[i] = convertBvh(&child);
 			}
 			else {
-				bvh.pointers_b[i - 4] = index + i + 1;
+				bvh.pointers_b[i - 4] = convertBvh(&child);
 			}
-			convertBvh(&child);
 		}
 	}
 	else {
-		bvh.particle_pointer = particles.size();
-		bvh.particle_count = node->particles.size();
+		bvh.particle_start =  ul_to_u(particles.size());
+		bvh.particle_end =  ul_to_u(particles.size() + node->particles.size());
 		for (const auto& particle : node->particles) {
 			particles.push_back(particle);
 		}
@@ -166,6 +176,7 @@ void Builder::convertBvh(CPU_Bvh* node) {
 	if (node == &root_node) {
 		gpu_root_node = bvh;
 	}
+	return index;
 }
 
 Bvh_Particle::Bvh_Particle(const vec3& p_min, const vec3& p_max, const vec3& center, const uint64& index, const CPU_Particle& part) :

@@ -45,16 +45,17 @@ Renderer::Renderer() {
 	TIME_SCALE       = 0.1f;
 	RENDER_SCALE     = 0.5f;
 	PARTICLE_RADIUS  = 0.065f;
-	PARTICLE_COUNT   = 2048;
-	LAYER_COUNT      = 1;
+	PARTICLE_COUNT   = 4096;
+	LAYER_COUNT      = 6;
 	PARTICLE_DISPLAY = 1.0f;
+	OCTREE_DEPTH = 5;
 
 	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(RENDER_SCALE));
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
 
 	render_planet = true;
 	render_octree = false;
-	render_particles = false;
+	render_particles = true;
 	{
 		render_particle_color_mode = 0;
 	}
@@ -267,7 +268,7 @@ void Renderer::f_tickUpdate() {
 }
 
 void Renderer::initKernel() {
-	flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT);
+	flip.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT, OCTREE_DEPTH);
 
 	glDeleteBuffers(1, &buffers["bvh_nodes"]);
 	buffers["bvh_nodes"] = ssboBinding(2, ul_to_u(flip.bvh_nodes.size() * sizeof(GPU_Bvh)), flip.bvh_nodes.data());
@@ -333,7 +334,11 @@ void Renderer::guiLoop() {
 			initKernel();
 		}
 
-		if (ImGui::SliderInt("Particle Count", &PARTICLE_COUNT, 128, 4096 * 4)) {
+		if (ImGui::SliderInt("Particle Count", &PARTICLE_COUNT, 128, 4096 * 12)) {
+			initKernel();
+		}
+
+		if (ImGui::SliderInt("Octree Depth", &OCTREE_DEPTH, 0, 7)) {
 			initKernel();
 		}
 
@@ -409,9 +414,9 @@ void Renderer::displayLoop() {
 		glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"), 1, value_ptr(projection_v));
 
 		glUniform3fv (glGetUniformLocation(compute_program, "root_bvh.p_min"), 1, value_ptr(flip.root_node.p_min));
-		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_pointer"), flip.root_node.particle_pointer);
+		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_start"), flip.root_node.particle_start);
 		glUniform3fv (glGetUniformLocation(compute_program, "root_bvh.p_max"), 1, value_ptr(flip.root_node.p_max));
-		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_count"), flip.root_node.particle_count);
+		glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_end"), flip.root_node.particle_end);
 		glUniform4iv (glGetUniformLocation(compute_program, "root_bvh.pointers_a"), 1, value_ptr(flip.root_node.pointers_a));
 		glUniform4iv (glGetUniformLocation(compute_program, "root_bvh.pointers_b"), 1, value_ptr(flip.root_node.pointers_b));
 
