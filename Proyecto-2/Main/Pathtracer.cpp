@@ -85,7 +85,7 @@ void PathTracer::f_initialize() {
 	data["raw_render_layer"] = renderLayer(renderer->render_resolution);
 
 	vector<uint> texture_data;
-	vector<string> texture_names = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature" };
+	vector<string> texture_names = { "Albedo", "Sea Surface Temperature CAF", "Land Surface Temperature CAF" };
 	for (const string& tex : texture_names) {
 		Texture texture = Texture::fromFile("./Resources/Nasa Earth Data/" + tex + ".png", Texture_Format::RGBA_8);
 		textures.push_back(GPU_Texture(ul_to_u(texture_data.size()), texture.resolution.x, texture.resolution.y, 0));

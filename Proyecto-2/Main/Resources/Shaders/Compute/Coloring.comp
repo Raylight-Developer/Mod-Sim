@@ -65,8 +65,14 @@ vec4 f_earthColor(in vec2 uv) {
 	vec4 color = sampleTextureRgba8u(textures[render_planet_texture], uv);
 	switch (render_planet_texture) {
 		case 0: return color;
-		case 1: return vec4(f_temperatureToColor(color.x), 1.0);
-		case 2: return vec4(f_temperatureToColor(color.x), 1.0);
+		case 1: {
+			float mappedValue1 = f_mapFloat(-25.0, 45.0, 0.0, 1.0, -2.0);
+			float mappedValue2 = f_mapFloat(-25.0, 45.0, 0.0, 1.0, 35.0);
+			return vec4(f_temperatureToColor(f_mapFloat(0.0, 1.0, mappedValue1, mappedValue2, color.x)), 1.0);
+		}
+		case 2: {
+			return vec4(f_temperatureToColor(color.x), 1.0);
+		}
 	}
 	return vec4(1,0,1, 1);
 }

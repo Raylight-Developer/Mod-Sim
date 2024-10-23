@@ -47,15 +47,15 @@ Renderer::Renderer() {
 
 	TIME_SCALE       = 0.1f;
 	RENDER_SCALE     = 0.25f;
-	PARTICLE_RADIUS  = 0.065f;
-	PARTICLE_COUNT   = 1024;
+	PARTICLE_RADIUS  = 0.03f;
+	PARTICLE_COUNT   = 8192;
 	MAX_PARTICLES    = 4096 * 4;
 	LAYER_COUNT      = 1;
 	PARTICLE_DISPLAY = 1.0f;
-	MAX_OCTREE_DEPTH = 2;
+	MAX_OCTREE_DEPTH = 3;
 
-	POLE_BIAS = 0.95f;
-	POLE_BIAS_POWER = 2.5f;
+	POLE_BIAS = 0.9f;
+	POLE_BIAS_POWER = 5.0f;
 	POLE_GEOLOCATION = vec2(23.1510, 93.0422);
 
 	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(RENDER_SCALE));
@@ -293,7 +293,7 @@ void Renderer::f_guiLoop() {
 			f_changeSettings();
 		}
 
-		if (ImGui::SliderFloat("Pole Power", &POLE_BIAS_POWER, 1.0f, 3.0f)) {
+		if (ImGui::SliderFloat("Pole Power", &POLE_BIAS_POWER, 1.0f, 10.0f)) {
 			f_changeSettings();
 		}
 

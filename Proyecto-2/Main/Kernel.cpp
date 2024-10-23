@@ -26,9 +26,23 @@
 #define HEAT_TRANSFER_COEFFICIENT  0.05f
 
 Kernel::Kernel() {
+	PARTICLE_RADIUS    = 0;
+	PARTICLE_COUNT     = 0;
+	LAYER_COUNT        = 0;
+	MAX_OCTREE_DEPTH   = 0;
+	POLE_BIAS          = 0;
+	POLE_BIAS_POWER    = 0;
+	POLE_GEOLOCATION   = vec2(0);
+	PARTICLE_AREA      = 0;
+	SMOOTH_RADIUS      = 0;
+	DT                 = 0;
+	RUNFRAME           = 0;
+	SAMPLES            = 0;
+	SDT                = 0;
+
 	textures[Texture_Field::TOPOGRAPHY] = Texture::fromFile("./Resources/Nasa Earth Data/Topography.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::SST] = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::LST] = Texture::fromFile("./Resources/Nasa Earth Data/Land Surface Temperature.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::SST] = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::LST] = Texture::fromFile("./Resources/Nasa Earth Data/Land Surface Temperature CAF.png", Texture_Format::MONO_FLOAT);
 }
 
 void Kernel::init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT, const uint& MAX_OCTREE_DEPTH, const vec1& POLE_BIAS, const vec1& POLE_BIAS_POWER, const vec2& POLE_GEOLOCATION) {
