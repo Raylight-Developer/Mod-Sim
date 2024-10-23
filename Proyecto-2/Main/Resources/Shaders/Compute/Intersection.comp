@@ -36,8 +36,8 @@ bool f_rayBvhIntersection(in Ray ray, in Bvh box) {
 	return false;
 }
 
-bool f_raySphereIntersection(in Ray ray, in vec3 sphere, out float t) {
-	vec3 CO = ray.origin - sphere;
+bool f_raySphereIntersection(in Ray ray, in vec3 position, out float t) {
+	vec3 CO = ray.origin - position;
 	float a = dot(ray.direction, ray.direction);
 	float b = 2.0*dot(ray.direction, CO);
 	float c = dot(CO, CO) - sphere_display_radius*sphere_display_radius;
@@ -49,10 +49,23 @@ bool f_raySphereIntersection(in Ray ray, in vec3 sphere, out float t) {
 	return true;
 }
 
+vec2 f_AtmosphereIntersection(in Ray ray, in float radius) {
+	float b = dot( ray.origin, ray.direction );
+	float c = dot( ray.origin, ray.origin ) - radius * radius;
+	
+	float d = b * b - c;
+	if ( d < 0.0 ) {
+		return vec2( MAX_DIST, -MAX_DIST );
+	}
+	d = sqrt( d );
+	
+	return vec2( -b - d, -b + d );
+}
+
 bool f_EarthIntersection(in Ray ray, out float t, out vec2 uv) {
 	float a = dot(ray.direction, ray.direction);
 	float b = 2.0*dot(ray.direction, ray.origin);
-	float c = dot(ray.origin, ray.origin) - 40.589641f;
+	float c = dot(ray.origin, ray.origin) - EARTH_RADIUS_SQ;
 	float delta = b*b - 4.0*a*c;
 	if(delta < 0.0) {
 		return false;
@@ -62,11 +75,15 @@ bool f_EarthIntersection(in Ray ray, out float t, out vec2 uv) {
 	vec3 intersectionPoint = ray.origin + t * ray.direction;
 	vec3 normal = normalize(intersectionPoint );
 	
+	float axialTilt = radians(23.5);
+	mat3 tiltRotation = mat3(1.0, 0.0, 0.0, 0.0, cos(axialTilt), -sin(axialTilt), 0.0, sin(axialTilt), cos(axialTilt));
+	normal = tiltRotation * normal;
+	
 	float theta = acos(normal.y);
 	float phi = atan(normal.z, normal.x);
-	
-	uv.x = 1.0 - ((phi + 3.14159265358979323846) / (2.0 * 3.14159265358979323846));
-	uv.y = (theta) / 3.14159265358979323846;
+
+	uv.x = 1.0 - ((phi + PI) / TWO_PI);
+	uv.y = (theta) / PI;
 	return true;
 }
 

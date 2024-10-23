@@ -138,16 +138,16 @@ void Kernel::traceProperties(CPU_Particle* particle) {
 		return;
 	}
 
+	const vec1 axialTilt = glm::radians(23.5f);
+	const mat3 tiltRotation = mat3(1.0, 0.0, 0.0, 0.0, cos(axialTilt), -sin(axialTilt), 0.0, sin(axialTilt), cos(axialTilt));
+
 	const vec3 intersectionPoint = particle->position + ((-b - sqrt(delta)) / (2.0f * a)) * ray_direction;
-	const vec3 normal = glm::normalize(intersectionPoint);
+	const vec3 normal = tiltRotation *glm::normalize(intersectionPoint);
 
 	const vec1 theta = acos(normal.y);
 	const vec1 phi = glm::atan(normal.z, normal.x);
 
-	const vec2 uv = vec2(
-		1.0 - ((phi + PI) / TWO_PI),
-		(theta) / PI);
-
+	const vec2 uv = vec2(1.0 - ((phi + PI) / TWO_PI), (theta) / PI);
 
 	const vec1 topography_sample = textures[Texture_Field::TOPOGRAPHY].sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
 	const vec1 sst_sample = textures[Texture_Field::SST].sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
@@ -166,7 +166,7 @@ void Kernel::traceProperties(CPU_Particle* particle) {
 }
 
 vec3 rotateGeoloc(const vec3& point, const vec2& geoloc) {
-	const vec1 phi = glm::radians(geoloc.x - 90.0f);
+	const vec1 phi = glm::radians(geoloc.x - 90.0f) - glm::radians(23.5f);
 	const vec1 theta = glm::radians(geoloc.y);
 
 	const mat3 rotationY = mat3(

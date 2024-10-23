@@ -4,8 +4,9 @@
 #include "Compute/Globals.comp"
 #include "Compute/Inputs.comp"
 #include "Compute/Texture.comp"
-#include "Compute/Coloring.comp"
 #include "Compute/Intersection.comp"
+#include "Compute/Atmosphere.comp"
+#include "Compute/Coloring.comp"
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 
@@ -18,6 +19,9 @@ void main() {
 	vec2 uv = (pixel_id - 1 - vec2(resolution) / 2.0) / float(max(resolution.x, resolution.y));
 
 	Ray ray = f_cameraRay(uv);
+
+	mat3 rot = rot3xy( vec2( 0.0, current_time * 0.5 ) );
+	vec3 sun_dir = normalize(vec3(0.0, 0.0, 1.0) * rot);
 
 	vec4 color = vec4(0,0,0,1);
 	uint octree_view_depth = 0;
@@ -33,7 +37,11 @@ void main() {
 			if (f_EarthIntersection(ray, t_dist, earth_uv)) {
 				if (t_dist < t_length && t_dist > EPSILON) {
 					t_length = t_dist;
-					color = f_earthColor(earth_uv);
+					vec3 intersection = ray.origin + ray.direction * t_dist;
+					vec3 normal = normalize(intersection);
+					float diffuse = max(dot(normal, sun_dir), 0.0) * 0.95 + 0.05;
+
+					color = vec4(f_earthColor(earth_uv).xyz * diffuse, 1);
 				}
 			}
 		}
@@ -49,7 +57,11 @@ void main() {
 			float earth_dist = MAX_DIST;
 			vec2 earth_uv = vec2(0.5);
 			if (f_EarthIntersection(ray, earth_dist, earth_uv)) {
-				color = f_earthColor(earth_uv);
+				vec3 intersection = ray.origin + ray.direction * earth_dist;
+				vec3 normal = normalize(intersection);
+				float diffuse = max(dot(normal, sun_dir), 0.0) * 0.95 + 0.05;
+
+				color = vec4(f_earthColor(earth_uv).xyz * diffuse, 1);
 			}
 		}
 	}
@@ -80,6 +92,16 @@ void main() {
 	}
 	for (int i = 0; i < octree_view_depth; i++) {
 		octree_alpha *= 0.95;
+	}
+
+	if (render_atmosphere == 1) {
+		vec2 e = ray_vs_sphere( ray.origin, ray.direction, ATMOSPHERE_RADIUS );
+		if ( e.x <= e.y ) {
+			vec2 f = ray_vs_sphere( ray.origin, ray.direction, EARTH_RADIUS );
+			e.y = min( e.y, f.x );
+			vec3 I = in_scatter( ray.origin, ray.direction, e, sun_dir );
+			color.rgb += I;
+		}
 	}
 
 	color = clamp(mix(octree_color, color, octree_alpha), 0.0, 1.0);

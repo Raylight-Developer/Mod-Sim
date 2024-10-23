@@ -47,7 +47,7 @@ Renderer::Renderer() {
 
 	TIME_SCALE       = 0.1f;
 	RENDER_SCALE     = 0.25f;
-	PARTICLE_RADIUS  = 0.03f;
+	PARTICLE_RADIUS  = 0.01f;
 	PARTICLE_COUNT   = 8192;
 	MAX_PARTICLES    = 4096 * 4;
 	LAYER_COUNT      = 1;

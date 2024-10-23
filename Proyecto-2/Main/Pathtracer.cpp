@@ -8,13 +8,14 @@ PathTracer::PathTracer(Renderer* renderer) :
 	texture_size = 0;
 
 	params_bool["render_planet"] = true;
+	params_bool["render_atmosphere"] = true;
 	params_bool["render_octree"] = false;
 	{
 		params_bool["render_octree_hue"] = false;
 		params_bool["render_octree_debug"] = false;
 		params_int["render_octree_debug_index"] = 0;
 	}
-	params_bool["render_particles"] = true;
+	params_bool["render_particles"] = false;
 	{
 		params_int["render_particle_color_mode"] = 0;
 	}
@@ -116,6 +117,7 @@ void PathTracer::f_guiUpdate() {
 		const char* items_b[] = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature" };
 		ImGui::Combo("Planet Texture", &params_int["render_planet_texture"], items_b, IM_ARRAYSIZE(items_b));
 	}
+	ImGui::Checkbox("Render Atmosphere", &params_bool["render_atmosphere"]);
 	ImGui::Checkbox("Render Octree", &params_bool["render_octree"]);
 	if (params_bool["render_octree"]) {
 		ImGui::Checkbox("Hue", &params_bool["render_octree_hue"]);
@@ -222,6 +224,7 @@ void PathTracer::f_render() {
 	{
 		glUniform1i(glGetUniformLocation(compute_program, "render_planet_texture"), params_int["render_planet_texture"]);
 	}
+	glUniform1ui (glGetUniformLocation(compute_program, "render_atmosphere"), params_bool["render_atmosphere"]);
 	glUniform1ui (glGetUniformLocation(compute_program, "render_octree"), params_bool["render_octree"]);
 	{
 		glUniform1ui (glGetUniformLocation(compute_program, "render_octree_hue"), params_bool["render_octree_hue"]);

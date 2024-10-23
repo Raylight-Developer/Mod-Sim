@@ -13,6 +13,16 @@ vec4 floatToColor(float f) {
 	return vec4(color, 1.0);
 }
 
+vec4 blendColors(vec4 bottomLayer, vec4 topLayer) {
+	vec3 topColor = topLayer.rgb;
+	vec3 bottomColor = bottomLayer.rgb;
+	float topAlpha = topLayer.a;
+	float bottomAlpha = bottomLayer.a;
+	float outAlpha = topAlpha + bottomAlpha * (1.0 - topAlpha);
+	vec3 outColor = (topColor * topAlpha + bottomColor * bottomAlpha * (1.0 - topAlpha)) / outAlpha;
+	return vec4(outColor, outAlpha);
+}
+
 vec3 velocityToColor(vec3 velocity) {
 	vec3 color;
 	float speed = length(velocity);
