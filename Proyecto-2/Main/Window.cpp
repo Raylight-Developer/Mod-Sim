@@ -14,7 +14,6 @@ Renderer::Renderer() {
 	pathtracer = PathTracer(this);
 
 	camera_transform = Transform(dvec3(0, 0, 37.5), dvec3(0));
-	camera_transform.orbit(dvec3(0), dvec3(-15, 15, 0));
 
 	render_mode = Mode::RASTERIZATION;
 
@@ -45,20 +44,28 @@ Renderer::Renderer() {
 
 	run_sim = false;
 
-	TIME_SCALE       = 0.1f;
-	RENDER_SCALE     = 0.25f;
-	PARTICLE_RADIUS  = 0.01f;
-	PARTICLE_COUNT   = 8192;
-	MAX_PARTICLES    = 4096 * 4;
-	LAYER_COUNT      = 1;
-	PARTICLE_DISPLAY = 1.0f;
-	MAX_OCTREE_DEPTH = 3;
+	params_float["TIME_SCALE"]       = 0.1f;
+	params_float["RENDER_SCALE"]     = 0.5f;
+	params_float["PARTICLE_RADIUS"]  = 0.01f;
+	params_int["PARTICLE_COUNT"]     = 8192;
+	params_int["MAX_PARTICLES"]      = 4096 * 4;
+	params_int["LAYER_COUNT"]        = 1;
+	params_float["PARTICLE_DISPLAY"] = 1.0f;
+	params_int["MAX_OCTREE_DEPTH"]   = 3;
 
-	POLE_BIAS = 0.9f;
-	POLE_BIAS_POWER = 5.0f;
-	POLE_GEOLOCATION = vec2(23.1510, 93.0422);
+	params_float["POLE_BIAS"] = 0.9f;
+	params_float["POLE_BIAS_POWER"] = 5.0f;
+	params_float["POLE_GEOLOCATION.x"] = 23.1510;
+	params_float["POLE_GEOLOCATION.y"] = 93.0422;
 
-	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(RENDER_SCALE));
+	params_float["CALENDAR_TIME"]  = 0.0f;
+	params_float["EARTH_CENTER.x"] = 150'000.0f;
+	params_float["EARTH_CENTER.y"] = 0.0f;
+	params_float["EARTH_CENTER.z"] = 0.0f;
+
+	params_float["EARTH_TILT"] = 23.5f;
+
+	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(params_float["RENDER_SCALE"]));
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
 }
 
@@ -74,7 +81,7 @@ Renderer::~Renderer() {
 void Renderer::init() {
 	initGlfw();
 	initImGui();
-	systemInfo();
+	//systemInfo();
 
 	f_pipeline();
 	f_displayLoop();
@@ -204,7 +211,7 @@ void Renderer::f_recompile() {
 void Renderer::f_tickUpdate() {
 	if (run_sim) {
 		const dvec1 start = glfwGetTime();
-		const dvec1 delta = delta_time * TIME_SCALE;
+		const dvec1 delta = delta_time * params_float["TIME_SCALE"];
 		kernel.simulate(delta);
 		sim_delta = glfwGetTime() - start;
 	}
@@ -214,7 +221,7 @@ void Renderer::f_tickUpdate() {
 }
 
 void Renderer::f_changeSettings() {
-	kernel.init(PARTICLE_RADIUS, PARTICLE_COUNT, LAYER_COUNT, MAX_OCTREE_DEPTH, POLE_BIAS, POLE_BIAS_POWER, POLE_GEOLOCATION);
+	kernel.init(params_float, params_bool, params_int);
 
 	if (render_mode == Mode::PATHTRACING) {
 		pathtracer.f_changeSettings();
@@ -250,8 +257,8 @@ void Renderer::f_guiLoop() {
 		ImGui::Text(("Fps: " + to_str(frame_count, 0)).c_str());
 	}
 	ImGui::SeparatorText("General Settings");
-	ImGui::SliderFloat("Time Scale", &TIME_SCALE, 0.01f, 2.0f, "%.4f");
-	if (ImGui::SliderFloat("Render Scale", &RENDER_SCALE, 0.1f, 1.0f, "%.3f")) {
+	ImGui::SliderFloat("Time Scale", &params_float["TIME_SCALE"], 0.01f, 2.0f, "%.4f");
+	if (ImGui::SliderFloat("Render Scale", &params_float["RENDER_SCALE"], 0.1f, 1.0f, "%.3f")) {
 		f_resize();
 	}
 	ImGui::SeparatorText("Play / Pause");
@@ -269,38 +276,41 @@ void Renderer::f_guiLoop() {
 			run_sim = true;
 		}
 		ImGui::SeparatorText("Init Settings");
-		if (ImGui::SliderFloat("Particle Radius", &PARTICLE_RADIUS, 0.001f, 1.0f, "%.5f")) {
+		if (ImGui::SliderFloat("Particle Radius", &params_float["PARTICLE_RADIUS"], 0.001f, 1.0f, "%.5f")) {
 			f_changeSettings();
 		}
 
-		if (ImGui::SliderFloat("Display Mult", &PARTICLE_DISPLAY, 0.05f, 5.0f, "%.3f")) {
+		if (ImGui::SliderFloat("Display Mult", &params_float["PARTICLE_DISPLAY"], 0.05f, 5.0f, "%.3f")) {
 			f_changeSettings();
 		}
 
-		if (ImGui::SliderInt("Particle Count", &PARTICLE_COUNT, 128, MAX_PARTICLES)) {
+		if (ImGui::SliderInt("Particle Count", &params_int["PARTICLE_COUNT"], 128, params_int["MAX_PARTICLES"])) {
 			f_changeSettings();
 		}
 
-		if (ImGui::SliderInt("Max Octree Depth", &MAX_OCTREE_DEPTH, 0, 10)) {
+		if (ImGui::SliderInt("Max Octree Depth", &params_int["MAX_OCTREE_DEPTH"], 0, 10)) {
 			f_changeSettings();
 		}
 
-		if (ImGui::SliderInt("Layer Count", &LAYER_COUNT, 1, 16)) {
+		if (ImGui::SliderInt("Layer Count", &params_int["LAYER_COUNT"], 1, 16)) {
 			f_changeSettings();
 		}
 
-		if (ImGui::SliderFloat("Pole Bias", &POLE_BIAS, 0.0f, 1.0f, "%.5f")) {
+		if (ImGui::SliderFloat("Pole Bias", &params_float["POLE_BIAS"], 0.0f, 1.0f, "%.5f")) {
 			f_changeSettings();
 		}
 
-		if (ImGui::SliderFloat("Pole Power", &POLE_BIAS_POWER, 1.0f, 10.0f)) {
+		if (ImGui::SliderFloat("Pole Power", &params_float["POLE_BIAS_POWER"], 1.0f, 10.0f)) {
 			f_changeSettings();
 		}
 
-		if (ImGui::SliderFloat("Latitude", &POLE_GEOLOCATION.x, -90.0f, 90.0f), "%.4f") {
+		if (ImGui::SliderFloat("Latitude", &params_float["POLE_GEOLOCATION.x"], -90.0f, 90.0f), "%.4f") {
 			f_changeSettings();
 		}
-		if (ImGui::SliderFloat("Longitude", &POLE_GEOLOCATION.y, -180.0f, 180.0f, "%.4f")) {
+		if (ImGui::SliderFloat("Longitude", &params_float["POLE_GEOLOCATION.y"], -180.0f, 180.0f, "%.4f")) {
+			f_changeSettings();
+		}
+		if (ImGui::SliderFloat("Earth Tilt", &params_float["EARTH_TILT"], -180.0f, 180.0f, "%.2f")) {
 			f_changeSettings();
 		}
 	}
@@ -390,7 +400,7 @@ void Renderer::f_displayLoop() {
 
 void Renderer::f_resize() {
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
-	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(RENDER_SCALE));
+	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(params_float["RENDER_SCALE"]));
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
 	if (render_mode == Mode::PATHTRACING) {
 		pathtracer.f_resize();

@@ -58,18 +58,9 @@ struct Renderer {
 
 	bool  run_sim;
 
-	vec1  TIME_SCALE;
-	vec1  RENDER_SCALE;
-	vec1  PARTICLE_RADIUS;
-	vec1  PARTICLE_DISPLAY;
-	int   PARTICLE_COUNT;
-	int   MAX_PARTICLES;
-	int   LAYER_COUNT;
-	int   MAX_OCTREE_DEPTH;
-
-	vec1  POLE_BIAS;
-	vec1  POLE_BIAS_POWER;
-	vec2  POLE_GEOLOCATION;
+	unordered_map<string, float> params_float;
+	unordered_map<string, bool> params_bool;
+	unordered_map<string, int> params_int;
 
 	Renderer();
 	~Renderer();

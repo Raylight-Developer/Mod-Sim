@@ -45,20 +45,24 @@ Kernel::Kernel() {
 	textures[Texture_Field::LST] = Texture::fromFile("./Resources/Nasa Earth Data/Land Surface Temperature CAF.png", Texture_Format::MONO_FLOAT);
 }
 
-void Kernel::init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uint& LAYER_COUNT, const uint& MAX_OCTREE_DEPTH, const vec1& POLE_BIAS, const vec1& POLE_BIAS_POWER, const vec2& POLE_GEOLOCATION) {
-	this->PARTICLE_RADIUS = PARTICLE_RADIUS;
-	this->PARTICLE_COUNT  = PARTICLE_COUNT;
-	this->LAYER_COUNT     = LAYER_COUNT;
-	this->MAX_OCTREE_DEPTH    = MAX_OCTREE_DEPTH;
-	this->POLE_BIAS = POLE_BIAS;
-	this->POLE_BIAS_POWER = POLE_BIAS_POWER;
-	this->POLE_GEOLOCATION = POLE_GEOLOCATION;
-	PARTICLE_AREA         = 4.0f * glm::pi<vec1>() * PARTICLE_RADIUS * PARTICLE_RADIUS;
-	SMOOTH_RADIUS         = 1.0f * 1.5f;
-	DT                    = 0.016f;
-	RUNFRAME              = 0;
-	SAMPLES               = 5;
-	SDT                   = 0.016f / u_to_f(SAMPLES);
+void Kernel::init(const unordered_map<string, float>& params_float, const unordered_map<string, bool>& params_bool,const unordered_map<string, int>& params_int) {
+	this->params_float = params_float;
+	this->params_bool = params_bool;
+	this->params_int = params_int;
+
+	PARTICLE_RADIUS  = params_float.at("PARTICLE_RADIUS");
+	PARTICLE_COUNT   = params_int.at("PARTICLE_COUNT");
+	LAYER_COUNT      = params_int.at("LAYER_COUNT");
+	MAX_OCTREE_DEPTH = params_int.at("MAX_OCTREE_DEPTH");
+	POLE_BIAS        = params_float.at("POLE_BIAS");
+	POLE_BIAS_POWER  = params_float.at("POLE_BIAS_POWER");
+	POLE_GEOLOCATION = vec2(params_float.at("POLE_GEOLOCATION.x"), params_float.at("POLE_GEOLOCATION.y"));
+	PARTICLE_AREA    = 4.0f * glm::pi<vec1>() * PARTICLE_RADIUS * PARTICLE_RADIUS;
+	SMOOTH_RADIUS    = 1.0f * 1.5f;
+	DT               = 0.016f;
+	RUNFRAME         = 0;
+	SAMPLES          = 5;
+	SDT              = 0.016f / u_to_f(SAMPLES);
 
 	initParticles();
 	initBvh();
@@ -103,9 +107,8 @@ void Kernel::initParticles() {
 void Kernel::initBvh() {
 	const uint bvh_depth = d_to_u(glm::log2(ul_to_d(particles.size()) / 64.0));
 
-	Builder bvh_build = Builder(particles, PARTICLE_RADIUS, MAX_OCTREE_DEPTH);
+	const Builder bvh_build = Builder(particles, PARTICLE_RADIUS, MAX_OCTREE_DEPTH);
 	particles = bvh_build.particles;
-	root_node = bvh_build.gpu_root_node;
 	bvh_nodes = bvh_build.nodes;
 
 	gpu_particles.clear();
@@ -138,11 +141,8 @@ void Kernel::traceProperties(CPU_Particle* particle) {
 		return;
 	}
 
-	const vec1 axialTilt = glm::radians(23.5f);
-	const mat3 tiltRotation = mat3(1.0, 0.0, 0.0, 0.0, cos(axialTilt), -sin(axialTilt), 0.0, sin(axialTilt), cos(axialTilt));
-
 	const vec3 intersectionPoint = particle->position + ((-b - sqrt(delta)) / (2.0f * a)) * ray_direction;
-	const vec3 normal = tiltRotation *glm::normalize(intersectionPoint);
+	const vec3 normal = glm::normalize(intersectionPoint);
 
 	const vec1 theta = acos(normal.y);
 	const vec1 phi = glm::atan(normal.z, normal.x);
@@ -165,25 +165,15 @@ void Kernel::traceProperties(CPU_Particle* particle) {
 	}
 }
 
-vec3 rotateGeoloc(const vec3& point, const vec2& geoloc) {
-	const vec1 phi = glm::radians(geoloc.x - 90.0f) - glm::radians(23.5f);
-	const vec1 theta = glm::radians(geoloc.y);
+vec3 Kernel::rotateGeoloc(const vec3& point, const vec2& geoloc) {
+	const vec1 phi = glm::radians(geoloc.x - 90.0f);
+	const vec1 theta = glm::radians(geoloc.y + 90.0f);
+	const vec1 axialTilt = -glm::radians(params_float["EARTH_TILT"]);
 
-	const mat3 rotationY = mat3(
-		vec3(cos(theta), 0, sin(theta)),
-		vec3(0, 1, 0),
-		vec3(-sin(theta), 0, cos(theta))
-	);
+	const quat tiltRotation = glm::angleAxis(axialTilt, glm::vec3(0, 0, 1));
+	const quat latRotation  = glm::angleAxis(phi, glm::vec3(1, 0, 0));
+	const quat lonRotation  = glm::angleAxis(theta, glm::vec3(0, 1, 0));
+	const quat combinedRotation = tiltRotation * lonRotation * latRotation;
 
-	const mat3 rotationX = mat3(
-		vec3(1, 0, 0),
-		vec3(0, cos(phi), -sin(phi)),
-		vec3(0, sin(phi), cos(phi))
-	);
-
-	vec3 res = point;
-	res = rotationY * res;
-	res = rotationX * res;
-
-	return res;
+	return combinedRotation * point;
 }

@@ -73,10 +73,13 @@ bool f_EarthIntersection(in Ray ray, out float t, out vec2 uv) {
 	t = (-b-sqrt(delta)) / (2.0 * a);
 
 	vec3 intersectionPoint = ray.origin + t * ray.direction;
-	vec3 normal = normalize(intersectionPoint );
+	vec3 normal = normalize(intersectionPoint);
 	
-	float axialTilt = radians(23.5);
-	mat3 tiltRotation = mat3(1.0, 0.0, 0.0, 0.0, cos(axialTilt), -sin(axialTilt), 0.0, sin(axialTilt), cos(axialTilt));
+	float axialTilt = radians(-earth_tilt);
+	mat3 tiltRotation = mat3(
+		vec3(cos(axialTilt), -sin(axialTilt), 0),
+		vec3(sin(axialTilt), cos(axialTilt), 0),
+		vec3(0, 0, 1));
 	normal = tiltRotation * normal;
 	
 	float theta = acos(normal.y);

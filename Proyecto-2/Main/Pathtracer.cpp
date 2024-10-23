@@ -8,6 +8,7 @@ PathTracer::PathTracer(Renderer* renderer) :
 	texture_size = 0;
 
 	params_bool["render_planet"] = true;
+	params_bool["render_lighting"] = false;
 	params_bool["render_atmosphere"] = true;
 	params_bool["render_octree"] = false;
 	{
@@ -15,7 +16,7 @@ PathTracer::PathTracer(Renderer* renderer) :
 		params_bool["render_octree_debug"] = false;
 		params_int["render_octree_debug_index"] = 0;
 	}
-	params_bool["render_particles"] = false;
+	params_bool["render_particles"] = true;
 	{
 		params_int["render_particle_color_mode"] = 0;
 	}
@@ -117,7 +118,10 @@ void PathTracer::f_guiUpdate() {
 		const char* items_b[] = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature" };
 		ImGui::Combo("Planet Texture", &params_int["render_planet_texture"], items_b, IM_ARRAYSIZE(items_b));
 	}
-	ImGui::Checkbox("Render Atmosphere", &params_bool["render_atmosphere"]);
+	ImGui::Checkbox("Render Lighting", &params_bool["render_lighting"]);
+	if (params_bool["render_lighting"]) {
+		ImGui::Checkbox("Render Atmosphere", &params_bool["render_atmosphere"]);
+	}
 	ImGui::Checkbox("Render Octree", &params_bool["render_octree"]);
 	if (params_bool["render_octree"]) {
 		ImGui::Checkbox("Hue", &params_bool["render_octree_hue"]);
@@ -136,7 +140,7 @@ void PathTracer::f_guiUpdate() {
 
 	ImGui::Text(string("Octree VRAM: " + to_string((renderer->kernel.bvh_nodes.size() * sizeof(GPU_Bvh)) / 1024) + "mb ").c_str());
 	ImGui::Text(string("Texture VRAM: " + to_string((texture_size * sizeof(uint)) / 1024) + "mb ").c_str());
-	ImGui::Text(string("Particle VRAM: " + to_string((renderer->PARTICLE_COUNT * sizeof(GPU_Particle)) / 1024) + "mb ").c_str());
+	ImGui::Text(string("Particle VRAM: " + to_string((renderer->params_int["PARTICLE_COUNT"] * sizeof(GPU_Particle)) / 1024) + "mb ").c_str());
 }
 
 void PathTracer::f_recompile() {
@@ -210,20 +214,17 @@ void PathTracer::f_render() {
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_p_u"), 1, value_ptr(projection_u));
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"), 1, value_ptr(projection_v));
 
-	glUniform3fv (glGetUniformLocation(compute_program, "root_bvh.p_min"), 1, value_ptr(renderer->kernel.root_node.p_min));
-	glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_start"), renderer->kernel.root_node.particle_start);
-	glUniform3fv (glGetUniformLocation(compute_program, "root_bvh.p_max"), 1, value_ptr(renderer->kernel.root_node.p_max));
-	glUniform1ui (glGetUniformLocation(compute_program, "root_bvh.particle_end"), renderer->kernel.root_node.particle_end);
-	glUniform4iv (glGetUniformLocation(compute_program, "root_bvh.pointers_a"), 1, value_ptr(renderer->kernel.root_node.pointers_a));
-	glUniform4iv (glGetUniformLocation(compute_program, "root_bvh.pointers_b"), 1, value_ptr(renderer->kernel.root_node.pointers_b));
+	glUniform1f  (glGetUniformLocation(compute_program, "earth_tilt"), renderer->params_float["EARTH_TILT"]);
+	glUniform3fv (glGetUniformLocation(compute_program, "earth_center"), 1, value_ptr(vec3(renderer->params_float["EARTH_CENTER.x"], renderer->params_float["EARTH_CENTER.y"], renderer->params_float["EARTH_CENTER.z"])));
 
-	glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), renderer->PARTICLE_RADIUS);
-	glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), renderer->PARTICLE_DISPLAY * renderer->PARTICLE_RADIUS);
+	glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), renderer->params_float["PARTICLE_RADIUS"]);
+	glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), renderer->params_float["PARTICLE_RADIUS"] * renderer->params_float["PARTICLE_DISPLAY"]);
 
 	glUniform1ui (glGetUniformLocation(compute_program, "render_planet"), params_bool["render_planet"]);
 	{
 		glUniform1i(glGetUniformLocation(compute_program, "render_planet_texture"), params_int["render_planet_texture"]);
 	}
+	glUniform1ui (glGetUniformLocation(compute_program, "render_lighting"), params_bool["render_lighting"]);
 	glUniform1ui (glGetUniformLocation(compute_program, "render_atmosphere"), params_bool["render_atmosphere"]);
 	glUniform1ui (glGetUniformLocation(compute_program, "render_octree"), params_bool["render_octree"]);
 	{

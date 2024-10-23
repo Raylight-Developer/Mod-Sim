@@ -25,17 +25,19 @@ uniform float aspect_ratio;
 uniform float current_time;
 uniform uvec2 resolution;
 
-uniform vec3 camera_pos;
-uniform vec3 camera_p_uv;
-uniform vec3 camera_p_u;
-uniform vec3 camera_p_v;
+uniform vec3  camera_pos;
+uniform vec3  camera_p_uv;
+uniform vec3  camera_p_u;
+uniform vec3  camera_p_v;
 
-uniform Bvh  root_bvh;
+uniform float earth_tilt;
+uniform vec3  earth_center;
 
 uniform float sphere_radius;
 uniform float sphere_display_radius;
 
 uniform uint  render_planet;
+uniform uint  render_lighting;
 uniform uint  render_atmosphere;
 uniform uint  render_octree;
 uniform uint  render_octree_hue;
