@@ -115,7 +115,7 @@ void PathTracer::f_changeSettings() {
 void PathTracer::f_guiUpdate() {
 	if (!renderer->run_sim) {
 		ImGui::SeparatorText("Pathtracing Settings");
-		if (ImGui::SliderInt("Max Octree Depth", &renderer->params_int["MAX_OCTREE_DEPTH"], 0, 10)) {
+		if (ImGui::SliderInt("Max Octree Depth", &renderer->params_int["MAX_OCTREE_DEPTH"], 0, 5)) {
 			renderer->kernel.initBvh();
 			f_changeSettings();
 		}

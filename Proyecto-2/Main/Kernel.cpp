@@ -153,7 +153,12 @@ void Kernel::traceProperties(CPU_Particle* particle) {
 	}
 
 	const vec3 intersectionPoint = particle->position + ((-b - sqrt(delta)) / (2.0f * a)) * ray_direction;
-	const vec3 normal = glm::normalize(intersectionPoint);
+	const vec1 axialTilt = -glm::radians(params_float["EARTH_TILT"]);
+	const mat3 tiltRotation = mat3(
+		vec3(cos(axialTilt), -sin(axialTilt), 0),
+		vec3(sin(axialTilt), cos(axialTilt), 0),
+		vec3(0, 0, 1));
+	const vec3 normal = tiltRotation * glm::normalize(intersectionPoint);
 
 	const vec1 theta = acos(normal.y);
 	const vec1 phi = glm::atan(normal.z, normal.x);

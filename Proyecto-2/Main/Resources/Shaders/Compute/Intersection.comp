@@ -97,7 +97,7 @@ int f_visitBvh(in Ray ray, inout float result_raylength) {
 	float t_dist = MAX_DIST;
 
 	int closest_particle = -1;
-	int stack[32];
+	int stack[64];
 	int stack_index = 0;
 	stack[stack_index++] = 0;
 

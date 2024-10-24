@@ -49,15 +49,15 @@ Renderer::Renderer() {
 	params_float["PARTICLE_RADIUS"]  = 0.015f;
 	params_int["PARTICLE_COUNT"]     = 8192;
 	params_int["MAX_PARTICLES"]      = 4096 * 4;
-	params_int["MAX_OCTREE_DEPTH"]   = 3;
+	params_int["MAX_OCTREE_DEPTH"]   = 4;
 
-	params_float["POLE_BIAS"] = 0.9f;
-	params_float["POLE_BIAS_POWER"] = 5.0f;
+	params_float["POLE_BIAS"]          = 0.9f;
+	params_float["POLE_BIAS_POWER"]    = 5.0f;
 	params_float["POLE_GEOLOCATION.x"] = 23.1510f;
 	params_float["POLE_GEOLOCATION.y"] = 93.0422f;
-	params_float["EARTH_TILT"]     = 23.5f;
+	params_float["EARTH_TILT"]         = 23.5f;
 
-	params_int["CALENDAR_DAY"]  = 22;
+	params_int["CALENDAR_DAY"]   = 22;
 	params_int["CALENDAR_MONTH"] = 12;
 
 	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(params_float["RENDER_SCALE"]));
@@ -79,6 +79,7 @@ void Renderer::init() {
 	//systemInfo();
 
 	f_pipeline();
+	current_time = 0.0;
 	f_displayLoop();
 }
 
