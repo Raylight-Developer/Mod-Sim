@@ -7,13 +7,13 @@ PathTracer::PathTracer(Renderer* renderer) :
 {
 	texture_size = 0;
 
-	params_bool["render_planet"] = true;
-	params_bool["render_lighting"] = true;
+	params_bool["render_planet"]     = true;
+	params_bool["render_lighting"]   = true;
 	params_bool["render_atmosphere"] = true;
-	params_bool["render_octree"] = false;
+	params_bool["render_octree"]     = false;
 	{
-		params_bool["render_octree_hue"] = false;
-		params_bool["render_octree_debug"] = false;
+		params_bool["render_octree_hue"]        = false;
+		params_bool["render_octree_debug"]      = false;
 		params_int["render_octree_debug_index"] = 0;
 	}
 	params_bool["render_particles"] = false;
@@ -113,28 +113,26 @@ void PathTracer::f_changeSettings() {
 }
 
 void PathTracer::f_guiUpdate() {
-
-	if (! renderer->run_sim) {
+	if (!renderer->run_sim) {
 		ImGui::SeparatorText("Pathtracing Settings");
-		if (ImGui::SliderInt("Max Octree Depth", &params_int["MAX_OCTREE_DEPTH"], 0, 10)) {
+		if (ImGui::SliderInt("Max Octree Depth", &renderer->params_int["MAX_OCTREE_DEPTH"], 0, 10)) {
+			renderer->kernel.initBvh();
 			f_changeSettings();
 		}
 	}
 
 	ImGui::SeparatorText("Pathtraced Rendering");
-	if (ImGui::SliderFloat("Particle Radius", &params_float["PARTICLE_RADIUS"], 0.001f, 1.0f, "%.5f")) {
-		f_changeSettings();
-	}
-
 	ImGui::Checkbox("Render Planet", &params_bool["render_planet"]);
 	if (params_bool["render_planet"]) {
 		const char* items_b[] = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature" };
 		ImGui::Combo("Planet Texture", &params_int["render_planet_texture"], items_b, IM_ARRAYSIZE(items_b));
 	}
+
 	ImGui::Checkbox("Render Lighting", &params_bool["render_lighting"]);
 	if (params_bool["render_lighting"]) {
 		ImGui::Checkbox("Render Atmosphere", &params_bool["render_atmosphere"]);
 	}
+
 	ImGui::Checkbox("Render Octree", &params_bool["render_octree"]);
 	if (params_bool["render_octree"]) {
 		ImGui::Checkbox("Hue", &params_bool["render_octree_hue"]);
@@ -148,6 +146,10 @@ void PathTracer::f_guiUpdate() {
 	if (params_bool["render_particles"]) {
 		const char* items_b[] = { "Temperature" };
 		ImGui::Combo("Particle Color Mode", &params_int["render_particle_color_mode"], items_b, IM_ARRAYSIZE(items_b));
+
+		if (ImGui::SliderFloat("Particle Radius", &renderer->params_float["PARTICLE_RADIUS"], 0.001f, 1.0f, "%.5f")) {
+			renderer->f_changeSettings();
+		}
 	}
 	ImGui::SeparatorText("Theoretical Performance Stats");
 

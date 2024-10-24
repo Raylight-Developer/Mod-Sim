@@ -62,12 +62,12 @@ void Kernel::init(const unordered_map<string, float>& params_float, const unorde
 	SAMPLES          = 5;
 	SDT              = 0.016f / u_to_f(SAMPLES);
 
-	initParticles();
+	preInitParticles();
 	initBvh();
 }
 
-void Kernel::initParticles() {
-	const vec1 radius = 6.371f;
+void Kernel::preInitParticles() {
+	const vec1 radius = 6.371f + 0.05f;
 
 	particles.clear();
 	for (uint i = 0; i < PARTICLE_COUNT; i++) {
@@ -86,6 +86,32 @@ void Kernel::initParticles() {
 
 		traceProperties(&particle);
 		particles.push_back(particle);
+	}
+}
+
+void Kernel::initParticles() {
+	const int NUM_NEIGHBORS = 3;
+
+	for (uint i = 0; i < PARTICLE_COUNT; i++) {
+		CPU_Particle& particle = particles[i];
+
+		vector<CPU_Neighbor> neighbors;
+
+		for (uint j = 0; j < PARTICLE_COUNT; j++) {
+			if (i != j) {
+				const vec1 distSq = glm::distance2(particle.position, particles[j].position);
+				neighbors.push_back(CPU_Neighbor(distSq, &particles[j]));
+			}
+		}
+
+		sort(neighbors.begin(), neighbors.end(), [](const CPU_Neighbor& a, const CPU_Neighbor& b) {
+			return a.distance < b.distance;
+			});
+
+		particle.smoothing_radius = neighbors[2].distance * 2.0f;
+		for (uint k = 0; k < NUM_NEIGHBORS; k++) {
+			particle.neighbors.push_back(neighbors[k]);
+		}
 	}
 }
 
@@ -173,7 +199,7 @@ vec3 Kernel::sunDir() const {
 		s.y * s.x,  c.x,  c.y * s.x,
 		s.y * c.x, -s.x,  c.y * c.x
 	);
-	return vec3(-1,0,0) * rot;
+	return glm::normalize(vec3(-1,0,0) * rot);
 }
 
 vec1 dateToFloat(const int& month, const int& day) {

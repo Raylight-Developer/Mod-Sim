@@ -23,7 +23,7 @@ void main() {
 	Ray ray = f_cameraRay(uv);
 
 	mat3 rot = rot3xy(vec2( 0.0, date_time * TWO_PI ));
-	vec3 sun_dir = vec3(-1,0,0) * rot;
+	vec3 sun_dir = normalize(vec3(-1,0,0) * rot);
 
 	vec4 color = vec4(0,0,0,1);
 	uint octree_view_depth = 0;
@@ -62,9 +62,6 @@ void main() {
 	else if (render_planet == 1) {
 		float earth_dist = MAX_DIST;
 		vec2 earth_uv = vec2(0.5);
-		//if (f_SunIntersection(ray)) {
-		//	color = vec4(1,1,0,1);
-		//}
 		if (f_EarthIntersection(ray, earth_dist, earth_uv)) {
 			if (render_lighting == 1) {
 				vec3 intersection = ray.origin + ray.direction * earth_dist;
@@ -118,6 +115,7 @@ void main() {
 		}
 	}
 
+	color = mix(octree_color, color, octree_alpha);
 	color = clamp(color, 0.0, 1.0);
 	imageStore(raw_render_layer, pixel_id, color);
 }

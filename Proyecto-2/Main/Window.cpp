@@ -270,9 +270,10 @@ void Renderer::f_guiLoop() {
 	else {
 		if (ImGui::Button("Play")) {
 			run_sim = true;
+			kernel.initParticles();
 		}
 		ImGui::SeparatorText("Earth Settings");
-		if (ImGui::SliderFloat("Latitude", &params_float["POLE_GEOLOCATION.x"], -90.0f, 90.0f), "%.4f") {
+		if (ImGui::SliderFloat("Latitude", &params_float["POLE_GEOLOCATION.x"], -90.0f, 90.0f, "%.4f")) {
 			f_changeSettings();
 		}
 		if (ImGui::SliderFloat("Longitude", &params_float["POLE_GEOLOCATION.y"], -180.0f, 180.0f, "%.4f")) {

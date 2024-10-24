@@ -36,6 +36,7 @@ struct Kernel {
 	Kernel();
 
 	void init(const unordered_map<string, float>& params_float, const unordered_map<string, bool>& params_bool,const unordered_map<string, int>& params_int);
+	void preInitParticles();
 	void initParticles();
 	void initBvh();
 
