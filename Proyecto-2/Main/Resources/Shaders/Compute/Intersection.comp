@@ -40,7 +40,7 @@ bool f_raySphereIntersection(in Ray ray, in vec3 position, out float t) {
 	vec3 CO = ray.origin - position;
 	float a = dot(ray.direction, ray.direction);
 	float b = 2.0*dot(ray.direction, CO);
-	float c = dot(CO, CO) - sphere_display_radius*sphere_display_radius;
+	float c = dot(CO, CO) - render_particle_radius*render_particle_radius;
 	float delta = b*b - 4.0*a*c;
 	if(delta < 0.0) {
 		return false;

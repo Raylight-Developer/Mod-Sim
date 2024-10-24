@@ -43,13 +43,13 @@ Renderer::Renderer() {
 	last_time = 0.0;
 
 	run_sim = false;
+	lock_settings = false;
 
-	params_float["TIME_SCALE"]       = 1.0f;
-	params_float["RENDER_SCALE"]     = 1.0f;
-	params_float["PARTICLE_RADIUS"]  = 0.015f;
-	params_int["PARTICLE_COUNT"]     = 8192;
-	params_int["MAX_PARTICLES"]      = 4096 * 4;
-	params_int["MAX_OCTREE_DEPTH"]   = 4;
+	params_float["TIME_SCALE"]          = 1.0f;
+	params_float["RENDER_SCALE"]        = 0.5f;
+	params_int["PARTICLE_COUNT"]        = 8192;
+	params_int["MAX_PARTICLES"]         = 4096 * 4;
+	params_int["MAX_OCTREE_DEPTH"]      = 4;
 
 	params_float["POLE_BIAS"]          = 0.9f;
 	params_float["POLE_BIAS_POWER"]    = 5.0f;
@@ -257,11 +257,6 @@ void Renderer::f_guiLoop() {
 
 		ImGui::Text(("Fps: " + to_str(frame_count, 0)).c_str());
 	}
-	ImGui::SeparatorText("General Settings");
-	ImGui::SliderFloat("Time Scale", &params_float["TIME_SCALE"], 0.01f, 2.0f, "%.4f");
-	if (ImGui::SliderFloat("Render Scale", &params_float["RENDER_SCALE"], 0.1f, 1.0f, "%.3f")) {
-		f_resize();
-	}
 	ImGui::SeparatorText("Play / Pause");
 	if (run_sim) {
 		if (ImGui::Button("Pause")) {
@@ -269,42 +264,49 @@ void Renderer::f_guiLoop() {
 		}
 	}
 	else {
-		if (ImGui::Button("Play")) {
-			run_sim = true;
-			kernel.initParticles();
+		if (lock_settings) {
+			if (ImGui::Button("Play")) {
+				run_sim = true;
+			}
 		}
-		ImGui::SeparatorText("Earth Settings");
-		if (ImGui::SliderFloat("Latitude", &params_float["POLE_GEOLOCATION.x"], -90.0f, 90.0f, "%.4f")) {
-			f_changeSettings();
-		}
-		if (ImGui::SliderFloat("Longitude", &params_float["POLE_GEOLOCATION.y"], -180.0f, 180.0f, "%.4f")) {
-			f_changeSettings();
-		}
-		if (ImGui::SliderFloat("Earth Tilt", &params_float["EARTH_TILT"], -180.0f, 180.0f, "%.2f")) {
-			f_changeSettings();
-		}
+		else {
+			if (ImGui::Button("Lock n Load Settings")) {
+				lock_settings = true;
+				f_changeSettings();
+				kernel.initParticles();
+			}
+			ImGui::SeparatorText("Earth Settings");
+			if (ImGui::SliderFloat("Latitude", &params_float["POLE_GEOLOCATION.x"], -90.0f, 90.0f, "%.4f")) {
+				f_changeSettings();
+			}
+			if (ImGui::SliderFloat("Longitude", &params_float["POLE_GEOLOCATION.y"], -180.0f, 180.0f, "%.4f")) {
+				f_changeSettings();
+			}
+			if (ImGui::SliderFloat("Pole Bias", &params_float["POLE_BIAS"], 0.0f, 1.0f, "%.5f")) {
+				f_changeSettings();
+			}
+			if (ImGui::SliderFloat("Pole Power", &params_float["POLE_BIAS_POWER"], 1.0f, 10.0f)) {
+				f_changeSettings();
+			}
+			if (ImGui::SliderFloat("Earth Tilt", &params_float["EARTH_TILT"], -180.0f, 180.0f, "%.2f")) {
+				f_changeSettings();
+			}
 
-		if (ImGui::SliderInt("Day", &params_int["CALENDAR_DAY"], 0, 31)) {
-			params_float["DATE_TIME"] = dateToFloat(params_int["CALENDAR_MONTH"], params_int["CALENDAR_DAY"]);
-			f_changeSettings();
-		}
-		if (ImGui::SliderInt("Month", &params_int["CALENDAR_MONTH"], 0, 12)) {
-			params_float["DATE_TIME"] = dateToFloat(params_int["CALENDAR_MONTH"], params_int["CALENDAR_DAY"]);
-			f_changeSettings();
-		}
+			if (ImGui::SliderInt("Day", &params_int["CALENDAR_DAY"], 0, 31)) {
+				params_float["DATE_TIME"] = dateToFloat(params_int["CALENDAR_MONTH"], params_int["CALENDAR_DAY"]);
+				f_changeSettings();
+			}
+			if (ImGui::SliderInt("Month", &params_int["CALENDAR_MONTH"], 0, 12)) {
+				params_float["DATE_TIME"] = dateToFloat(params_int["CALENDAR_MONTH"], params_int["CALENDAR_DAY"]);
+				f_changeSettings();
+			}
 
-		ImGui::SeparatorText("Simulation Settings");
+			ImGui::SeparatorText("Simulation Settings");
 
-		if (ImGui::SliderInt("Particle Count", &params_int["PARTICLE_COUNT"], 128, params_int["MAX_PARTICLES"])) {
-			f_changeSettings();
-		}
-
-		if (ImGui::SliderFloat("Pole Bias", &params_float["POLE_BIAS"], 0.0f, 1.0f, "%.5f")) {
-			f_changeSettings();
-		}
-
-		if (ImGui::SliderFloat("Pole Power", &params_float["POLE_BIAS_POWER"], 1.0f, 10.0f)) {
-			f_changeSettings();
+			if (ImGui::SliderInt("Particle Count", &params_int["PARTICLE_COUNT"], 128, params_int["MAX_PARTICLES"])) {
+				f_changeSettings();
+			}
+			ImGui::SliderFloat("Time Scale", &params_float["TIME_SCALE"], 0.01f, 2.0f, "%.4f");
 		}
 	}
 

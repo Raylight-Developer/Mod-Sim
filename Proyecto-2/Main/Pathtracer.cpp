@@ -18,6 +18,7 @@ PathTracer::PathTracer(Renderer* renderer) :
 	}
 	params_bool["render_particles"] = false;
 	{
+		params_float["render_particle_radius"] = 0.015f;
 		params_int["render_particle_color_mode"] = 0;
 	}
 	params_int["render_planet_texture"] = 0;
@@ -113,14 +114,6 @@ void PathTracer::f_changeSettings() {
 }
 
 void PathTracer::f_guiUpdate() {
-	if (!renderer->run_sim) {
-		ImGui::SeparatorText("Pathtracing Settings");
-		if (ImGui::SliderInt("Max Octree Depth", &renderer->params_int["MAX_OCTREE_DEPTH"], 0, 5)) {
-			renderer->kernel.initBvh();
-			f_changeSettings();
-		}
-	}
-
 	ImGui::SeparatorText("Pathtraced Rendering");
 	ImGui::Checkbox("Render Planet", &params_bool["render_planet"]);
 	if (params_bool["render_planet"]) {
@@ -144,13 +137,23 @@ void PathTracer::f_guiUpdate() {
 
 	ImGui::Checkbox("Render Particles", &params_bool["render_particles"]);
 	if (params_bool["render_particles"]) {
+		ImGui::SliderFloat("Particle Radius", &params_float["render_particle_radius"], 0.005f, 0.025f, "%.4f");
+
 		const char* items_b[] = { "Temperature" };
 		ImGui::Combo("Particle Color Mode", &params_int["render_particle_color_mode"], items_b, IM_ARRAYSIZE(items_b));
+	}
 
-		if (ImGui::SliderFloat("Particle Radius", &renderer->params_float["PARTICLE_RADIUS"], 0.001f, 1.0f, "%.5f")) {
-			renderer->f_changeSettings();
+	ImGui::SeparatorText("Pathtracing Optimization Settings");
+	if (ImGui::SliderFloat("Render Scale", &renderer->params_float["RENDER_SCALE"], 0.1f, 1.0f, "%.3f")) {
+		f_resize();
+	}
+	if (!renderer->lock_settings) {
+		if (ImGui::SliderInt("Max Octree Depth", &renderer->params_int["MAX_OCTREE_DEPTH"], 0, 5)) {
+			renderer->kernel.initBvh();
+			f_changeSettings();
 		}
 	}
+
 	ImGui::SeparatorText("Theoretical Performance Stats");
 
 	ImGui::Text(string("Octree VRAM: " + to_string((renderer->kernel.bvh_nodes.size() * sizeof(GPU_Bvh)) / 1024) + "mb ").c_str());
@@ -233,7 +236,6 @@ void PathTracer::f_render() {
 	glUniform1f  (glGetUniformLocation(compute_program, "earth_tilt"), renderer->params_float["EARTH_TILT"]);
 	glUniform1f  (glGetUniformLocation(compute_program, "date_time"), renderer->params_float["DATE_TIME"]);
 
-	glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), renderer->params_float["PARTICLE_RADIUS"]);
 
 	glUniform1ui (glGetUniformLocation(compute_program, "render_planet"), params_bool["render_planet"]);
 	{
@@ -249,6 +251,7 @@ void PathTracer::f_render() {
 	}
 	glUniform1ui (glGetUniformLocation(compute_program, "render_particles"), params_bool["render_particles"]);
 	{
+		glUniform1f  (glGetUniformLocation(compute_program, "render_particle_radius"), params_float["render_particle_radius"]);
 		glUniform1i(glGetUniformLocation(compute_program, "render_particle_color_mode"), params_bool["render_particle_color_mode"]);
 	}
 

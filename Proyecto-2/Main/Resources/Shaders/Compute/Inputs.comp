@@ -33,7 +33,6 @@ uniform vec3  camera_p_v;
 uniform float earth_tilt;
 uniform float date_time;
 
-uniform float sphere_display_radius;
 
 uniform uint  render_planet;
 uniform uint  render_lighting;
@@ -44,6 +43,7 @@ uniform uint  render_octree_debug;
 uniform int   render_octree_debug_index;
 
 uniform uint  render_particles;
+uniform float render_particle_radius;
 uniform int   render_particle_color_mode;
 
 uniform int   render_planet_texture;

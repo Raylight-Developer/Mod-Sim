@@ -57,6 +57,7 @@ struct Renderer {
 	dvec1 last_time;
 
 	bool  run_sim;
+	bool  lock_settings;
 
 	unordered_map<string, float> params_float;
 	unordered_map<string, bool> params_bool;

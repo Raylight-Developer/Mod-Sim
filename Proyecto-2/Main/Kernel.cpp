@@ -32,8 +32,6 @@ Kernel::Kernel() {
 	POLE_BIAS          = 0;
 	POLE_BIAS_POWER    = 0;
 	POLE_GEOLOCATION   = vec2(0);
-	PARTICLE_AREA      = 0;
-	SMOOTH_RADIUS      = 0;
 	DT                 = 0;
 	RUNFRAME           = 0;
 	SAMPLES            = 0;
@@ -49,14 +47,12 @@ void Kernel::init(const unordered_map<string, float>& params_float, const unorde
 	this->params_bool = params_bool;
 	this->params_int = params_int;
 
-	PARTICLE_RADIUS  = params_float.at("PARTICLE_RADIUS");
+	PARTICLE_RADIUS  = 0.025f;
 	PARTICLE_COUNT   = params_int.at("PARTICLE_COUNT");
 	MAX_OCTREE_DEPTH = params_int.at("MAX_OCTREE_DEPTH");
 	POLE_BIAS        = params_float.at("POLE_BIAS");
 	POLE_BIAS_POWER  = params_float.at("POLE_BIAS_POWER");
 	POLE_GEOLOCATION = vec2(params_float.at("POLE_GEOLOCATION.x"), params_float.at("POLE_GEOLOCATION.y"));
-	PARTICLE_AREA    = 4.0f * glm::pi<vec1>() * PARTICLE_RADIUS * PARTICLE_RADIUS;
-	SMOOTH_RADIUS    = 1.0f * 1.5f;
 	DT               = 0.016f;
 	RUNFRAME         = 0;
 	SAMPLES          = 5;
@@ -67,7 +63,7 @@ void Kernel::init(const unordered_map<string, float>& params_float, const unorde
 }
 
 void Kernel::preInitParticles() {
-	const vec1 radius = 6.371f + 0.05f;
+	const vec1 radius = 6.371f + PARTICLE_RADIUS;
 
 	particles.clear();
 	for (uint i = 0; i < PARTICLE_COUNT; i++) {
@@ -133,15 +129,7 @@ void Kernel::simulate(const dvec1& delta_time) {
 	SDT = DT / u_to_f(SAMPLES);
 }
 
-vec1 Kernel::smoothWeight(const vec1& distance) const {
-	//vec1 value = glm::max(0.0f, radius * radius - distance * distance);
-	//return value * value * value
-	const vec1 value = glm::max(0.0f, SMOOTH_RADIUS - distance);
-	const vec1 volume = glm::pi<vec1>() * pow(SMOOTH_RADIUS, 3.0f) /3.0f;
-	return value;
-}
-
-void Kernel::traceProperties(CPU_Particle* particle) {
+void Kernel::traceProperties(CPU_Particle* particle) const {
 	const vec3 ray_direction = glm::normalize(vec3(0) - particle->position);
 
 	const vec1 a = glm::dot(ray_direction, ray_direction);
@@ -153,7 +141,7 @@ void Kernel::traceProperties(CPU_Particle* particle) {
 	}
 
 	const vec3 intersectionPoint = particle->position + ((-b - sqrt(delta)) / (2.0f * a)) * ray_direction;
-	const vec1 axialTilt = -glm::radians(params_float["EARTH_TILT"]);
+	const vec1 axialTilt = -glm::radians(params_float.at("EARTH_TILT"));
 	const mat3 tiltRotation = mat3(
 		vec3(cos(axialTilt), -sin(axialTilt), 0),
 		vec3(sin(axialTilt), cos(axialTilt), 0),
@@ -165,9 +153,9 @@ void Kernel::traceProperties(CPU_Particle* particle) {
 
 	const vec2 uv = vec2(1.0 - ((phi + PI) / TWO_PI), (theta) / PI);
 
-	const vec1 topography_sample = textures[Texture_Field::TOPOGRAPHY].sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
-	const vec1 sst_sample = textures[Texture_Field::SST].sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
-	const vec1 lst_sample = textures[Texture_Field::LST].sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 topography_sample = textures.at(Texture_Field::TOPOGRAPHY).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 sst_sample = textures.at(Texture_Field::SST).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 lst_sample = textures.at(Texture_Field::LST).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
 
 	const vec1 topography =  lut(Texture_Field::TOPOGRAPHY, topography_sample);
 	const vec1 sst =         lut(Texture_Field::SST, sst_sample);
@@ -181,10 +169,10 @@ void Kernel::traceProperties(CPU_Particle* particle) {
 	}
 }
 
-vec3 Kernel::rotateGeoloc(const vec3& point, const vec2& geoloc) {
+vec3 Kernel::rotateGeoloc(const vec3& point, const vec2& geoloc) const {
 	const vec1 phi = glm::radians(geoloc.x - 90.0f);
 	const vec1 theta = glm::radians(geoloc.y + 90.0f);
-	const vec1 axialTilt = -glm::radians(params_float["EARTH_TILT"]);
+	const vec1 axialTilt = -glm::radians(params_float.at("EARTH_TILT"));
 
 	const quat tiltRotation = glm::angleAxis(axialTilt, glm::vec3(0, 0, 1));
 	const quat latRotation  = glm::angleAxis(phi, glm::vec3(1, 0, 0));
