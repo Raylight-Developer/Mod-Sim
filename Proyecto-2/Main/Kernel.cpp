@@ -70,13 +70,13 @@ void Kernel::initParticles() {
 	const vec1 radius = 6.371f;
 
 	particles.clear();
-	for (uint j = 0; j < PARTICLE_COUNT; j++) {
+	for (uint i = 0; i < PARTICLE_COUNT; i++) {
 		CPU_Particle particle = CPU_Particle();
-		const vec1 normalized_i = j / (vec1)(PARTICLE_COUNT - 1);
+		const vec1 normalized_i = i / (vec1)(PARTICLE_COUNT - 1);
 		const vec1 biased_i = (1.0f - POLE_BIAS) * normalized_i + POLE_BIAS * pow(normalized_i, POLE_BIAS_POWER);
 
 		const vec1 theta = acos(1.0f - 2.0f * biased_i);
-		const vec1 phi = vec1(j) * (glm::pi<vec1>() * (3.0f - sqrt(5.0f)));
+		const vec1 phi = vec1(i) * (glm::pi<vec1>() * (3.0f - sqrt(5.0f)));
 
 		const vec1 x = radius * sin(theta) * cos(phi);
 		const vec1 y = radius * cos(theta);
@@ -163,6 +163,19 @@ vec3 Kernel::rotateGeoloc(const vec3& point, const vec2& geoloc) {
 	return combinedRotation * point;
 }
 
+vec3 Kernel::sunDir() const {
+	const vec2 time = vec2(0, params_float.at("DATE_TIME") * TWO_PI);
+	const vec2 c = cos(time);
+	const vec2 s = sin(time);
+
+	const mat3 rot = mat3(
+		c.y      ,  0.0, -s.y,
+		s.y * s.x,  c.x,  c.y * s.x,
+		s.y * c.x, -s.x,  c.y * c.x
+	);
+	return vec3(-1,0,0) * rot;
+}
+
 vec1 dateToFloat(const int& month, const int& day) {
 	const array<int, 12> daysInMonth = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
@@ -173,7 +186,7 @@ vec1 dateToFloat(const int& month, const int& day) {
 	dayOfYear += day;
 
 	const int totalDaysInYear = 365;
-	vec1 adjustedValue = (355 - dayOfYear + 1) / static_cast<vec1>(totalDaysInYear); // Start in solstice
+	vec1 adjustedValue = (355 - dayOfYear + 1) / static_cast<vec1>(totalDaysInYear); // Start in solstice december 21
 
 	if (adjustedValue < 0) {
 		adjustedValue = 1.0f + adjustedValue;

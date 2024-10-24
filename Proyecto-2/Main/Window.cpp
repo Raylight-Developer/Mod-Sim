@@ -44,9 +44,9 @@ Renderer::Renderer() {
 
 	run_sim = false;
 
-	params_float["TIME_SCALE"]       = 0.1f;
-	params_float["RENDER_SCALE"]     = 0.5f;
-	params_float["PARTICLE_RADIUS"]  = 0.01f;
+	params_float["TIME_SCALE"]       = 1.0f;
+	params_float["RENDER_SCALE"]     = 1.0f;
+	params_float["PARTICLE_RADIUS"]  = 0.015f;
 	params_int["PARTICLE_COUNT"]     = 8192;
 	params_int["MAX_PARTICLES"]      = 4096 * 4;
 	params_int["MAX_OCTREE_DEPTH"]   = 3;
@@ -207,6 +207,11 @@ void Renderer::f_tickUpdate() {
 	if (run_sim) {
 		const dvec1 start = glfwGetTime();
 		const dvec1 delta = delta_time * params_float["TIME_SCALE"];
+		vec1* date_time = &params_float.at("DATE_TIME");
+		*date_time -= d_to_f(delta) * 0.05f;
+		if (*date_time < 0.0f) {
+			*date_time += 1.0f;
+		}
 		kernel.simulate(delta);
 		sim_delta = glfwGetTime() - start;
 	}
@@ -258,16 +263,12 @@ void Renderer::f_guiLoop() {
 	}
 	ImGui::SeparatorText("Play / Pause");
 	if (run_sim) {
-		if (ImGui::Button("Stop")) {
+		if (ImGui::Button("Pause")) {
 			run_sim = false;
-		}
-		if (ImGui::Button("Restart")) {
-			run_sim = false;
-			f_changeSettings();
 		}
 	}
 	else {
-		if (ImGui::Button("Start")) {
+		if (ImGui::Button("Play")) {
 			run_sim = true;
 		}
 		ImGui::SeparatorText("Earth Settings");
@@ -337,12 +338,6 @@ void Renderer::f_frameUpdate() {
 }
 
 void Renderer::f_inputLoop() {
-	//if (inputs[GLFW_MOUSE_BUTTON_RIGHT] or inputs[GLFW_MOUSE_BUTTON_LEFT]) {
-	//	const dvec1 xoffset = (last_mouse.x - current_mouse.x) * delta_time * camera_orbit_sensitivity;
-	//	const dvec1 yoffset = (last_mouse.y - current_mouse.y) * delta_time * camera_orbit_sensitivity;
-	//	camera_transform.orbit(dvec3(0.0), dvec2(yoffset, xoffset));
-	//	last_mouse = current_mouse;
-	//}
 	if (inputs[GLFW_KEY_W]) {
 		camera_transform.orbit(dvec3(0.0), dvec2(-25, 0) * delta_time);
 	}
@@ -378,7 +373,6 @@ void Renderer::f_displayLoop() {
 			f_tickUpdate();
 			rasterizer.f_render();
 		}
-
 
 		f_frameUpdate();
 		f_guiLoop();
