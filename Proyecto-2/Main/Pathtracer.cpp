@@ -8,7 +8,7 @@ PathTracer::PathTracer(Renderer* renderer) :
 	texture_size = 0;
 
 	params_bool["render_planet"] = true;
-	params_bool["render_lighting"] = false;
+	params_bool["render_lighting"] = true;
 	params_bool["render_atmosphere"] = true;
 	params_bool["render_octree"] = false;
 	{
@@ -16,7 +16,7 @@ PathTracer::PathTracer(Renderer* renderer) :
 		params_bool["render_octree_debug"] = false;
 		params_int["render_octree_debug_index"] = 0;
 	}
-	params_bool["render_particles"] = true;
+	params_bool["render_particles"] = false;
 	{
 		params_int["render_particle_color_mode"] = 0;
 	}
@@ -199,7 +199,10 @@ void PathTracer::f_render() {
 	const vec1 focal_length = 0.05f;
 	const vec1 sensor_size  = 0.036f;
 
-	const vec3 projection_center = d_to_f(renderer->camera_transform.position) + focal_length * z_vector;
+	const vec3 earth_pos = vec3(renderer->params_float["EARTH_CENTER.x"], renderer->params_float["EARTH_CENTER.y"], renderer->params_float["EARTH_CENTER.z"]);
+
+	const vec3 camera_pos = d_to_f(renderer->camera_transform.position) + earth_pos;
+	const vec3 projection_center = camera_pos + focal_length * z_vector;
 	const vec3 projection_u = normalize(cross(z_vector, y_vector)) * sensor_size;
 	const vec3 projection_v = normalize(cross(projection_u, z_vector)) * sensor_size;
 
@@ -209,13 +212,13 @@ void PathTracer::f_render() {
 	glUniform1f  (glGetUniformLocation(compute_program, "current_time"), d_to_f(renderer->current_time));
 	glUniform2ui (glGetUniformLocation(compute_program, "resolution"), renderer->render_resolution.x, renderer->render_resolution.y);
 
-	glUniform3fv (glGetUniformLocation(compute_program, "camera_pos"), 1, value_ptr(d_to_f(renderer->camera_transform.position)));
+	glUniform3fv (glGetUniformLocation(compute_program, "camera_pos"), 1, value_ptr(camera_pos));
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_p_uv"),1, value_ptr(projection_center));
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_p_u"), 1, value_ptr(projection_u));
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"), 1, value_ptr(projection_v));
 
 	glUniform1f  (glGetUniformLocation(compute_program, "earth_tilt"), renderer->params_float["EARTH_TILT"]);
-	glUniform3fv (glGetUniformLocation(compute_program, "earth_center"), 1, value_ptr(vec3(renderer->params_float["EARTH_CENTER.x"], renderer->params_float["EARTH_CENTER.y"], renderer->params_float["EARTH_CENTER.z"])));
+	glUniform3fv (glGetUniformLocation(compute_program, "earth_center"), 1, value_ptr(earth_pos));
 
 	glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), renderer->params_float["PARTICLE_RADIUS"]);
 	glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), renderer->params_float["PARTICLE_RADIUS"] * renderer->params_float["PARTICLE_DISPLAY"]);

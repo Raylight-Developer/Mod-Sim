@@ -1,4 +1,4 @@
-float f_mapFloat(float from_min, float from_max, float to_min, float to_max, float value) {
+float f_mapfloat(float from_min, float from_max, float to_min, float to_max, float value) {
 	return (to_min + ((to_max - to_min) / (from_max - from_min)) * (value - from_min));
 }
 
@@ -26,7 +26,7 @@ vec4 blendColors(vec4 bottomLayer, vec4 topLayer) {
 vec3 velocityToColor(vec3 velocity) {
 	vec3 color;
 	float speed = length(velocity);
-	float normalizedSpeed = clamp(f_mapFloat(0.0, 1.0, 0.0, 1.0, speed), 0.0, 1.0);
+	float normalizedSpeed = clamp(f_mapfloat(0.0, 1.0, 0.0, 1.0, speed), 0.0, 1.0);
 
 	if (normalizedSpeed <= 0.5) {
 		float t = normalizedSpeed * 2.0;
@@ -41,7 +41,7 @@ vec3 velocityToColor(vec3 velocity) {
 
 vec3 f_temperatureToColor(float temp) {
 	vec3 color;
-	float t = clamp(f_mapFloat(0.0, 1.0, 1.0, 0.0, temp), 0.0, 1.0);
+	float t = clamp(f_mapfloat(0.0, 1.0, 1.0, 0.0, temp), 0.0, 1.0);
 
 	if (t < 0.25) {
 		// Interpolate from Red to Yellow
@@ -64,9 +64,9 @@ vec3 f_temperatureToColor(float temp) {
 }
 
 vec3 f_particleColor(in Particle particle, in float dist) {
-	float distance_factor = clamp(f_mapFloat(39.0, 32.0, 0.0, 1.0, dist), 0, 1);
+	float distance_factor = clamp(f_mapfloat(39.0, 32.0, 0.0, 1.0, dist), 0, 1);
 	switch (render_particle_color_mode) {
-		case 0: return f_temperatureToColor(f_mapFloat(-25.0, 45.0, 0.0, 1.0, particle.temperature));
+		case 0: return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.temperature));
 	}
 	return vec3(1,0,1);
 }
@@ -76,9 +76,9 @@ vec4 f_earthColor(in vec2 uv) {
 	switch (render_planet_texture) {
 		case 0: return color;
 		case 1: {
-			float mappedValue1 = f_mapFloat(-25.0, 45.0, 0.0, 1.0, -2.0);
-			float mappedValue2 = f_mapFloat(-25.0, 45.0, 0.0, 1.0, 35.0);
-			return vec4(f_temperatureToColor(f_mapFloat(0.0, 1.0, mappedValue1, mappedValue2, color.x)), 1.0);
+			float mappedValue1 = f_mapfloat(-25.0, 45.0, 0.0, 1.0, -2.0);
+			float mappedValue2 = f_mapfloat(-25.0, 45.0, 0.0, 1.0, 35.0);
+			return vec4(f_temperatureToColor(f_mapfloat(0.0, 1.0, mappedValue1, mappedValue2, color.x)), 1.0);
 		}
 		case 2: {
 			return vec4(f_temperatureToColor(color.x), 1.0);

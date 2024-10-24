@@ -8,7 +8,7 @@ uniform uvec2 render_resolution;
 
 uniform sampler2D raw_render_layer;
 
-in vec2 uv_coords;
+in  vec2 uv_coords;
 out vec4 color_out;
 
 void main() {

@@ -28,7 +28,6 @@
 Kernel::Kernel() {
 	PARTICLE_RADIUS    = 0;
 	PARTICLE_COUNT     = 0;
-	LAYER_COUNT        = 0;
 	MAX_OCTREE_DEPTH   = 0;
 	POLE_BIAS          = 0;
 	POLE_BIAS_POWER    = 0;
@@ -52,7 +51,6 @@ void Kernel::init(const unordered_map<string, float>& params_float, const unorde
 
 	PARTICLE_RADIUS  = params_float.at("PARTICLE_RADIUS");
 	PARTICLE_COUNT   = params_int.at("PARTICLE_COUNT");
-	LAYER_COUNT      = params_int.at("LAYER_COUNT");
 	MAX_OCTREE_DEPTH = params_int.at("MAX_OCTREE_DEPTH");
 	POLE_BIAS        = params_float.at("POLE_BIAS");
 	POLE_BIAS_POWER  = params_float.at("POLE_BIAS_POWER");
@@ -70,37 +68,26 @@ void Kernel::init(const unordered_map<string, float>& params_float, const unorde
 
 void Kernel::initParticles() {
 	const vec1 radius = 6.371f;
-	const vec1 atmosphere_thickness = 0.35f;
-	const vec1 layer_distance = atmosphere_thickness / u_to_f(LAYER_COUNT);
 
 	particles.clear();
-	for (uint i = 0; i < LAYER_COUNT; i++) {
-		const vec1 current_layer_radius = radius + u_to_f(i) * layer_distance;
-		for (uint j = 0; j < PARTICLE_COUNT; j++) {
-			CPU_Particle particle = CPU_Particle();
-			const vec1 normalized_i = j / (vec1)(PARTICLE_COUNT - 1);
-			const vec1 biased_i = (1.0f - POLE_BIAS) * normalized_i + POLE_BIAS * pow(normalized_i, POLE_BIAS_POWER);
+	for (uint j = 0; j < PARTICLE_COUNT; j++) {
+		CPU_Particle particle = CPU_Particle();
+		const vec1 normalized_i = j / (vec1)(PARTICLE_COUNT - 1);
+		const vec1 biased_i = (1.0f - POLE_BIAS) * normalized_i + POLE_BIAS * pow(normalized_i, POLE_BIAS_POWER);
 
-			const vec1 theta = acos(1.0f - 2.0f * biased_i);
-			const vec1 phi = vec1(j) * (glm::pi<vec1>() * (3.0f - sqrt(5.0f)));
+		const vec1 theta = acos(1.0f - 2.0f * biased_i);
+		const vec1 phi = vec1(j) * (glm::pi<vec1>() * (3.0f - sqrt(5.0f)));
 
-			const vec1 x = current_layer_radius * sin(theta) * cos(phi);
-			const vec1 y = current_layer_radius * cos(theta);
-			const vec1 z = current_layer_radius * sin(theta) * sin(phi);
+		const vec1 x = radius * sin(theta) * cos(phi);
+		const vec1 y = radius * cos(theta);
+		const vec1 z = radius * sin(theta) * sin(phi);
 
-			particle.position = rotateGeoloc(vec3(x, y, z), POLE_GEOLOCATION);
-			particle.velocity = vec3(0, -1, 0);
+		const vec3 earth_pos = vec3(params_float["EARTH_CENTER.x"], params_float["EARTH_CENTER.y"], params_float["EARTH_CENTER.z"]);
 
-			particle.mass = randF(0.5, 1.0);
-			if (LAYER_COUNT > 1) {
-				particle.temperature = f_map(0.0f, u_to_f(LAYER_COUNT - 1), AMBIENT_TEMP, ATMOSPHERE_TEMP, u_to_f(i));
-			}
-			else {
-				particle.temperature = AMBIENT_TEMP;
-			}
-			traceProperties(&particle);
-			particles.push_back(particle);
-		}
+		particle.position = earth_pos + rotateGeoloc(vec3(x, y, z), POLE_GEOLOCATION);
+
+		traceProperties(&particle);
+		particles.push_back(particle);
 	}
 }
 
@@ -176,4 +163,14 @@ vec3 Kernel::rotateGeoloc(const vec3& point, const vec2& geoloc) {
 	const quat combinedRotation = tiltRotation * lonRotation * latRotation;
 
 	return combinedRotation * point;
+}
+
+vec3 getEarthPosition(const vec1& time, const vec1& radius) {
+	const vec1 theta = glm::two_pi<float>() * (time / 365.0f);
+
+	const vec1 x = radius * glm::cos(theta);
+	const vec1 y = radius * 0.0f;
+	const vec1 z = radius * glm::sin(theta);
+
+	return vec3(x, y, z);
 }

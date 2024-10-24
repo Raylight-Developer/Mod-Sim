@@ -3,13 +3,8 @@
 #include "Shared.hpp"
 
 struct CPU_Particle {
-	vec1 mass;
-	vec1 density;
-	vec1 temperature;
-
 	vec3 position;
-	vec3 velocity;
-	vec3 acceleration;
+	vec1 temperature;
 
 	CPU_Particle();
 };

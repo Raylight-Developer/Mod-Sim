@@ -1,6 +1,8 @@
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 #version 460
+#extension GL_ARB_gpu_shader_fp64 : enable
+
 #include "Compute/Globals.comp"
 #include "Compute/Inputs.comp"
 #include "Compute/Texture.comp"
@@ -21,7 +23,7 @@ void main() {
 	Ray ray = f_cameraRay(uv);
 
 	mat3 rot = rot3xy( vec2( 0.0, 0.0 ) );
-	vec3 sun_dir = normalize(-earth_center);
+	vec3 sun_dir = earth_center == vec3(0.0) ? vec3(0,0,1) : normalize(-earth_center);
 
 	vec4 color = vec4(0,0,0,1);
 	uint octree_view_depth = 0;
@@ -60,6 +62,9 @@ void main() {
 	else if (render_planet == 1) {
 		float earth_dist = MAX_DIST;
 		vec2 earth_uv = vec2(0.5);
+		//if (f_SunIntersection(ray)) {
+		//	color = vec4(1,1,0,1);
+		//}
 		if (f_EarthIntersection(ray, earth_dist, earth_uv)) {
 			if (render_lighting == 1) {
 				vec3 intersection = ray.origin + ray.direction * earth_dist;
@@ -72,6 +77,7 @@ void main() {
 				color = f_earthColor(earth_uv);
 			}
 		}
+		
 	}
 
 	float octree_alpha = 1.0;
@@ -103,15 +109,15 @@ void main() {
 	}
 
 	if (render_lighting == 1 && render_atmosphere == 1) {
-		vec2 e = ray_vs_sphere( ray.origin, ray.direction, ATMOSPHERE_RADIUS );
+		vec2 e = ray_vs_sphere( ray.origin - earth_center, ray.direction, ATMOSPHERE_RADIUS );
 		if ( e.x <= e.y ) {
-			vec2 f = ray_vs_sphere( ray.origin, ray.direction, EARTH_RADIUS );
+			vec2 f = ray_vs_sphere( ray.origin - earth_center, ray.direction, EARTH_RADIUS );
 			e.y = min( e.y, f.x );
-			vec3 I = in_scatter( ray.origin, ray.direction, e, sun_dir );
+			vec3 I = in_scatter( ray.origin - earth_center, ray.direction, e, sun_dir );
 			color.rgb += I;
 		}
 	}
 
-	color = clamp(mix(octree_color, color, octree_alpha), 0.0, 1.0);
+	color = clamp(color, 0.0, 1.0);
 	imageStore(raw_render_layer, pixel_id, color);
 }

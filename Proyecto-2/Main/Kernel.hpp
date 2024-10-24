@@ -15,7 +15,6 @@ struct Kernel {
 	unordered_map<string, int> params_int;
 	vec1  PARTICLE_RADIUS;
 	uint  PARTICLE_COUNT;
-	uint  LAYER_COUNT;
 	uint  MAX_OCTREE_DEPTH;
 	vec1  POLE_BIAS;
 	vec1  POLE_BIAS_POWER;
@@ -47,3 +46,4 @@ struct Kernel {
 	void traceProperties(CPU_Particle* particle);
 	vec3 rotateGeoloc(const vec3& point, const vec2& geoloc);
 };
+vec3 getEarthPosition(const vec1& time, const vec1& radius);

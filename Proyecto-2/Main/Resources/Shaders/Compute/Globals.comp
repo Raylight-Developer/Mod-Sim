@@ -30,18 +30,19 @@ struct Ray {
 // DEFINITIONS ------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 
-#define EARTH_RADIUS 6.371
-#define ATMOSPHERE_RADIUS EARTH_RADIUS + 0.5
-#define EARTH_RADIUS_SQ 40.589641
+const float EARTH_RADIUS = 6.371;
+const float ATMOSPHERE_RADIUS = EARTH_RADIUS + 0.5;
+const float EARTH_RADIUS_SQ = 40.589641;
+const float SUN_RADIUS_SQ = 484889.3956;
 
-#define TWO_PI   6.28318530718
-#define PI       3.14159265359
-#define HALF_PI  1.57079632679
-#define INV_PI   0.31830988618
-#define DEG_RAD  0.01745329252
-#define RAD_DEG  0.01745329252
+const float TWO_PI   = 6.28318530718;
+const float PI       = 3.14159265359;
+const float HALF_PI  = 1.57079632679;
+const float INV_PI   = 0.31830988618;
+const float DEG_RAD  = 0.01745329252;
+const float RAD_DEG  = 0.01745329252;
 
-#define MAX_DIST 1000.0
-#define EPSILON  0.00001
+const float MAX_DIST = 1000.0;
+const float EPSILON  = 0.00001;
 
-#define MAX_UINT 4294967295
+const float MAX_UINT = 4294967295;
