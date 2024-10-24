@@ -49,20 +49,16 @@ Renderer::Renderer() {
 	params_float["PARTICLE_RADIUS"]  = 0.01f;
 	params_int["PARTICLE_COUNT"]     = 8192;
 	params_int["MAX_PARTICLES"]      = 4096 * 4;
-	params_float["PARTICLE_DISPLAY"] = 1.0f;
 	params_int["MAX_OCTREE_DEPTH"]   = 3;
 
 	params_float["POLE_BIAS"] = 0.9f;
 	params_float["POLE_BIAS_POWER"] = 5.0f;
 	params_float["POLE_GEOLOCATION.x"] = 23.1510f;
 	params_float["POLE_GEOLOCATION.y"] = 93.0422f;
-
-	params_float["CALENDAR_TIME"]  = 0.0f;
-	params_float["EARTH_CENTER.x"] = 0.0f;
-	params_float["EARTH_CENTER.y"] = 0.0f;
-	params_float["EARTH_CENTER.z"] = 0.0f;
-	params_float["EARTH_DIST"]     = 0.0f;// 148'800.0f;
 	params_float["EARTH_TILT"]     = 23.5f;
+
+	params_int["CALENDAR_DAY"]  = 22;
+	params_int["CALENDAR_MONTH"] = 12;
 
 	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(params_float["RENDER_SCALE"]));
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
@@ -220,11 +216,6 @@ void Renderer::f_tickUpdate() {
 }
 
 void Renderer::f_changeSettings() {
-	const vec3 earth_pos = getEarthPosition(params_float.at("CALENDAR_TIME"), params_float.at("EARTH_DIST"));
-	params_float["EARTH_CENTER.x"] = earth_pos.x;
-	params_float["EARTH_CENTER.y"] = earth_pos.y;
-	params_float["EARTH_CENTER.z"] = earth_pos.z;
-
 	kernel.init(params_float, params_bool, params_int);
 
 	if (render_mode == Mode::PATHTRACING) {
@@ -279,7 +270,7 @@ void Renderer::f_guiLoop() {
 		if (ImGui::Button("Start")) {
 			run_sim = true;
 		}
-		ImGui::SeparatorText("Init Settings");
+		ImGui::SeparatorText("Earth Settings");
 		if (ImGui::SliderFloat("Latitude", &params_float["POLE_GEOLOCATION.x"], -90.0f, 90.0f), "%.4f") {
 			f_changeSettings();
 		}
@@ -289,28 +280,19 @@ void Renderer::f_guiLoop() {
 		if (ImGui::SliderFloat("Earth Tilt", &params_float["EARTH_TILT"], -180.0f, 180.0f, "%.2f")) {
 			f_changeSettings();
 		}
-		if (ImGui::SliderFloat("Earth Distance", &params_float["EARTH_DIST"], 0.0f, 5.0f, "%.2f")) {
+
+		if (ImGui::SliderInt("Day", &params_int["CALENDAR_DAY"], 0, 31)) {
+			params_float["DATE_TIME"] = dateToFloat(params_int["CALENDAR_MONTH"], params_int["CALENDAR_DAY"]);
 			f_changeSettings();
 		}
-		int day = int(round(params_float["CALENDAR_DAY"] * 365.0f));
-		if (ImGui::SliderInt("Day", &day, 0, 365)) {
-			params_float["CALENDAR_DAY"] = i_to_u(day) / 365.0f;
+		if (ImGui::SliderInt("Month", &params_int["CALENDAR_MONTH"], 0, 12)) {
+			params_float["DATE_TIME"] = dateToFloat(params_int["CALENDAR_MONTH"], params_int["CALENDAR_DAY"]);
 			f_changeSettings();
 		}
 
-		if (ImGui::SliderFloat("Particle Radius", &params_float["PARTICLE_RADIUS"], 0.001f, 1.0f, "%.5f")) {
-			f_changeSettings();
-		}
-
-		if (ImGui::SliderFloat("Display Mult", &params_float["PARTICLE_DISPLAY"], 0.05f, 5.0f, "%.3f")) {
-			f_changeSettings();
-		}
+		ImGui::SeparatorText("Simulation Settings");
 
 		if (ImGui::SliderInt("Particle Count", &params_int["PARTICLE_COUNT"], 128, params_int["MAX_PARTICLES"])) {
-			f_changeSettings();
-		}
-
-		if (ImGui::SliderInt("Max Octree Depth", &params_int["MAX_OCTREE_DEPTH"], 0, 10)) {
 			f_changeSettings();
 		}
 

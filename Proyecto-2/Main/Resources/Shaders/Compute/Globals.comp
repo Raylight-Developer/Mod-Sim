@@ -45,4 +45,4 @@ const float RAD_DEG  = 0.01745329252;
 const float MAX_DIST = 1000.0;
 const float EPSILON  = 0.00001;
 
-const float MAX_UINT = 4294967295;
+const uint MAX_UINT = 4294967295;

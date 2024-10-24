@@ -31,9 +31,8 @@ uniform vec3  camera_p_u;
 uniform vec3  camera_p_v;
 
 uniform float earth_tilt;
-uniform vec3  earth_center;
+uniform float date_time;
 
-uniform float sphere_radius;
 uniform float sphere_display_radius;
 
 uniform uint  render_planet;

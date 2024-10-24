@@ -46,4 +46,4 @@ struct Kernel {
 	void traceProperties(CPU_Particle* particle);
 	vec3 rotateGeoloc(const vec3& point, const vec2& geoloc);
 };
-vec3 getEarthPosition(const vec1& time, const vec1& radius);
+vec1 dateToFloat(const int& month, const int& day);

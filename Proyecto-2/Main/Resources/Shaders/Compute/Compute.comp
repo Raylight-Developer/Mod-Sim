@@ -22,8 +22,8 @@ void main() {
 
 	Ray ray = f_cameraRay(uv);
 
-	mat3 rot = rot3xy( vec2( 0.0, 0.0 ) );
-	vec3 sun_dir = earth_center == vec3(0.0) ? vec3(0,0,1) : normalize(-earth_center);
+	mat3 rot = rot3xy(vec2( 0.0, date_time * TWO_PI ));
+	vec3 sun_dir = vec3(-1,0,0) * rot;
 
 	vec4 color = vec4(0,0,0,1);
 	uint octree_view_depth = 0;
@@ -109,11 +109,11 @@ void main() {
 	}
 
 	if (render_lighting == 1 && render_atmosphere == 1) {
-		vec2 e = ray_vs_sphere( ray.origin - earth_center, ray.direction, ATMOSPHERE_RADIUS );
+		vec2 e = ray_vs_sphere( ray.origin, ray.direction, ATMOSPHERE_RADIUS );
 		if ( e.x <= e.y ) {
-			vec2 f = ray_vs_sphere( ray.origin - earth_center, ray.direction, EARTH_RADIUS );
+			vec2 f = ray_vs_sphere( ray.origin, ray.direction, EARTH_RADIUS );
 			e.y = min( e.y, f.x );
-			vec3 I = in_scatter( ray.origin - earth_center, ray.direction, e, sun_dir );
+			vec3 I = in_scatter( ray.origin, ray.direction, e, sun_dir );
 			color.rgb += I;
 		}
 	}

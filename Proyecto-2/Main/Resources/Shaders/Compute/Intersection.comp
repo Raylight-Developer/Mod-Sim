@@ -63,17 +63,16 @@ vec2 f_AtmosphereIntersection(in Ray ray, in float radius) {
 }
 
 bool f_EarthIntersection(in Ray ray, out float t, out vec2 uv) {
-	vec3 CO = ray.origin - earth_center;
 	float a = dot(ray.direction, ray.direction);
-	float b = 2.0*dot(ray.direction, CO);
-	float c = dot(CO, CO) - EARTH_RADIUS_SQ;
+	float b = 2.0*dot(ray.direction, ray.origin);
+	float c = dot(ray.origin, ray.origin) - EARTH_RADIUS_SQ;
 	float delta = b*b - 4.0*a*c;
 	if(delta < 0.0) {
 		return false;
 	}
 	t = (-b-sqrt(delta)) / (2.0 * a);
 
-	vec3 intersectionPoint = CO + t * ray.direction;
+	vec3 intersectionPoint = ray.origin + t * ray.direction;
 	vec3 normal = normalize(intersectionPoint);
 	
 	float axialTilt = radians(-earth_tilt);

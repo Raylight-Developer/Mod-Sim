@@ -113,6 +113,19 @@ void PathTracer::f_changeSettings() {
 }
 
 void PathTracer::f_guiUpdate() {
+
+	if (! renderer->run_sim) {
+		ImGui::SeparatorText("Pathtracing Settings");
+		if (ImGui::SliderInt("Max Octree Depth", &params_int["MAX_OCTREE_DEPTH"], 0, 10)) {
+			f_changeSettings();
+		}
+	}
+
+	ImGui::SeparatorText("Pathtraced Rendering");
+	if (ImGui::SliderFloat("Particle Radius", &params_float["PARTICLE_RADIUS"], 0.001f, 1.0f, "%.5f")) {
+		f_changeSettings();
+	}
+
 	ImGui::Checkbox("Render Planet", &params_bool["render_planet"]);
 	if (params_bool["render_planet"]) {
 		const char* items_b[] = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature" };
@@ -130,7 +143,7 @@ void PathTracer::f_guiUpdate() {
 			ImGui::SliderInt("Index", &params_int["render_octree_debug_index"], 0, ul_to_i(renderer->kernel.bvh_nodes.size()));
 		}
 	}
-	ImGui::SeparatorText("Particle Settings");
+
 	ImGui::Checkbox("Render Particles", &params_bool["render_particles"]);
 	if (params_bool["render_particles"]) {
 		const char* items_b[] = { "Temperature" };
@@ -190,7 +203,7 @@ void PathTracer::f_resize() {
 
 void PathTracer::f_render() {
 	const GLuint compute_program = data["compute_program"];
-	const GLuint display_program = data["display_program"];	
+	const GLuint display_program = data["display_program"];
 
 	const mat4 matrix = d_to_f(glm::yawPitchRoll(renderer->camera_transform.euler_rotation.y * DEG_RAD, renderer->camera_transform.euler_rotation.x * DEG_RAD, renderer->camera_transform.euler_rotation.z * DEG_RAD));
 	const vec3 y_vector = matrix[1];
@@ -199,9 +212,7 @@ void PathTracer::f_render() {
 	const vec1 focal_length = 0.05f;
 	const vec1 sensor_size  = 0.036f;
 
-	const vec3 earth_pos = vec3(renderer->params_float["EARTH_CENTER.x"], renderer->params_float["EARTH_CENTER.y"], renderer->params_float["EARTH_CENTER.z"]);
-
-	const vec3 camera_pos = d_to_f(renderer->camera_transform.position) + earth_pos;
+	const vec3 camera_pos = d_to_f(renderer->camera_transform.position);
 	const vec3 projection_center = camera_pos + focal_length * z_vector;
 	const vec3 projection_u = normalize(cross(z_vector, y_vector)) * sensor_size;
 	const vec3 projection_v = normalize(cross(projection_u, z_vector)) * sensor_size;
@@ -218,10 +229,9 @@ void PathTracer::f_render() {
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"), 1, value_ptr(projection_v));
 
 	glUniform1f  (glGetUniformLocation(compute_program, "earth_tilt"), renderer->params_float["EARTH_TILT"]);
-	glUniform3fv (glGetUniformLocation(compute_program, "earth_center"), 1, value_ptr(earth_pos));
+	glUniform1f  (glGetUniformLocation(compute_program, "date_time"), renderer->params_float["DATE_TIME"]);
 
-	glUniform1f  (glGetUniformLocation(compute_program, "sphere_radius"), renderer->params_float["PARTICLE_RADIUS"]);
-	glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), renderer->params_float["PARTICLE_RADIUS"] * renderer->params_float["PARTICLE_DISPLAY"]);
+	glUniform1f  (glGetUniformLocation(compute_program, "sphere_display_radius"), renderer->params_float["PARTICLE_RADIUS"]);
 
 	glUniform1ui (glGetUniformLocation(compute_program, "render_planet"), params_bool["render_planet"]);
 	{

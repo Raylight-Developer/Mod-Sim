@@ -82,9 +82,7 @@ void Kernel::initParticles() {
 		const vec1 y = radius * cos(theta);
 		const vec1 z = radius * sin(theta) * sin(phi);
 
-		const vec3 earth_pos = vec3(params_float["EARTH_CENTER.x"], params_float["EARTH_CENTER.y"], params_float["EARTH_CENTER.z"]);
-
-		particle.position = earth_pos + rotateGeoloc(vec3(x, y, z), POLE_GEOLOCATION);
+		particle.position = rotateGeoloc(vec3(x, y, z), POLE_GEOLOCATION);
 
 		traceProperties(&particle);
 		particles.push_back(particle);
@@ -165,12 +163,20 @@ vec3 Kernel::rotateGeoloc(const vec3& point, const vec2& geoloc) {
 	return combinedRotation * point;
 }
 
-vec3 getEarthPosition(const vec1& time, const vec1& radius) {
-	const vec1 theta = glm::two_pi<float>() * (time / 365.0f);
+vec1 dateToFloat(const int& month, const int& day) {
+	const array<int, 12> daysInMonth = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
-	const vec1 x = radius * glm::cos(theta);
-	const vec1 y = radius * 0.0f;
-	const vec1 z = radius * glm::sin(theta);
+	int dayOfYear = 0;
+	for (int i = 0; i < month - 1; ++i) {
+		dayOfYear += daysInMonth[i];
+	}
+	dayOfYear += day;
 
-	return vec3(x, y, z);
+	const int totalDaysInYear = 365;
+	vec1 adjustedValue = (355 - dayOfYear + 1) / static_cast<vec1>(totalDaysInYear); // Start in solstice
+
+	if (adjustedValue < 0) {
+		adjustedValue = 1.0f + adjustedValue;
+	}
+	return adjustedValue;
 }
