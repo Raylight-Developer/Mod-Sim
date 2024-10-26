@@ -6,7 +6,7 @@
 
 int main(int argc, char* argv[]) {
 	Renderer renderer = Renderer();
-	renderer.init();
+	renderer.preInit();
 
 	return 1;
 }

@@ -9,13 +9,9 @@
 Renderer::Renderer() {
 	window = nullptr;
 	kernel = Kernel();
-
-	rasterizer = Rasterizer(this);
 	pathtracer = PathTracer(this);
 
 	camera_transform = Transform(dvec3(0, 0, 37.5), dvec3(0));
-
-	render_mode = Mode::RASTERIZATION;
 
 	runframe = 0;
 
@@ -69,11 +65,13 @@ Renderer::~Renderer() {
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 
+	pathtracer.f_cleanup();
+
 	glfwDestroyWindow(window);
 	glfwTerminate();
 }
 
-void Renderer::init() {
+void Renderer::preInit() {
 	initGlfw();
 	initImGui();
 	//systemInfo();
@@ -186,22 +184,12 @@ void Renderer::systemInfo() {
 }
 
 void Renderer::f_pipeline() {
-	if (render_mode == Mode::PATHTRACING) {
-		render_mode = Mode::RASTERIZATION;
-		pathtracer.f_cleanup();
-		rasterizer.f_initialize();
-	}
-	else if (render_mode == Mode::RASTERIZATION) {
-		render_mode = Mode::PATHTRACING;
-		rasterizer.f_cleanup();
-		pathtracer.f_initialize();
-	}
+	pathtracer.f_initialize();
 	f_changeSettings();
 }
 
 void Renderer::f_recompile() {
 	pathtracer.f_recompile();
-	rasterizer.f_recompile();
 }
 
 void Renderer::f_tickUpdate() {
@@ -222,14 +210,8 @@ void Renderer::f_tickUpdate() {
 }
 
 void Renderer::f_changeSettings() {
-	kernel.init(params_float, params_bool, params_int);
-
-	if (render_mode == Mode::PATHTRACING) {
-		pathtracer.f_changeSettings();
-	}
-	else if (render_mode == Mode::RASTERIZATION) {
-		//rasterizer.f_resize();
-	}
+	kernel.preInit(params_float, params_bool, params_int);
+	pathtracer.f_changeSettings();
 }
 
 void Renderer::f_guiLoop() {
@@ -273,7 +255,7 @@ void Renderer::f_guiLoop() {
 			if (ImGui::Button("Lock n Load Settings")) {
 				lock_settings = true;
 				f_changeSettings();
-				kernel.initParticles();
+				kernel.init();
 			}
 			ImGui::SeparatorText("Earth Settings");
 			if (ImGui::SliderFloat("Latitude", &params_float["POLE_GEOLOCATION.x"], -90.0f, 90.0f, "%.4f")) {
@@ -310,12 +292,7 @@ void Renderer::f_guiLoop() {
 		}
 	}
 
-	if (render_mode == Mode::PATHTRACING) {
-		pathtracer.f_guiUpdate();
-	}
-	else if (render_mode == Mode::RASTERIZATION) {
-		rasterizer.f_guiUpdate();
-	}
+	pathtracer.f_guiUpdate();
 
 	ImGui::End();
 	ImGui::Render();
@@ -367,16 +344,9 @@ void Renderer::f_displayLoop() {
 	while (!glfwWindowShouldClose(window)) {
 
 		f_timings();
-		if (render_mode == Mode::PATHTRACING) {
-			f_inputLoop();
-			f_tickUpdate();
-			pathtracer.f_render();
-		}
-		else if (render_mode == Mode::RASTERIZATION) {
-			f_inputLoop();
-			f_tickUpdate();
-			rasterizer.f_render();
-		}
+		f_inputLoop();
+		f_tickUpdate();
+		pathtracer.f_render();
 
 		f_frameUpdate();
 		f_guiLoop();
@@ -390,12 +360,7 @@ void Renderer::f_resize() {
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
 	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(params_float["RENDER_SCALE"]));
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
-	if (render_mode == Mode::PATHTRACING) {
-		pathtracer.f_resize();
-	}
-	else if (render_mode == Mode::RASTERIZATION) {
-		rasterizer.f_resize();
-	}
+	pathtracer.f_resize();
 }
 
 void Renderer::framebufferSize(GLFWwindow* window, int width, int height) {
@@ -434,9 +399,6 @@ void Renderer::key(GLFWwindow* window, int key, int scancode, int action, int mo
 	}
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, GLFW_TRUE);
-	}
-	if (key == GLFW_KEY_M && action == GLFW_PRESS) {
-		instance->f_pipeline();
 	}
 	if (action == GLFW_PRESS) {
 		instance->inputs[key] = true;

@@ -72,9 +72,14 @@ vec3 f_particleColor(in Particle particle, in float dist) {
 }
 
 vec4 f_earthColor(in vec2 uv) {
-	vec4 color = sampleTextureRgba8u(textures[render_planet_texture], uv);
+	vec4 color;
+	if (render_planet_texture <= 2) {
+		color = sampleTextureRgba8u(textures[render_planet_texture], uv);
+	}
 	switch (render_planet_texture) {
-		case 0: return color;
+		case 0: {
+			return color;
+		}
 		case 1: {
 			float mappedValue1 = f_mapfloat(-25.0, 45.0, 0.0, 1.0, -2.0);
 			float mappedValue2 = f_mapfloat(-25.0, 45.0, 0.0, 1.0, 35.0);
@@ -82,6 +87,12 @@ vec4 f_earthColor(in vec2 uv) {
 		}
 		case 2: {
 			return vec4(f_temperatureToColor(color.x), 1.0);
+		}
+		case 3: {
+			return texture(pressure_map, uv);
+		}
+		case 4: {
+			return texture(wind_map, uv);
 		}
 	}
 	return vec4(1,0,1, 1);

@@ -20,6 +20,9 @@ layout(std430, binding = 4) buffer TextureDataBuffer {
 	uint texture_data[];
 };
 
+uniform sampler2D pressure_map;
+uniform sampler2D wind_map;
+
 uniform uint  frame_count;
 uniform float aspect_ratio;
 uniform float current_time;
@@ -32,7 +35,6 @@ uniform vec3  camera_p_v;
 
 uniform float earth_tilt;
 uniform float date_time;
-
 
 uniform uint  render_planet;
 uniform uint  render_lighting;

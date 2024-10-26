@@ -1,7 +1,7 @@
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 #version 460
-#extension GL_ARB_gpu_shader_fp64 : enable
+//#extension GL_ARB_gpu_shader_fp64 : enable
 
 #include "Compute/Globals.comp"
 #include "Compute/Inputs.comp"
@@ -67,7 +67,6 @@ void main() {
 				vec3 intersection = ray.origin + ray.direction * earth_dist;
 				vec3 normal = normalize(intersection);
 				float diffuse = max(dot(normal, sun_dir), 0.0) * 0.95 + 0.05;
-
 				color = vec4(f_earthColor(earth_uv).xyz * diffuse, 1);
 			}
 			else {
@@ -90,8 +89,8 @@ void main() {
 		else {
 			for (int i = 0; i < bvh_nodes.length(); i++) {
 				Bvh node = bvh_nodes[i];
-				node.p_min += 0.1;
-				node.p_max -= 0.1;
+				node.p_min += 0.05;
+				node.p_max -= 0.05;
 				if (f_rayBvhIntersection(bvh_ray, node)) {
 					octree_view_depth++;
 					if (render_octree_hue == 1) {

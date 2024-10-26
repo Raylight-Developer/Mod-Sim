@@ -10,22 +10,13 @@
 #include "OpenGL.hpp"
 #include "Kernel.hpp"
 
-#include "Rasterizer.hpp"
 #include "PathTracer.hpp"
-
-enum struct Mode {
-	PATHTRACING,
-	RASTERIZATION
-};
 
 struct Renderer {
 	GLFWwindow* window;
 	Kernel kernel;
 
-	Rasterizer rasterizer;
 	PathTracer pathtracer;
-
-	Mode render_mode;
 
 	Transform camera_transform;
 
@@ -66,7 +57,7 @@ struct Renderer {
 	Renderer();
 	~Renderer();
 
-	void init();
+	void preInit();
 
 	void initGlfw();
 	void initImGui();

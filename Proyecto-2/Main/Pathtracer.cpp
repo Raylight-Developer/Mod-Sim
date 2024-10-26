@@ -25,22 +25,22 @@ PathTracer::PathTracer(Renderer* renderer) :
 }
 
 void PathTracer::f_initialize() {
-	data["VAO"] = 0;
-	data["VBO"] = 0;
-	data["EBO"] = 0;
+	gl_data["VAO"] = 0;
+	gl_data["VBO"] = 0;
+	gl_data["EBO"] = 0;
 
-	data["compute_program"] = 0;
-	data["display_program"] = 0;
+	gl_data["compute_program"] = 0;
+	gl_data["display_program"] = 0;
 
-	data["compute_layout.x"] = 0;
-	data["compute_layout.y"] = 0;
+	gl_data["compute_layout.x"] = 0;
+	gl_data["compute_layout.y"] = 0;
 
-	data["raw_render_layer"] = 0;
+	gl_data["raw_render_layer"] = 0;
 
-	data["ssbo 1"] = 0;
-	data["ssbo 2"] = 0;
-	data["ssbo 3"] = 0;
-	data["ssbo 4"] = 0;
+	gl_data["ssbo 1"] = 0;
+	gl_data["ssbo 2"] = 0;
+	gl_data["ssbo 3"] = 0;
+	gl_data["ssbo 4"] = 0;
 
 	glClearColor(0, 0, 0, 0);
 
@@ -56,12 +56,12 @@ void PathTracer::f_initialize() {
 	};
 
 	// Display Quad
-	glCreateVertexArrays(1, &data["VAO"]);
-	glCreateBuffers(1, &data["VBO"]);
-	glCreateBuffers(1, &data["EBO"]);
-	GLuint VAO = data["VAO"];
-	GLuint VBO = data["VBO"];
-	GLuint EBO = data["EBO"];
+	glCreateVertexArrays(1, &gl_data["VAO"]);
+	glCreateBuffers(1, &gl_data["VBO"]);
+	glCreateBuffers(1, &gl_data["EBO"]);
+	GLuint VAO = gl_data["VAO"];
+	GLuint VBO = gl_data["VBO"];
+	GLuint EBO = gl_data["EBO"];
 
 	glNamedBufferData(VBO, sizeof(vertices), vertices, GL_STATIC_DRAW);
 	glNamedBufferData(EBO, sizeof(indices), indices, GL_STATIC_DRAW);
@@ -77,15 +77,15 @@ void PathTracer::f_initialize() {
 	glVertexArrayVertexBuffer(VAO, 0, VBO, 0, 4 * sizeof(GLfloat));
 	glVertexArrayElementBuffer(VAO, EBO);
 
-	glBindVertexArray(data["VAO"]);
+	glBindVertexArray(gl_data["VAO"]);
 
 	f_recompile();
 
-	data["compute_layout.x"] = d_to_u(ceil(u_to_d(renderer->render_resolution.x) / 32.0));
-	data["compute_layout.y"] = d_to_u(ceil(u_to_d(renderer->render_resolution.y) / 32.0));
+	compute_layout.x = d_to_u(ceil(u_to_d(renderer->render_resolution.x) / 32.0));
+	compute_layout.y = d_to_u(ceil(u_to_d(renderer->render_resolution.y) / 32.0));
 
 	// Compute Output
-	data["raw_render_layer"] = renderLayer(renderer->render_resolution);
+	gl_data["raw_render_layer"] = renderLayer(renderer->render_resolution);
 
 	vector<uint> texture_data;
 	vector<string> texture_names = { "Albedo", "Sea Surface Temperature CAF", "Land Surface Temperature CAF" };
@@ -96,8 +96,8 @@ void PathTracer::f_initialize() {
 		texture_data.insert(texture_data.end(), data.begin(), data.end());
 	}
 	texture_size = ul_to_u(texture_data.size());
-	data["ssbo 3"] = ssboBinding(3, ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
-	data["ssbo 4"] = ssboBinding(4, ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
+	gl_data["ssbo 3"] = ssboBinding(ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
+	gl_data["ssbo 4"] = ssboBinding(ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
 }
 
 void PathTracer::f_tickUpdate() {
@@ -106,18 +106,18 @@ void PathTracer::f_tickUpdate() {
 }
 
 void PathTracer::f_changeSettings() {
-	glDeleteBuffers(1, &data["ssbo 1"]);
-	glDeleteBuffers(1, &data["ssbo 2"]);
+	glDeleteBuffers(1, &gl_data["ssbo 1"]);
+	glDeleteBuffers(1, &gl_data["ssbo 2"]);
 
-	data["ssbo 1"] = ssboBinding(1, ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
-	data["ssbo 2"] = ssboBinding(2, ul_to_u(renderer->kernel.bvh_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.bvh_nodes.data());
+	gl_data["ssbo 1"] = ssboBinding(ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
+	gl_data["ssbo 2"] = ssboBinding(ul_to_u(renderer->kernel.bvh_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.bvh_nodes.data());
 }
 
 void PathTracer::f_guiUpdate() {
 	ImGui::SeparatorText("Pathtraced Rendering");
 	ImGui::Checkbox("Render Planet", &params_bool["render_planet"]);
 	if (params_bool["render_planet"]) {
-		const char* items_b[] = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature" };
+		const char* items_b[] = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature", "Pressure Map", "Wind Map" };
 		ImGui::Combo("Planet Texture", &params_int["render_planet_texture"], items_b, IM_ARRAYSIZE(items_b));
 	}
 
@@ -165,33 +165,33 @@ void PathTracer::f_recompile() {
 	{
 		auto confirmation = computeShaderProgram("Compute/Compute");
 		if (confirmation) {
-			glDeleteProgram(data["compute_program"]);
-			data["compute_program"] =  confirmation.data;
+			glDeleteProgram(gl_data["compute_program"]);
+			gl_data["compute_program"] =  confirmation.data;
 		}
 	}
 	{
 		auto confirmation = fragmentShaderProgram("Compute/Display", "Compute/Display");
 		if (confirmation) {
-			glDeleteProgram(data["display_program"]);
-			data["display_program"] = confirmation.data;
+			glDeleteProgram(gl_data["display_program"]);
+			gl_data["display_program"] = confirmation.data;
 		}
 	}
 }
 
 void PathTracer::f_cleanup() {
-	glDeleteVertexArrays(1, &data["VAO"]);
-	glDeleteBuffers(1, &data["VBO"]);
-	glDeleteBuffers(1, &data["EBO"]);
+	glDeleteVertexArrays(1, &gl_data["VAO"]);
+	glDeleteBuffers(1, &gl_data["VBO"]);
+	glDeleteBuffers(1, &gl_data["EBO"]);
 
-	glDeleteProgram(data["compute_program"]);
-	glDeleteProgram(data["display_program"]);
+	glDeleteProgram(gl_data["compute_program"]);
+	glDeleteProgram(gl_data["display_program"]);
 
-	glDeleteBuffers(1, &data["ssbo 1"]);
-	glDeleteBuffers(1, &data["ssbo 2"]);
-	glDeleteBuffers(1, &data["ssbo 3"]);
-	glDeleteBuffers(1, &data["ssbo 4"]);
+	glDeleteBuffers(1, &gl_data["ssbo 1"]);
+	glDeleteBuffers(1, &gl_data["ssbo 2"]);
+	glDeleteBuffers(1, &gl_data["ssbo 3"]);
+	glDeleteBuffers(1, &gl_data["ssbo 4"]);
 
-	glDeleteTextures(1, &data["raw_render_layer"]);
+	glDeleteTextures(1, &gl_data["raw_render_layer"]);
 
 	glBindTextureUnit(0, 0);
 
@@ -199,16 +199,16 @@ void PathTracer::f_cleanup() {
 }
 
 void PathTracer::f_resize() {
-	data["compute_layout.x"] = d_to_u(ceil(u_to_d(renderer->render_resolution.x) / 32.0));
-	data["compute_layout.y"] = d_to_u(ceil(u_to_d(renderer->render_resolution.y) / 32.0));
+	compute_layout.x = d_to_u(ceil(u_to_d(renderer->render_resolution.x) / 32.0));
+	compute_layout.y = d_to_u(ceil(u_to_d(renderer->render_resolution.y) / 32.0));
 
-	glDeleteTextures(1, &data["raw_render_layer"]);
-	data["raw_render_layer"] = renderLayer(renderer->render_resolution);
+	glDeleteTextures(1, &gl_data["raw_render_layer"]);
+	gl_data["raw_render_layer"] = renderLayer(renderer->render_resolution);
 }
 
 void PathTracer::f_render() {
-	const GLuint compute_program = data["compute_program"];
-	const GLuint display_program = data["display_program"];
+	const GLuint compute_program = gl_data["compute_program"];
+	const GLuint display_program = gl_data["display_program"];
 
 	const mat4 matrix = d_to_f(glm::yawPitchRoll(renderer->camera_transform.euler_rotation.y * DEG_RAD, renderer->camera_transform.euler_rotation.x * DEG_RAD, renderer->camera_transform.euler_rotation.z * DEG_RAD));
 	const vec3 y_vector = matrix[1];
@@ -223,6 +223,7 @@ void PathTracer::f_render() {
 	const vec3 projection_v = normalize(cross(projection_u, z_vector)) * sensor_size;
 
 	glUseProgram(compute_program);
+
 	glUniform1ui (glGetUniformLocation(compute_program, "frame_count"), ul_to_u(renderer->runframe));
 	glUniform1f  (glGetUniformLocation(compute_program, "aspect_ratio"), d_to_f(renderer->render_aspect_ratio));
 	glUniform1f  (glGetUniformLocation(compute_program, "current_time"), d_to_f(renderer->current_time));
@@ -235,7 +236,6 @@ void PathTracer::f_render() {
 
 	glUniform1f  (glGetUniformLocation(compute_program, "earth_tilt"), renderer->params_float["EARTH_TILT"]);
 	glUniform1f  (glGetUniformLocation(compute_program, "date_time"), renderer->params_float["DATE_TIME"]);
-
 
 	glUniform1ui (glGetUniformLocation(compute_program, "render_planet"), params_bool["render_planet"]);
 	{
@@ -255,9 +255,15 @@ void PathTracer::f_render() {
 		glUniform1i(glGetUniformLocation(compute_program, "render_particle_color_mode"), params_bool["render_particle_color_mode"]);
 	}
 
-	glBindImageTexture(0, data["raw_render_layer"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+	glBindImageTexture(0, gl_data["raw_render_layer"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gl_data["ssbo 1"]);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, gl_data["ssbo 2"]);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, gl_data["ssbo 3"]);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, gl_data["ssbo 4"]);
+	bindRenderLayer(compute_program, 0, renderer->kernel.gl_data["buf B"], "pressure_map");
+	bindRenderLayer(compute_program, 1, renderer->kernel.gl_data["buf C"], "wind_map");
 
-	glDispatchCompute(data["compute_layout.x"], data["compute_layout.y"], 1);
+	glDispatchCompute(compute_layout.x, compute_layout.y, 1);
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
@@ -267,6 +273,10 @@ void PathTracer::f_render() {
 	glUniform1f  (glGetUniformLocation(display_program, "render_aspect_ratio") , d_to_f(renderer->render_aspect_ratio));
 	glUniform2uiv(glGetUniformLocation(display_program, "display_resolution"), 1, value_ptr(renderer->display_resolution));
 	glUniform2uiv(glGetUniformLocation(display_program, "render_resolution") , 1, value_ptr(renderer->render_resolution));
-	bindRenderLayer(display_program, 0, data["raw_render_layer"], "raw_render_layer");
+	bindRenderLayer(display_program, 0, gl_data["raw_render_layer"], "raw_render_layer");
+	bindRenderLayer(display_program, 1, renderer->kernel.gl_data["buf B"], "bufB");
+	bindRenderLayer(display_program, 2, renderer->kernel.gl_data["buf C"], "bufC");
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+	glUseProgram(0);
 }

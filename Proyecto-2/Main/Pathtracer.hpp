@@ -9,7 +9,8 @@ struct Renderer;
 struct PathTracer {
 	Renderer* renderer;
 
-	unordered_map<string, GLuint> data;
+	unordered_map<string, GLuint> gl_data;
+	uvec2 compute_layout;
 
 	vector<GPU_Texture> textures;
 	uint texture_size;

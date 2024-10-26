@@ -31,10 +31,18 @@ struct Kernel {
 	vector<GPU_Particle> gpu_particles;
 	vector<GPU_Bvh> bvh_nodes;
 
+	vec1  time;
+	uint  frame_count;
+	uvec2 compute_layout;
+	uvec2 compute_resolution;
+	unordered_map<string, GLuint> gl_data;
+
 	Kernel();
 
-	void init(const unordered_map<string, float>& params_float, const unordered_map<string, bool>& params_bool,const unordered_map<string, int>& params_int);
+	void preInit(const unordered_map<string, float>& params_float, const unordered_map<string, bool>& params_bool,const unordered_map<string, int>& params_int);
 	void preInitParticles();
+
+	void init();
 	void initParticles();
 	void initBvh();
 

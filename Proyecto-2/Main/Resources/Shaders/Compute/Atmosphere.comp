@@ -121,8 +121,8 @@ mat3 rot3xy( vec2 angle ) {
 	vec2 s = sin( angle );
 	
 	return mat3(
-		c.y      ,  0.0, -s.y,
-		s.y * s.x,  c.x,  c.y * s.x,
-		s.y * c.x, -s.x,  c.y * c.x
+		c.y, 0.0, -s.y,
+		s.y * s.x, c.x, c.y * s.x,
+		s.y * c.x,-s.x, c.y * c.x
 	);
 }

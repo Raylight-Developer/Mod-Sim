@@ -56,9 +56,6 @@
     <ClCompile Include="Pathtracer.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Rasterizer.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Shared\Include\Glm.hpp">
@@ -107,9 +104,6 @@
       <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="Pathtracer.hpp">
-      <Filter>Include</Filter>
-    </ClInclude>
-    <ClInclude Include="Rasterizer.hpp">
       <Filter>Include</Filter>
     </ClInclude>
   </ItemGroup>

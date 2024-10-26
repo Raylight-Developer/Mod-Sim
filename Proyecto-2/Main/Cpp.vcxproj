@@ -97,7 +97,6 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Particle.cpp" />
     <ClCompile Include="Pathtracer.cpp" />
-    <ClCompile Include="Rasterizer.cpp" />
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -116,7 +115,6 @@
     <ClInclude Include="Lut.hpp" />
     <ClInclude Include="Particle.hpp" />
     <ClInclude Include="Pathtracer.hpp" />
-    <ClInclude Include="Rasterizer.hpp" />
     <ClInclude Include="Window.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

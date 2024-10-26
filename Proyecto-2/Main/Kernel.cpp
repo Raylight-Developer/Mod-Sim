@@ -36,13 +36,17 @@ Kernel::Kernel() {
 	RUNFRAME           = 0;
 	SAMPLES            = 0;
 	SDT                = 0;
+	time               = 0;
+	frame_count        = 0;
+	compute_layout     = uvec2(0);
+	compute_resolution = uvec2(0);
 
 	textures[Texture_Field::TOPOGRAPHY] = Texture::fromFile("./Resources/Nasa Earth Data/Topography.png", Texture_Format::MONO_FLOAT);
 	textures[Texture_Field::SST] = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature CAF.png", Texture_Format::MONO_FLOAT);
 	textures[Texture_Field::LST] = Texture::fromFile("./Resources/Nasa Earth Data/Land Surface Temperature CAF.png", Texture_Format::MONO_FLOAT);
 }
 
-void Kernel::init(const unordered_map<string, float>& params_float, const unordered_map<string, bool>& params_bool,const unordered_map<string, int>& params_int) {
+void Kernel::preInit(const unordered_map<string, float>& params_float, const unordered_map<string, bool>& params_bool,const unordered_map<string, int>& params_int) {
 	this->params_float = params_float;
 	this->params_bool = params_bool;
 	this->params_int = params_int;
@@ -83,6 +87,48 @@ void Kernel::preInitParticles() {
 		traceProperties(&particle);
 		particles.push_back(particle);
 	}
+}
+
+void Kernel::init() {
+	//initParticles();
+	time = 0.0f;
+	frame_count = 0;
+	compute_resolution = uvec2(1920, 1080);
+
+	compute_layout.x = d_to_u(ceil(u_to_d(compute_resolution.x) / 32.0));
+	compute_layout.y = d_to_u(ceil(u_to_d(compute_resolution.y) / 32.0));
+
+	glDeleteTextures(1, &gl_data["buf B"]);
+	glDeleteTextures(1, &gl_data["buf C"]);
+	gl_data["buf B"] = renderLayer(compute_resolution);
+	gl_data["buf C"] = renderLayer(compute_resolution);
+
+	{
+		auto confirmation = computeShaderProgram("Simulation/Pressure");
+		if (confirmation) {
+			glDeleteProgram(gl_data["prog B"]);
+			gl_data["prog B"] =  confirmation.data;
+		}
+	}
+	{
+		auto confirmation = computeShaderProgram("Simulation/Wind");
+		if (confirmation) {
+			glDeleteProgram(gl_data["prog C"]);
+			gl_data["prog C"] =  confirmation.data;
+		}
+	}
+
+	vector<uint> texture_data;
+	vector<GPU_Texture> textures;
+	vector<string> texture_names = { "Topography" };
+	for (const string& tex : texture_names) {
+		Texture texture = Texture::fromFile("./Resources/Nasa Earth Data/" + tex + ".png", Texture_Format::RGBA_8);
+		textures.push_back(GPU_Texture(ul_to_u(texture_data.size()), texture.resolution.x, texture.resolution.y, 0));
+		auto data = texture.toRgba8Texture();
+		texture_data.insert(texture_data.end(), data.begin(), data.end());
+	}
+	gl_data["ssbo 2"] = ssboBinding(ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
+	gl_data["ssbo 3"] = ssboBinding(ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
 }
 
 void Kernel::initParticles() {
@@ -127,6 +173,37 @@ void Kernel::initBvh() {
 void Kernel::simulate(const dvec1& delta_time) {
 	DT = d_to_f(delta_time);
 	SDT = DT / u_to_f(SAMPLES);
+
+	time += DT;
+
+	const GLuint prog_B = gl_data["prog B"];
+	const GLuint prog_C = gl_data["prog C"];
+
+	glUseProgram(prog_B);
+	glUniform1f (glGetUniformLocation(prog_B, "iTime"), time);
+	glUniform1ui(glGetUniformLocation(prog_B, "iFrame"), frame_count);
+	glUniform2ui(glGetUniformLocation(prog_B, "iResolution"), compute_resolution.x, compute_resolution.y);
+
+	glBindImageTexture(0, gl_data["buf B"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gl_data["ssbo 2"]);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, gl_data["ssbo 3"]);
+
+	glDispatchCompute(compute_layout.x, compute_layout.y, 1);
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+	glUseProgram(prog_C);
+	glUniform1f (glGetUniformLocation(prog_C, "iTime"), time);
+	glUniform1ui(glGetUniformLocation(prog_C, "iFrame"), frame_count);
+	glUniform2ui(glGetUniformLocation(prog_C, "iResolution"), compute_resolution.x, compute_resolution.y);
+
+	glBindImageTexture(0, gl_data["buf B"], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
+	glBindImageTexture(1, gl_data["buf C"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+
+	glDispatchCompute(compute_layout.x, compute_layout.y, 1);
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+	glUseProgram(0);
+	frame_count++;
 }
 
 void Kernel::traceProperties(CPU_Particle* particle) const {

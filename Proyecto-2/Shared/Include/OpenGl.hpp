@@ -47,11 +47,10 @@ bool checkProgramLinking(const GLuint& program);
 void printShaderErrorWithContext(const string& shaderSource, const string& errorLog);
 
 template <typename T>
-GLuint ssboBinding(const GLuint& binding, const GLuint& size, const T& data) {
+GLuint ssboBinding(const GLuint& size, const T& data) {
 	GLuint buffer;
 	glGenBuffers(1, &buffer);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, size, data, GL_STATIC_DRAW);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, buffer);
 	return buffer;
 }
