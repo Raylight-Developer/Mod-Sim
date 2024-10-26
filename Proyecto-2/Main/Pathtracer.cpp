@@ -8,7 +8,7 @@ PathTracer::PathTracer(Renderer* renderer) :
 	texture_size = 0;
 
 	params_bool["render_planet"]     = true;
-	params_bool["render_lighting"]   = true;
+	params_bool["render_lighting"]   = false;
 	params_bool["render_atmosphere"] = true;
 	params_bool["render_octree"]     = false;
 	{
@@ -117,7 +117,7 @@ void PathTracer::f_guiUpdate() {
 	ImGui::SeparatorText("Pathtraced Rendering");
 	ImGui::Checkbox("Render Planet", &params_bool["render_planet"]);
 	if (params_bool["render_planet"]) {
-		const char* items_b[] = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature", "Pressure Map", "Wind Map" };
+		const char* items_b[] = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature", "Pressure Map 1", "Pressure Map 2", "Pressure Map 3", "Pressure Map 4", "Wind Map" };
 		ImGui::Combo("Planet Texture", &params_int["render_planet_texture"], items_b, IM_ARRAYSIZE(items_b));
 	}
 
@@ -260,8 +260,11 @@ void PathTracer::f_render() {
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, gl_data["ssbo 2"]);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, gl_data["ssbo 3"]);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, gl_data["ssbo 4"]);
-	bindRenderLayer(compute_program, 0, renderer->kernel.gl_data["buf B"], "pressure_map");
-	bindRenderLayer(compute_program, 1, renderer->kernel.gl_data["buf C"], "wind_map");
+	bindRenderLayer(compute_program, 0, renderer->kernel.gl_data["pass1"], "pass_1");
+	bindRenderLayer(compute_program, 1, renderer->kernel.gl_data["pass2"], "pass_2");
+	bindRenderLayer(compute_program, 2, renderer->kernel.gl_data["pass3"], "pass_3");
+	bindRenderLayer(compute_program, 3, renderer->kernel.gl_data["pass4"], "pass_4");
+	bindRenderLayer(compute_program, 4, renderer->kernel.gl_data["passW"], "pass_W");
 
 	glDispatchCompute(compute_layout.x, compute_layout.y, 1);
 
@@ -274,8 +277,11 @@ void PathTracer::f_render() {
 	glUniform2uiv(glGetUniformLocation(display_program, "display_resolution"), 1, value_ptr(renderer->display_resolution));
 	glUniform2uiv(glGetUniformLocation(display_program, "render_resolution") , 1, value_ptr(renderer->render_resolution));
 	bindRenderLayer(display_program, 0, gl_data["raw_render_layer"], "raw_render_layer");
-	bindRenderLayer(display_program, 1, renderer->kernel.gl_data["buf B"], "bufB");
-	bindRenderLayer(display_program, 2, renderer->kernel.gl_data["buf C"], "bufC");
+	bindRenderLayer(display_program, 1, renderer->kernel.gl_data["pass1"], "pass_1");
+	bindRenderLayer(display_program, 2, renderer->kernel.gl_data["pass2"], "pass_2");
+	bindRenderLayer(display_program, 3, renderer->kernel.gl_data["pass3"], "pass_3");
+	bindRenderLayer(display_program, 4, renderer->kernel.gl_data["pass4"], "pass_4");
+	bindRenderLayer(display_program, 5, renderer->kernel.gl_data["passW"], "pass_W");
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
 	glUseProgram(0);

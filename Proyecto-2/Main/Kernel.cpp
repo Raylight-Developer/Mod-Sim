@@ -98,23 +98,52 @@ void Kernel::init() {
 	compute_layout.x = d_to_u(ceil(u_to_d(compute_resolution.x) / 32.0));
 	compute_layout.y = d_to_u(ceil(u_to_d(compute_resolution.y) / 32.0));
 
-	glDeleteTextures(1, &gl_data["buf B"]);
-	glDeleteTextures(1, &gl_data["buf C"]);
-	gl_data["buf B"] = renderLayer(compute_resolution);
-	gl_data["buf C"] = renderLayer(compute_resolution);
+	glDeleteTextures(1, &gl_data["pass1"]);
+	glDeleteTextures(1, &gl_data["pass2"]);
+	glDeleteTextures(1, &gl_data["pass3"]);
+	glDeleteTextures(1, &gl_data["pass4"]);
+	glDeleteTextures(1, &gl_data["passW"]);
+	glDeleteTextures(1, &gl_data["lastPassW"]);
+	gl_data["pass1"] = renderLayer(compute_resolution);
+	gl_data["pass2"] = renderLayer(compute_resolution);
+	gl_data["pass3"] = renderLayer(compute_resolution);
+	gl_data["pass4"] = renderLayer(compute_resolution);
+	gl_data["passW"] = renderLayer(compute_resolution);
+	gl_data["lastPassW"] = renderLayer(compute_resolution);
 
 	{
-		auto confirmation = computeShaderProgram("Simulation/Pressure");
+		auto confirmation = computeShaderProgram("Simulation/Pressure Pass1");
 		if (confirmation) {
-			glDeleteProgram(gl_data["prog B"]);
-			gl_data["prog B"] =  confirmation.data;
+			glDeleteProgram(gl_data["prog 1"]);
+			gl_data["prog 1"] =  confirmation.data;
+		}
+	}
+	{
+		auto confirmation = computeShaderProgram("Simulation/Pressure Pass2");
+		if (confirmation) {
+			glDeleteProgram(gl_data["prog 2"]);
+			gl_data["prog 2"] =  confirmation.data;
+		}
+	}
+	{
+		auto confirmation = computeShaderProgram("Simulation/Pressure Pass3");
+		if (confirmation) {
+			glDeleteProgram(gl_data["prog 3"]);
+			gl_data["prog 3"] =  confirmation.data;
+		}
+	}
+	{
+		auto confirmation = computeShaderProgram("Simulation/Pressure Pass4");
+		if (confirmation) {
+			glDeleteProgram(gl_data["prog 4"]);
+			gl_data["prog 4"] =  confirmation.data;
 		}
 	}
 	{
 		auto confirmation = computeShaderProgram("Simulation/Wind");
 		if (confirmation) {
-			glDeleteProgram(gl_data["prog C"]);
-			gl_data["prog C"] =  confirmation.data;
+			glDeleteProgram(gl_data["prog W"]);
+			gl_data["prog W"] =  confirmation.data;
 		}
 	}
 
@@ -127,8 +156,8 @@ void Kernel::init() {
 		auto data = texture.toRgba8Texture();
 		texture_data.insert(texture_data.end(), data.begin(), data.end());
 	}
-	gl_data["ssbo 2"] = ssboBinding(ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
-	gl_data["ssbo 3"] = ssboBinding(ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
+	gl_data["ssbo 1"] = ssboBinding(ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
+	gl_data["ssbo 2"] = ssboBinding(ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
 }
 
 void Kernel::initParticles() {
@@ -176,34 +205,118 @@ void Kernel::simulate(const dvec1& delta_time) {
 
 	time += DT;
 
-	const GLuint prog_B = gl_data["prog B"];
-	const GLuint prog_C = gl_data["prog C"];
+	const GLuint prog_1 = gl_data["prog 1"];
+	const GLuint prog_2 = gl_data["prog 2"];
+	const GLuint prog_3 = gl_data["prog 3"];
+	const GLuint prog_4 = gl_data["prog 4"];
+	const GLuint prog_W = gl_data["prog W"];
 
-	glUseProgram(prog_B);
-	glUniform1f (glGetUniformLocation(prog_B, "iTime"), time);
-	glUniform1ui(glGetUniformLocation(prog_B, "iFrame"), frame_count);
-	glUniform2ui(glGetUniformLocation(prog_B, "iResolution"), compute_resolution.x, compute_resolution.y);
+	{
+		glUseProgram(prog_1);
+		glUniform1f(glGetUniformLocation(prog_1, "iTime"), time);
+		glUniform1ui(glGetUniformLocation(prog_1, "iFrame"), frame_count);
+		glUniform2ui(glGetUniformLocation(prog_1, "iResolution"), compute_resolution.x, compute_resolution.y);
 
-	glBindImageTexture(0, gl_data["buf B"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gl_data["ssbo 2"]);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, gl_data["ssbo 3"]);
+		glBindImageTexture(0, gl_data["pass1"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gl_data["ssbo 1"]);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, gl_data["ssbo 2"]);
 
-	glDispatchCompute(compute_layout.x, compute_layout.y, 1);
-	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+		glDispatchCompute(compute_layout.x, compute_layout.y, 1);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+	}
+	{
+		glUseProgram(prog_2);
+		glUniform1f(glGetUniformLocation(prog_2, "iTime"), time);
+		glUniform1ui(glGetUniformLocation(prog_2, "iFrame"), frame_count);
+		glUniform2ui(glGetUniformLocation(prog_2, "iResolution"), compute_resolution.x, compute_resolution.y);
 
-	glUseProgram(prog_C);
-	glUniform1f (glGetUniformLocation(prog_C, "iTime"), time);
-	glUniform1ui(glGetUniformLocation(prog_C, "iFrame"), frame_count);
-	glUniform2ui(glGetUniformLocation(prog_C, "iResolution"), compute_resolution.x, compute_resolution.y);
+		glBindImageTexture(0, gl_data["pass1"], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
+		glBindImageTexture(1, gl_data["pass2"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
-	glBindImageTexture(0, gl_data["buf B"], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
-	glBindImageTexture(1, gl_data["buf C"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+		glDispatchCompute(compute_layout.x, compute_layout.y, 1);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+	}
+	{
+		glUseProgram(prog_3);
+		glUniform1f(glGetUniformLocation(prog_3, "iTime"), time);
+		glUniform1ui(glGetUniformLocation(prog_3, "iFrame"), frame_count);
+		glUniform2ui(glGetUniformLocation(prog_3, "iResolution"), compute_resolution.x, compute_resolution.y);
 
-	glDispatchCompute(compute_layout.x, compute_layout.y, 1);
-	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+		glBindImageTexture(0, gl_data["pass2"], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
+		glBindImageTexture(1, gl_data["pass3"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
+		glDispatchCompute(compute_layout.x, compute_layout.y, 1);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+	}
+	{
+		glUseProgram(prog_4);
+		glUniform1f(glGetUniformLocation(prog_4, "iTime"), time);
+		glUniform1ui(glGetUniformLocation(prog_4, "iFrame"), frame_count);
+		glUniform2ui(glGetUniformLocation(prog_4, "iResolution"), compute_resolution.x, compute_resolution.y);
+
+		glBindImageTexture(0, gl_data["pass3"], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
+		glBindImageTexture(1, gl_data["pass4"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+
+		glDispatchCompute(compute_layout.x, compute_layout.y, 1);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+	}
+
+	{
+		glUseProgram(prog_W);
+		glUniform1f(glGetUniformLocation(prog_W, "iTime"), time);
+		glUniform1ui(glGetUniformLocation(prog_W, "iFrame"), frame_count);
+		glUniform2ui(glGetUniformLocation(prog_W, "iResolution"), compute_resolution.x, compute_resolution.y);
+
+		glBindImageTexture(0, gl_data["pass4"], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
+		glBindImageTexture(1, gl_data["passW"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+		glBindImageTexture(2, gl_data["lastPassW"], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
+
+		glDispatchCompute(compute_layout.x, compute_layout.y, 1);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+	}
 	glUseProgram(0);
+
+	copyRenderLayer(gl_data["passW"], gl_data["lastPassW"], compute_resolution);
+
 	frame_count++;
+}
+
+void Kernel::f_recompile() {
+	{
+		auto confirmation = computeShaderProgram("Simulation/Pressure Pass1");
+		if (confirmation) {
+			glDeleteProgram(gl_data["prog 1"]);
+			gl_data["prog 1"] =  confirmation.data;
+		}
+	}
+	{
+		auto confirmation = computeShaderProgram("Simulation/Pressure Pass2");
+		if (confirmation) {
+			glDeleteProgram(gl_data["prog 2"]);
+			gl_data["prog 2"] =  confirmation.data;
+		}
+	}
+	{
+		auto confirmation = computeShaderProgram("Simulation/Pressure Pass3");
+		if (confirmation) {
+			glDeleteProgram(gl_data["prog 3"]);
+			gl_data["prog 3"] =  confirmation.data;
+		}
+	}
+	{
+		auto confirmation = computeShaderProgram("Simulation/Pressure Pass4");
+		if (confirmation) {
+			glDeleteProgram(gl_data["prog 4"]);
+			gl_data["prog 4"] =  confirmation.data;
+		}
+	}
+	{
+		auto confirmation = computeShaderProgram("Simulation/Wind");
+		if (confirmation) {
+			glDeleteProgram(gl_data["prog W"]);
+			gl_data["prog W"] =  confirmation.data;
+		}
+	}
 }
 
 void Kernel::traceProperties(CPU_Particle* particle) const {

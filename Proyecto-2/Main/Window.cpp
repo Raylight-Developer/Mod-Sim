@@ -185,11 +185,15 @@ void Renderer::systemInfo() {
 
 void Renderer::f_pipeline() {
 	pathtracer.f_initialize();
+	kernel.init();
+	kernel.simulate(0.01);
 	f_changeSettings();
 }
 
 void Renderer::f_recompile() {
 	pathtracer.f_recompile();
+	kernel.f_recompile();
+	kernel.simulate(0.01);
 }
 
 void Renderer::f_tickUpdate() {

@@ -196,6 +196,17 @@ void bindRenderLayer(const GLuint& program_id, const GLuint& unit, const GLuint&
 	glBindTextureUnit(unit, id);
 }
 
+void copyRenderLayer(const GLuint& source, const GLuint& target, const uvec2& resolution) {
+	GLuint fbo;
+	glGenFramebuffers(1, &fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, source, 0);
+	glBindTexture(GL_TEXTURE_2D, target);
+	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, resolution.x, resolution.y);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glDeleteFramebuffers(1, &fbo);
+}
+
 bool checkShaderCompilation(const GLuint& shader, const string& shader_code) {
 	GLint success;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &success);

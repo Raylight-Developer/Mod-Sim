@@ -1,0 +1,31 @@
+#version 460
+
+#include "Simulation/Utils.comp"
+
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+layout(rgba8, binding = 0) readonly  uniform image2D pass_1;
+layout(rgba8, binding = 1) writeonly uniform image2D pass_2;
+
+uniform float iTime;
+uniform uint  iFrame;
+uniform uvec2 iResolution;
+
+#define buf(uv) imageLoad(pass_1, ivec2(uv * iResolution))
+
+vec4 pass2(vec2 uv) {
+	vec4 r = vec4(0);
+	for (float i = -20.; i <= 20.; i++) {
+		r += buf(uv + i*N/iResolution.xy) * normpdf(i);
+	}
+	return r;
+}
+
+void main() {
+	ivec2 pixel_id = ivec2(gl_GlobalInvocationID.xy);
+	vec2 uv = vec2(pixel_id) / vec2(iResolution);
+	vec4 fragColor;
+
+	fragColor = pass2(uv);
+	imageStore(pass_2, pixel_id, fragColor);
+}

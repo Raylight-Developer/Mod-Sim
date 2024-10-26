@@ -41,6 +41,7 @@ Confirm<GLuint> fragmentShaderProgram(const string& vert_file_path, const string
 Confirm<GLuint> computeShaderProgram(const string& file_path);
 GLuint renderLayer(const uvec2& resolution);
 void   bindRenderLayer(const GLuint& program_id, const GLuint& unit, const GLuint& id, const string& name);
+void   copyRenderLayer(const GLuint& source, const GLuint& target, const uvec2& resolution);
 
 bool checkShaderCompilation(const GLuint& shader, const string& shader_code);
 bool checkProgramLinking(const GLuint& program);
