@@ -26,9 +26,11 @@ Renderer::Renderer() {
 	display_resolution = uvec2(3840U, 2160U);
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
 
-	camera_zoom_sensitivity = 2.0;
-	camera_orbit_sensitivity = 5.0;
+	camera_zoom_sensitivity = 7.5;
+	camera_orbit_sensitivity = 20.0;
+	input_lerp = 15.0;
 	inputs = vector(6, false);
+	input_lerps = vector(6, dvec3(0.0));
 
 	sim_time_aggregate = 0.0;
 
@@ -239,6 +241,8 @@ void Renderer::f_guiLoop() {
 
 		ImGui::Text(("Fps: " + to_str(frame_count, 0)).c_str());
 	}
+	ImGui::Text(("Zoom: " + to_str(camera_zoom_sensitivity, 1)).c_str());
+	ImGui::Text(("Orbit: " + to_str(camera_orbit_sensitivity, 1)).c_str());
 	ImGui::SeparatorText("Play / Pause");
 	if (run_sim) {
 		if (ImGui::Button("Pause")) {
@@ -319,23 +323,34 @@ void Renderer::f_frameUpdate() {
 }
 
 void Renderer::f_inputLoop() {
-	if (inputs[0]) {
-		camera_transform.orbit(dvec3(0.0), dvec2(-25, 0) * delta_time);
-	}
-	if (inputs[1]) {
-		camera_transform.orbit(dvec3(0.0), dvec2(0, -25) * delta_time);
-	}
-	if (inputs[2]) {
-		camera_transform.orbit(dvec3(0.0), dvec2(25, 0) * delta_time);
-	}
-	if (inputs[3]) {
-		camera_transform.orbit(dvec3(0.0), dvec2(0, 25) * delta_time);
-	}
-	if (inputs[4]) {
-		camera_transform.moveLocal(dvec3(0.0, 0.0, -15.0) * camera_zoom_sensitivity * delta_time);
-	}
-	if (inputs[5]) {
-		camera_transform.moveLocal(dvec3(0.0, 0.0, 15.0) * camera_zoom_sensitivity * delta_time);
+	for (uint i = 0; i < 6; i++) {
+		dvec3* input = &input_lerps[i];
+		if (input->y < 1.0) {
+			input->y += delta_time / input_lerp;
+			if (input->y > 1.0)
+				input->y = 1.0;
+			//const dvec1 progress = easeInOut(input->y);
+			input->x = lerp(input->x, input->z, input->y);
+			//input->x = input->z == 1.0 ? progress : (1.0 - progress);
+		}
+		if (i == 0) {
+			camera_transform.orbit(dvec3(0), dvec2(-1, 0) * input->x * camera_orbit_sensitivity * delta_time);
+		}
+		if (i == 1) {
+			camera_transform.orbit(dvec3(0), dvec2(0, -1) * input->x * camera_orbit_sensitivity * delta_time);
+		}
+		if (i == 2) {
+			camera_transform.orbit(dvec3(0), dvec2(1, 0) * input->x * camera_orbit_sensitivity * delta_time);
+		}
+		if (i == 3) {
+			camera_transform.orbit(dvec3(0), dvec2(0, 1) * input->x * camera_orbit_sensitivity * delta_time);
+		}
+		if (i == 4) {
+			camera_transform.moveLocal(dvec3(0, 0, -1) * input->x * camera_zoom_sensitivity * delta_time);
+		}
+		if (i == 5) {
+			camera_transform.moveLocal(dvec3(0, 0, 1) * input->x * camera_zoom_sensitivity * delta_time);
+		}
 	}
 }
 
@@ -398,32 +413,34 @@ void Renderer::key(GLFWwindow* window, int key, int scancode, int action, int mo
 	//if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
 	//	glfwSetWindowShouldClose(window, GLFW_TRUE);
 	//}
-	if (action == GLFW_PRESS) {
-		if (key == GLFW_KEY_W)
-			instance->inputs[0] = true;
-		if (key == GLFW_KEY_A)
-			instance->inputs[1] = true;
-		if (key == GLFW_KEY_S)
-			instance->inputs[2] = true;
-		if (key == GLFW_KEY_D)
-			instance->inputs[3] = true;
-		if (key == GLFW_KEY_UP)
-			instance->inputs[4] = true;
-		if (key == GLFW_KEY_DOWN)
-			instance->inputs[5] = true;
+	if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) {
+		instance->camera_orbit_sensitivity /= 0.9;
+		instance->camera_zoom_sensitivity /= 0.9;
 	}
-	else if (action == GLFW_RELEASE) {
-		if (key == GLFW_KEY_W)
-			instance->inputs[0] = false;
-		if (key == GLFW_KEY_A)
-			instance->inputs[1] = false;
-		if (key == GLFW_KEY_S)
-			instance->inputs[2] = false;
-		if (key == GLFW_KEY_D)
-			instance->inputs[3] = false;
-		if (key == GLFW_KEY_UP)
-			instance->inputs[4] = false;
-		if (key == GLFW_KEY_DOWN)
-			instance->inputs[5] = false;
+	if (key == GLFW_KEY_LEFT && action == GLFW_PRESS) {
+		instance->camera_orbit_sensitivity *= 0.9;
+		instance->camera_zoom_sensitivity *= 0.9;
+	}
+	uint64 rkey = 6;
+	switch (key) {
+		case GLFW_KEY_W: rkey = 0; break;
+		case GLFW_KEY_A: rkey = 1; break;
+		case GLFW_KEY_S: rkey = 2; break;
+		case GLFW_KEY_D: rkey = 3; break;
+		case GLFW_KEY_UP: rkey = 4; break;
+		case GLFW_KEY_DOWN: rkey = 5; break;
+	}
+
+	if (rkey != 6) {
+		if (action == GLFW_PRESS && !instance->inputs[rkey]) { // Key was just pressed
+			instance->inputs[rkey] = true;
+			instance->input_lerps[rkey].y = 0.0; // Progress
+			instance->input_lerps[rkey].z = 1.0; // Target
+		}
+		else if (action == GLFW_RELEASE && instance->inputs[rkey]) { // Key was just released
+			instance->inputs[rkey] = false;
+			instance->input_lerps[rkey].y = 0.0; // Progress
+			instance->input_lerps[rkey].z = 0.0; // Target
+		}
 	}
 }

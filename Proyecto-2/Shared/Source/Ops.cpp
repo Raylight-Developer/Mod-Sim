@@ -273,6 +273,10 @@ bool insideAABB(const vec3& point, vec3& p_min, const vec3& p_max) {
 		(point.z >= p_min.z && point.z <= p_max.z);
 }
 
+dvec1 easeInOut(const dvec1& t) {
+	return t < 0.5f ? 4.0 * t * t * t : 1 - pow(-2.0 * t + 2.0, 3.0) / 2.0;
+}
+
 uvec3 u_to_u3(const uint& index, const uvec3& size) {
 	uvec3 res;
 	res.z = index % size.z;

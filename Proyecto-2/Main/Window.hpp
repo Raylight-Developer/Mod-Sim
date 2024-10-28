@@ -37,7 +37,10 @@ struct Renderer {
 
 	dvec1 camera_zoom_sensitivity;
 	dvec1 camera_orbit_sensitivity;
+
+	dvec1 input_lerp;
 	vector<bool> inputs;
+	vector<dvec3> input_lerps; // current , progress, target
 
 	dvec1 sim_time_aggregate;
 
