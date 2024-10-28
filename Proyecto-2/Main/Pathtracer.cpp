@@ -108,7 +108,7 @@ void PathTracer::f_updateBvh() {
 	gl_data["ssbo 2"] = ssboBinding(ul_to_u(renderer->kernel.bvh_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.bvh_nodes.data());
 }
 
-void PathTracer::f_tickUpdate() {
+void PathTracer::f_updateParticles() {
 	glDeleteBuffers(1, &gl_data["ssbo 1"]);
 	gl_data["ssbo 1"] = ssboBinding(ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
 }
@@ -136,7 +136,6 @@ void PathTracer::f_guiUpdate() {
 	ImGui::Checkbox("Render Particle Lighting", &render_particle_lighting);
 
 	if (!renderer->run_sim) {
-		ImGui::Checkbox("Use Octree", &use_octree);
 		if (use_octree) {
 			ImGui::Checkbox("Render Octree", &render_octree);
 			if (render_octree) {
@@ -151,6 +150,15 @@ void PathTracer::f_guiUpdate() {
 
 	ImGui::Checkbox("Render Particles", &render_particles);
 	if (render_particles) {
+		ImGui::Checkbox("Use Octree", &use_octree);
+		if (use_octree) {
+			int MAX_OCTREE_DEPTH = 4;
+			if (ImGui::SliderInt("Max Octree Depth", &MAX_OCTREE_DEPTH, 0, 6)) {
+				renderer->kernel.MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
+				renderer->kernel.buildBvh();
+				f_updateBvh();
+			}
+		}
 		ImGui::SliderFloat("Particle Radius", &render_particle_radius, 0.005f, 0.025f, "%.4f");
 
 		const char* items_b[] = { "Sun Intensity", "Height", "Pressure", "Current Temperature", "Day Temperature", "Night Temperature", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "Albedo", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation"};
@@ -274,7 +282,7 @@ void PathTracer::f_render() {
 
 	glDispatchCompute(compute_layout.x, compute_layout.y, 1);
 
-	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+	glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
 	glUseProgram(display_program);
 	glClear(GL_COLOR_BUFFER_BIT);

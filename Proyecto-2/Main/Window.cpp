@@ -17,11 +17,11 @@ Renderer::Renderer() {
 
 	frame_counter = 0;
 	frame_timer = 0;
-	sim_timer = 0;
+	gpu_timer = 0;
 
 	frame_count = 0;
 	frame_time = 0;
-	sim_time = 0;
+	gpu_time = 0;
 
 	display_resolution = uvec2(3840U, 2160U);
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
@@ -36,12 +36,12 @@ Renderer::Renderer() {
 	inputs = vector(6, false);
 	input_lerps = vector(6, dvec3(0.0));
 
-	sim_time_aggregate = 0.0;
+	gpu_time_aggregate = 0.0;
 
 	current_time = 0.0;
 	window_time = 0.0;
 	delta_time = FPS_60;
-	sim_delta = FPS_60 / 2.0;
+	gpu_delta = FPS_60 / 2.0;
 	last_time = 0.0;
 
 	run_sim = false;
@@ -49,12 +49,11 @@ Renderer::Renderer() {
 }
 
 Renderer::~Renderer() {
+	pathtracer.f_cleanup();
+
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
-
-	pathtracer.f_cleanup();
-
 	glfwDestroyWindow(window);
 	glfwTerminate();
 }
@@ -86,7 +85,7 @@ void Renderer::initGlfw() {
 	window = glfwCreateWindow(display_resolution.x, display_resolution.y, "Screensaver", NULL, NULL);
 
 	if (window == NULL) {
-		cout << "Failed to create GLFW window" << endl;
+		cerr << "Failed to create GLFW window" << endl;
 		glfwTerminate();
 	}
 
@@ -182,13 +181,17 @@ void Renderer::f_recompile() {
 
 void Renderer::f_tickUpdate() {
 	if (run_sim) {
-		const dvec1 start = glfwGetTime();
 		kernel.simulate(delta_time);
-		sim_delta = glfwGetTime() - start;
-		pathtracer.f_tickUpdate();
-	}
-	else {
-		sim_delta = 0.0;
+
+		if (pathtracer.render_particles && pathtracer.use_octree) {
+			kernel.buildBvh();
+			const dvec1 start = glfwGetTime();
+			pathtracer.f_updateBvh();
+			gpu_delta += glfwGetTime() - start;
+		}
+		const dvec1 start = glfwGetTime();
+		pathtracer.f_updateParticles();
+		gpu_delta += glfwGetTime() - start;
 	}
 }
 
@@ -208,17 +211,17 @@ void Renderer::f_guiLoop() {
 
 	ImGui::SeparatorText("Average Stats");
 	{
-		const dvec1 percent = round((sim_time_aggregate / current_time) * 100.0);
-		ImGui::Text(("~GPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
-		ImGui::Text(("~CPU[" + to_str(percent, 0) + "]%%").c_str());
+		const dvec1 percent = round((gpu_time_aggregate / current_time) * 100.0);
+		ImGui::Text(("~GPU[" + to_str(percent, 0) + "]%%").c_str());
+		ImGui::Text(("~CPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
 
 		ImGui::Text(("Fps: " + to_str(ul_to_d(runframe) / current_time, 0)).c_str());
 	}
 	ImGui::SeparatorText("Stats");
 	{
-		const dvec1 percent = round((sim_time / frame_time) * 100.0);
-		ImGui::Text(("~GPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
-		ImGui::Text(("~CPU[" + to_str(percent, 0) + "]%%").c_str());
+		const dvec1 percent = round((gpu_time / frame_time) * 100.0);
+		ImGui::Text(("~GPU[" + to_str(percent, 0) + "]%%").c_str());
+		ImGui::Text(("~CPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
 
 		ImGui::Text(("Fps: " + to_str(frame_count, 0)).c_str());
 	}
@@ -228,8 +231,8 @@ void Renderer::f_guiLoop() {
 		if (ImGui::Button("Pause")) {
 			run_sim = false;
 			kernel.buildBvh();
-			pathtracer.f_changeSettings();
 			pathtracer.use_octree = true;
+			pathtracer.f_updateBvh();
 		}
 	}
 	else {
@@ -262,20 +265,28 @@ void Renderer::f_guiLoop() {
 				f_changeSettings();
 			}
 
-			if (ImGui::SliderInt("Month", &kernel.CALENDAR_MONTH, 0, 12)
-				or ImGui::SliderInt("Day", &kernel.CALENDAR_DAY, 0, 31)
-				or ImGui::SliderInt("Hour", &kernel.CALENDAR_HOUR, 0, 24)
-				or ImGui::SliderInt("Minute", &kernel.CALENDAR_MINUTE, 0, 60)
-			) {
+			if (ImGui::SliderInt("Month", &kernel.CALENDAR_MONTH, 0, 12)) {
+				kernel.calculateDateTime();
+				pathtracer.f_changeSettings();
+			}
+			if (ImGui::SliderInt("Day", &kernel.CALENDAR_DAY, 0, 31)) {
+				kernel.calculateDateTime();
+				pathtracer.f_changeSettings();
+			}
+			if (ImGui::SliderInt("Hour", &kernel.CALENDAR_HOUR, 0, 24)) {
+				kernel.calculateDateTime();
+				pathtracer.f_changeSettings();
+			}
+			if (ImGui::SliderInt("Minute", &kernel.CALENDAR_MINUTE, 0, 60)) {
 				kernel.calculateDateTime();
 				pathtracer.f_changeSettings();
 			}
 
 			ImGui::SeparatorText("Simulation Settings");
 
-			int PARTICLE_COUNT = kernel.PARTICLE_COUNT;
+			int PARTICLE_COUNT = u_to_i(kernel.PARTICLE_COUNT);
 			if (ImGui::SliderInt("Particle Count", &PARTICLE_COUNT, 128,4096*4)) {
-				kernel.PARTICLE_COUNT = PARTICLE_COUNT;
+				kernel.PARTICLE_COUNT = i_to_u(PARTICLE_COUNT);
 				f_changeSettings();
 			}
 		}
@@ -294,20 +305,20 @@ void Renderer::f_guiLoop() {
 }
 
 void Renderer::f_frameUpdate() {
-	sim_time_aggregate += sim_delta;
+	gpu_time_aggregate += gpu_delta;
 	frame_timer += delta_time;
-	sim_timer += sim_delta;
+	gpu_timer += gpu_delta;
 	frame_counter++;
 	runframe++;
 
 	if (window_time > 1.0) {
 		frame_count = frame_counter;
 		frame_time = frame_timer;
-		sim_time = sim_timer;
+		gpu_time = gpu_timer;
 
 		frame_counter = 0;
 		frame_timer = 0.0;
-		sim_timer = 0.0;
+		gpu_timer = 0.0;
 		window_time -= 1.0;
 	}
 }
@@ -354,8 +365,11 @@ void Renderer::f_displayLoop() {
 
 		f_timings();
 		f_inputLoop();
+		gpu_delta = 0.0;
 		f_tickUpdate();
+		const dvec1 start = glfwGetTime();
 		pathtracer.f_render();
+		gpu_delta += glfwGetTime() - start;
 
 		f_frameUpdate();
 		f_guiLoop();

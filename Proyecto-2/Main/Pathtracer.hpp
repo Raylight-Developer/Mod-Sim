@@ -33,7 +33,7 @@ struct PathTracer {
 
 	void f_initialize();
 	void f_updateBvh();
-	void f_tickUpdate();
+	void f_updateParticles();
 	void f_changeSettings();
 
 	void f_guiUpdate();

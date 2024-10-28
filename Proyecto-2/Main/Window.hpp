@@ -24,17 +24,17 @@ struct Renderer {
 	dvec1 render_aspect_ratio;
 	uvec2 display_resolution;
 	uvec2 render_resolution;
-	vec1 render_scale;
+	vec1  render_scale;
 
 	uint64 runframe;
 
 	uint   frame_counter;
 	dvec1  frame_timer;
-	dvec1  sim_timer;
+	dvec1  gpu_timer;
 
 	uint   frame_count;
 	dvec1  frame_time;
-	dvec1  sim_time;
+	dvec1  gpu_time;
 
 	dvec1 camera_zoom_sensitivity;
 	dvec1 camera_orbit_sensitivity;
@@ -43,12 +43,12 @@ struct Renderer {
 	vector<bool> inputs;
 	vector<dvec3> input_lerps; // current , progress, target
 
-	dvec1 sim_time_aggregate;
+	dvec1 gpu_time_aggregate;
 
 	dvec1 current_time;
 	dvec1 window_time;
 	dvec1 delta_time;
-	dvec1 sim_delta;
+	dvec1 gpu_delta;
 	dvec1 last_time;
 
 	bool  run_sim;

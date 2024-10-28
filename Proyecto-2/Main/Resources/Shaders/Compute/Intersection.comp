@@ -98,7 +98,7 @@ int f_visitBvh(in Ray ray, inout float result_raylength) {
 		float t_length = MAX_DIST;
 		float t_dist = MAX_DIST;
 
-		int stack[64];
+		int stack[100];
 		int stack_index = 0;
 		stack[stack_index++] = 0;
 

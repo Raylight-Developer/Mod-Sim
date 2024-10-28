@@ -28,13 +28,15 @@
 Kernel::Kernel() {
 	PARTICLE_RADIUS    = 0.025f;
 	PARTICLE_COUNT     = 8192;
-	MAX_OCTREE_DEPTH   = 2;
-	POLE_BIAS          = 0.9f;
+	MAX_OCTREE_DEPTH   = 4;
+	POLE_BIAS          = 0.975f;
 	POLE_BIAS_POWER    = 5.0f;
 	POLE_GEOLOCATION   = vec2(23.1510f, 93.0422f);
 	EARTH_TILT         = 23.5f;
 	CALENDAR_DAY       = 21;
 	CALENDAR_MONTH     = 12;
+	CALENDAR_HOUR      = 21;
+	CALENDAR_MINUTE    = 0;
 	YEAR_TIME          = 0;
 	DAY_TIME           = 0;
 	DAY                = 0;
@@ -79,7 +81,6 @@ void Kernel::preInit() {
 }
 
 void Kernel::preInitParticles() {
-	cout << "Build Particles" << endl;
 	const vec1 radius = 6.371f + PARTICLE_RADIUS;
 
 	particles.clear();
@@ -104,15 +105,13 @@ void Kernel::preInitParticles() {
 }
 
 void Kernel::init() {
-	cout << "Build Locked Settings" << endl;
-	//textures.clear();
+	textures.clear();
 	//initParticles();
 	time = 0.0f;
 	frame_count = 0;
 }
 
 void Kernel::initParticles() {
-	cout << "Build Full Particles" << endl;
 	const int NUM_NEIGHBORS = 3;
 
 	for (uint i = 0; i < PARTICLE_COUNT; i++) {
@@ -139,9 +138,6 @@ void Kernel::initParticles() {
 }
 
 void Kernel::buildBvh() {
-	cout << "Build Bvh" << endl;
-	const uint bvh_depth = d_to_u(glm::log2(ul_to_d(particles.size()) / 64.0));
-
 	const Builder bvh_build = Builder(particles, PARTICLE_RADIUS, MAX_OCTREE_DEPTH);
 	particles = bvh_build.particles;
 	bvh_nodes = bvh_build.nodes;
@@ -188,7 +184,6 @@ void Kernel::updateTime() {
 			DAY++;
 		else DAY = 0;
 		YEAR_TIME = u_to_f(DAY) / 365.0f;
-		cout << YEAR_TIME << endl;
 	}
 }
 

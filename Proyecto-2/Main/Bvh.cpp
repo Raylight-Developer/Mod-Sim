@@ -95,7 +95,7 @@ Builder::Builder(const vector<CPU_Particle>& particles, const vec1& particle_rad
 	particles(particles),
 	particle_radius(particle_radius * 2.0f)
 {
-	for (uint i = 0; i < len32(particles); i++) {
+	for (uint i = 0; i < particles.size(); i++) {
 		const vec3 center = (particles[i].position);
 		const vec3 max = particles[i].position + particle_radius;
 		const vec3 min = particles[i].position - particle_radius;
@@ -129,10 +129,8 @@ void Builder::splitBvh(CPU_Bvh* parent, const uint& max_depth) {
 				for (const CPU_Particle& particle : particles) {
 					if (child.contains(particle)) {
 						child.particles.push_back(particle);
-						child.growToInclude(particle, particle_radius);
 					}
 				}
-				parent->growToInclude(child.p_min, child.p_max);
 			}
 			++it;
 		}
@@ -140,21 +138,12 @@ void Builder::splitBvh(CPU_Bvh* parent, const uint& max_depth) {
 			it = parent->children.erase(it);
 		}
 	}
-
-	// TODO fix  380 361 342 314 312 307 304 295 271 All Stacking
-	//CPU_Bvh* upper = parent;
-	//while (upper) {
-	//	for (CPU_Bvh& child : upper->children) {
-	//		upper->growToInclude(child.p_min, child.p_max);
-	//	}
-	//	upper = upper->parent;
-	//}
 }
 
 uint Builder::convertBvh(CPU_Bvh* node) {
 	auto bvh = GPU_Bvh();
-	bvh.p_min = node->p_min;
-	bvh.p_max = node->p_max;
+	bvh.p_min = node->p_min - particle_radius;
+	bvh.p_max = node->p_max + particle_radius;
 
 	uint index = ul_to_u(nodes.size());
 	nodes.push_back(bvh);
