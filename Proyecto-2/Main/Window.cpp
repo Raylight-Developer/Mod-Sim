@@ -25,6 +25,10 @@ Renderer::Renderer() {
 
 	display_resolution = uvec2(3840U, 2160U);
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
+	render_scale = 0.5f;
+
+	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(render_scale));
+	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
 
 	camera_zoom_sensitivity = 7.5;
 	camera_orbit_sensitivity = 20.0;
@@ -43,24 +47,19 @@ Renderer::Renderer() {
 	run_sim = false;
 	lock_settings = false;
 
-	params_float["TIME_SCALE"]          = 1.0f;
-	params_float["RENDER_SCALE"]        = 0.5f;
-	params_int["PARTICLE_COUNT"]        = 8192;
-	params_int["MAX_PARTICLES"]         = 4096 * 4;
-	params_int["MAX_OCTREE_DEPTH"]      = 4;
+	kernel.TIME_SCALE            = 10.0f;
+	kernel.PARTICLE_COUNT        = 8192;
+	kernel.MAX_OCTREE_DEPTH      = 4;
+	kernel.SAMPLES               = 4;
 
-	params_float["POLE_BIAS"]          = 0.9f;
-	params_float["POLE_BIAS_POWER"]    = 5.0f;
-	params_float["POLE_GEOLOCATION.x"] = 23.1510f;
-	params_float["POLE_GEOLOCATION.y"] = 93.0422f;
-	params_float["EARTH_TILT"]         = 23.5f;
+	kernel.POLE_BIAS          = 0.9f;
+	kernel.POLE_BIAS_POWER    = 5.0f;
+	kernel.POLE_GEOLOCATION.x = 23.1510f;
+	kernel.POLE_GEOLOCATION.y = 93.0422f;
+	kernel.EARTH_TILT         = 23.5f;
 
-	params_int["CALENDAR_DAY"]   = 22;
-	params_int["CALENDAR_MONTH"] = 12;
-	params_float["DATE_TIME"] = dateToFloat(params_int["CALENDAR_MONTH"], params_int["CALENDAR_DAY"]);
-
-	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(params_float["RENDER_SCALE"]));
-	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
+	kernel.CALENDAR_DAY   = 22;
+	kernel.CALENDAR_MONTH = 12;
 }
 
 Renderer::~Renderer() {
@@ -198,13 +197,7 @@ void Renderer::f_recompile() {
 void Renderer::f_tickUpdate() {
 	if (run_sim) {
 		const dvec1 start = glfwGetTime();
-		const dvec1 delta = delta_time * params_float["TIME_SCALE"];
-		vec1* date_time = &params_float.at("DATE_TIME");
-		*date_time -= d_to_f(delta) * 0.05f;
-		if (*date_time < 0.0f) {
-			*date_time += 1.0f;
-		}
-		kernel.simulate(delta, *date_time);
+		kernel.simulate(delta_time);
 		sim_delta = glfwGetTime() - start;
 		pathtracer.f_tickUpdate();
 	}
@@ -214,7 +207,7 @@ void Renderer::f_tickUpdate() {
 }
 
 void Renderer::f_changeSettings() {
-	kernel.preInit(params_float, params_bool, params_int);
+	kernel.preInit();
 	pathtracer.f_changeSettings();
 }
 
@@ -263,38 +256,44 @@ void Renderer::f_guiLoop() {
 				kernel.init();
 			}
 			ImGui::SeparatorText("Earth Settings");
-			if (ImGui::SliderFloat("Latitude", &params_float["POLE_GEOLOCATION.x"], -90.0f, 90.0f, "%.4f")) {
+			if (ImGui::SliderFloat("Latitude", &kernel.POLE_GEOLOCATION.x, -90.0f, 90.0f, "%.4f")) {
 				f_changeSettings();
 			}
-			if (ImGui::SliderFloat("Longitude", &params_float["POLE_GEOLOCATION.y"], -180.0f, 180.0f, "%.4f")) {
+			if (ImGui::SliderFloat("Longitude", &kernel.POLE_GEOLOCATION.y, -180.0f, 180.0f, "%.4f")) {
 				f_changeSettings();
 			}
-			if (ImGui::SliderFloat("Pole Bias", &params_float["POLE_BIAS"], 0.0f, 1.0f, "%.5f")) {
+			if (ImGui::SliderFloat("Pole Bias", &kernel.POLE_BIAS, 0.0f, 1.0f, "%.5f")) {
 				f_changeSettings();
 			}
-			if (ImGui::SliderFloat("Pole Power", &params_float["POLE_BIAS_POWER"], 1.0f, 10.0f)) {
+			if (ImGui::SliderFloat("Pole Power", &kernel.POLE_BIAS_POWER, 1.0f, 10.0f)) {
 				f_changeSettings();
 			}
-			if (ImGui::SliderFloat("Earth Tilt", &params_float["EARTH_TILT"], -180.0f, 180.0f, "%.2f")) {
+			if (ImGui::SliderFloat("Earth Tilt", &kernel.EARTH_TILT, -180.0f, 180.0f, "%.2f")) {
 				f_changeSettings();
 			}
 
-			if (ImGui::SliderInt("Day", &params_int["CALENDAR_DAY"], 0, 31)) {
-				params_float["DATE_TIME"] = dateToFloat(params_int["CALENDAR_MONTH"], params_int["CALENDAR_DAY"]);
+			if (ImGui::SliderInt("Day", &kernel.CALENDAR_DAY, 0, 31)) {
+				kernel.DATE_TIME = dateToFloat(kernel.CALENDAR_MONTH, kernel.CALENDAR_DAY);
 				f_changeSettings();
 			}
-			if (ImGui::SliderInt("Month", &params_int["CALENDAR_MONTH"], 0, 12)) {
-				params_float["DATE_TIME"] = dateToFloat(params_int["CALENDAR_MONTH"], params_int["CALENDAR_DAY"]);
+			if (ImGui::SliderInt("Month", &kernel.CALENDAR_MONTH, 0, 12)) {
+				kernel.DATE_TIME = dateToFloat(kernel.CALENDAR_MONTH, kernel.CALENDAR_DAY);
 				f_changeSettings();
 			}
 
 			ImGui::SeparatorText("Simulation Settings");
 
-			if (ImGui::SliderInt("Particle Count", &params_int["PARTICLE_COUNT"], 128, params_int["MAX_PARTICLES"])) {
+			int PARTICLE_COUNT = kernel.PARTICLE_COUNT;
+			if (ImGui::SliderInt("Particle Count", &PARTICLE_COUNT, 128,4096*4)) {
+				kernel.PARTICLE_COUNT = PARTICLE_COUNT;
 				f_changeSettings();
 			}
-			ImGui::SliderFloat("Time Scale", &params_float["TIME_SCALE"], 0.01f, 2.0f, "%.4f");
 		}
+	}
+	ImGui::SliderFloat("Time Scale", &kernel.TIME_SCALE, 0.01f, 20.0f, "%.4f");
+	int SAMPLES = kernel.SAMPLES;
+	if (ImGui::SliderInt("Samples", &SAMPLES, 1, 10)) {
+		kernel.SAMPLES = SAMPLES;
 	}
 
 	pathtracer.f_guiUpdate();
@@ -378,7 +377,7 @@ void Renderer::f_displayLoop() {
 
 void Renderer::f_resize() {
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
-	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(params_float["RENDER_SCALE"]));
+	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(render_scale));
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
 	pathtracer.f_resize();
 }

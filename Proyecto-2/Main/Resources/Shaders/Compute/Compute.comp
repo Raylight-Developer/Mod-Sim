@@ -56,6 +56,9 @@ void main() {
 		if (closest_particle_index != -1) {
 			if (t_dist < t_length && t_dist > EPSILON) {
 				color = vec4(f_particleColor(particles[closest_particle_index], t_dist), 1.0);
+				if (render_lighting == 1) {
+					color.xyz *= particles[closest_particle_index].sun_intensity * 0.8 + 0.2;
+				}
 			}
 		}
 	}

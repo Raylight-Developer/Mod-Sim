@@ -20,12 +20,17 @@ struct Particle {
 	float cloud_particle_radius;
 	float cloud_optical_thickness;
 	float ozone;
-	float uv_index;
+	float albedo;
 
+	float uv_index;
 	float net_radiation;
 	float solar_insolation;
 	float outgoing_longwave_radiation;
+
 	float reflected_shortwave_radiation;
+	float pad_a;
+	float pad_b;
+	float pad_c;
 };
 
 struct Texture {

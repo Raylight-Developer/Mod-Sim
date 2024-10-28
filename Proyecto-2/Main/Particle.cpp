@@ -2,7 +2,28 @@
 
 CPU_Particle::CPU_Particle() {
 	position = vec3(0);
-	temperature = 20.0;
+	wind_vector  = vec3(0);
+	sun_intensity = 0;
+
+	height = 0;
+	pressure = 0;
+	temperature = 0;
+	day_temperature = 0;
+	night_temperature = 0;
+	humidity = 0;
+	water_vapor = 0;
+	cloud_coverage = 0;
+	cloud_water_content = 0;
+	cloud_particle_radius = 0;
+	cloud_optical_thickness = 0;
+	ozone = 0;
+	albedo = 0;
+	uv_index = 0;
+	net_radiation = 0;
+	solar_insolation = 0;
+	outgoing_longwave_radiation = 0;
+	reflected_shortwave_radiation = 0;
+	on_water = false;
 
 	smoothing_radius = 0.0f;
 }
@@ -24,6 +45,7 @@ GPU_Particle::GPU_Particle() {
 	cloud_particle_radius = 0;
 	cloud_optical_thickness = 0;
 	ozone = 0;
+	albedo = 0;
 	uv_index = 0;
 	net_radiation = 0;
 	solar_insolation = 0;
@@ -48,6 +70,7 @@ GPU_Particle::GPU_Particle(const CPU_Particle& particle) {
 	cloud_particle_radius = particle.cloud_particle_radius;
 	cloud_optical_thickness = particle.cloud_optical_thickness;
 	ozone = particle.ozone;
+	albedo = particle.albedo;
 	uv_index = particle.uv_index;
 	net_radiation = particle.net_radiation;
 	solar_insolation = particle.solar_insolation;

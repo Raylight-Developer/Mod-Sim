@@ -24,6 +24,7 @@ struct CPU_Particle {
 	vec1 cloud_optical_thickness; // 0-50%
 
 	vec1 ozone; // Dobson
+	vec1 albedo; // %
 	vec1 uv_index;
 	vec1 net_radiation; // W/m^2
 	vec1 solar_insolation; // W/m^2
@@ -65,12 +66,17 @@ struct alignas(16) GPU_Particle {
 	vec1 cloud_particle_radius;
 	vec1 cloud_optical_thickness;
 	vec1 ozone;
-	vec1 uv_index;
+	vec1 albedo;
 
+	vec1 uv_index;
 	vec1 net_radiation;
 	vec1 solar_insolation;
 	vec1 outgoing_longwave_radiation;
+
 	vec1 reflected_shortwave_radiation;
+	vec1 pad_a = 0;
+	vec1 pad_b = 0;
+	vec1 pad_c = 0;
 
 	GPU_Particle();
 	GPU_Particle(const CPU_Particle& particle);

@@ -20,6 +20,7 @@ enum struct Texture_Field {
 	CLOUD_OPTICAL_THICKNESS,
 
 	OZONE,
+	ALBEDO,
 	UV_INDEX,
 	NET_RADIATION,
 	SOLAR_INSOLATION,
@@ -57,6 +58,8 @@ vec1 lut(const Texture_Field& field, const vec1& color) {
 			return f_map(0.0f, 1.0f, 0.0f, 0.5f, color);
 		case Texture_Field::OZONE:
 			return f_map(0.0f, 1.0f, 100.0f, 500.0f, color);
+		case Texture_Field::ALBEDO:
+			return f_map(0.0f, 1.0f, 0.0f, 0.9f, color);
 		case Texture_Field::UV_INDEX:
 			return f_map(0.0f, 1.0f, 0.0f, 16.0f, color);
 		case Texture_Field::NET_RADIATION:

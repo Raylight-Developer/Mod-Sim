@@ -32,6 +32,7 @@ Kernel::Kernel() {
 	POLE_BIAS          = 0;
 	POLE_BIAS_POWER    = 0;
 	POLE_GEOLOCATION   = vec2(0);
+	DATE_TIME          = 0;
 	DT                 = 0;
 	RUNFRAME           = 0;
 	SAMPLES            = 0;
@@ -55,6 +56,7 @@ Kernel::Kernel() {
 	textures[Texture_Field::CLOUD_OPTICAL_THICKNESS] = Texture::fromFile("./Resources/Nasa Earth Data/Cloud Optical Thickness CAF.png", Texture_Format::MONO_FLOAT);
 	
 	textures[Texture_Field::OZONE]                         = Texture::fromFile("./Resources/Nasa Earth Data/Ozone CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::ALBEDO]                        = Texture::fromFile("./Resources/Nasa Earth Data/Albedo CAF.png", Texture_Format::MONO_FLOAT);
 	textures[Texture_Field::UV_INDEX]                      = Texture::fromFile("./Resources/Nasa Earth Data/UV Index.png", Texture_Format::MONO_FLOAT);
 	textures[Texture_Field::NET_RADIATION]                 = Texture::fromFile("./Resources/Nasa Earth Data/Net Radiation.png", Texture_Format::MONO_FLOAT);
 	textures[Texture_Field::SOLAR_INSOLATION]              = Texture::fromFile("./Resources/Nasa Earth Data/Solar Insolation.png", Texture_Format::MONO_FLOAT);
@@ -62,21 +64,9 @@ Kernel::Kernel() {
 	textures[Texture_Field::REFLECTED_SHORTWAVE_RADIATION] = Texture::fromFile("./Resources/Nasa Earth Data/Reflected Shortwave Radiation.png", Texture_Format::MONO_FLOAT);
 }
 
-void Kernel::preInit(const unordered_map<string, float>& params_float, const unordered_map<string, bool>& params_bool,const unordered_map<string, int>& params_int) {
-	this->params_float = params_float;
-	this->params_bool = params_bool;
-	this->params_int = params_int;
-
+void Kernel::preInit() {
 	PARTICLE_RADIUS  = 0.025f;
-	PARTICLE_COUNT   = params_int.at("PARTICLE_COUNT");
-	MAX_OCTREE_DEPTH = params_int.at("MAX_OCTREE_DEPTH");
-	POLE_BIAS        = params_float.at("POLE_BIAS");
-	POLE_BIAS_POWER  = params_float.at("POLE_BIAS_POWER");
-	POLE_GEOLOCATION = vec2(params_float.at("POLE_GEOLOCATION.x"), params_float.at("POLE_GEOLOCATION.y"));
-	DT               = 0.016f;
-	RUNFRAME         = 0;
-	SAMPLES          = 5;
-	SDT              = 0.016f / u_to_f(SAMPLES);
+
 
 	sun_dir = sunDir();
 
@@ -153,19 +143,30 @@ void Kernel::initBvh() {
 	}
 }
 
-void Kernel::simulate(const dvec1& delta_time, const vec1& date_time) {
-	params_float.at("DATE_TIME") = date_time;
-	DT = d_to_f(delta_time);
+void Kernel::simulate(const dvec1& delta_time) {
+	DT = d_to_f(delta_time) * TIME_SCALE;
 	SDT = DT / u_to_f(SAMPLES);
 	gpu_particles.clear();
-	sun_dir = sunDir();
 
-	time += DT;
-	for (CPU_Particle& particle : particles) {
-		calculateSunlight(&particle);
-		gpu_particles.push_back(GPU_Particle(particle));
+	for (uint i = 0; i < SAMPLES; i++) {
+		time += SDT;
+		DATE_TIME -= d_to_f(SDT) * 0.05f;
+		if (DATE_TIME < 0.0f) {
+			DATE_TIME += 1.0f;
+		}
+		sun_dir = sunDir();
+		for (CPU_Particle& particle : particles) {
+			calculateSunlight(&particle);
+			calculateThermodynamics(&particle);
+
+
+
+
+
+			gpu_particles.push_back(GPU_Particle(particle));
+		}
+		frame_count++;
 	}
-	frame_count++;
 }
 
 void Kernel::traceInitProperties(CPU_Particle* particle) const {
@@ -180,7 +181,7 @@ void Kernel::traceInitProperties(CPU_Particle* particle) const {
 	}
 
 	const vec3 intersectionPoint = particle->position + ((-b - sqrt(delta)) / (2.0f * a)) * ray_direction;
-	const vec1 axialTilt = -glm::radians(params_float.at("EARTH_TILT"));
+	const vec1 axialTilt = -glm::radians(EARTH_TILT);
 	const mat3 tiltRotation = mat3(
 		vec3(cos(axialTilt), -sin(axialTilt), 0),
 		vec3(sin(axialTilt), cos(axialTilt), 0),
@@ -208,6 +209,7 @@ void Kernel::traceInitProperties(CPU_Particle* particle) const {
 	const vec1 cloud_optical_thickness_sample = textures.at(Texture_Field::CLOUD_OPTICAL_THICKNESS   ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
 
 	const vec1 ozone_sample                         = textures.at(Texture_Field::OZONE                        ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 albedo_sample                        = textures.at(Texture_Field::ALBEDO                       ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
 	const vec1 uv_index_sample                      = textures.at(Texture_Field::UV_INDEX                     ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
 	const vec1 net_radiation_sample                 = textures.at(Texture_Field::NET_RADIATION                ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
 	const vec1 solar_insolation_sample              = textures.at(Texture_Field::SOLAR_INSOLATION             ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
@@ -226,12 +228,14 @@ void Kernel::traceInitProperties(CPU_Particle* particle) const {
 		particle->night_temperature = sst_night;
 		particle->on_water = true;
 		particle->height = bathymetry;
+		particle->albedo = 0.135f;
 	}
 	else { // Is on Land
 		particle->day_temperature = lst;
 		particle->night_temperature = lst_night;
 		particle->on_water = false;
 		particle->height = topography;
+		particle->albedo = lut(Texture_Field::ALBEDO, albedo_sample);
 	}
 
 	particle->humidity                = lut(Texture_Field::HUMIDITY, humidity_sample);
@@ -248,19 +252,28 @@ void Kernel::traceInitProperties(CPU_Particle* particle) const {
 	particle->outgoing_longwave_radiation   = lut(Texture_Field::OUTGOING_LONGWAVE_RADIATION, outgoiing_longwave_radiation_sample);
 	particle->reflected_shortwave_radiation = lut(Texture_Field::REFLECTED_SHORTWAVE_RADIATION, reflected_shortwave_radiation_sample);
 	calculateSunlight(particle);
+	particle->temperature = glm::mix(particle->night_temperature, particle->day_temperature, particle->sun_intensity);
 }
 
 void Kernel::calculateSunlight(CPU_Particle* particle) const {
 	const vec3 normal = glm::normalize(particle->position);
-	particle->sun_intensity = max(dot(normal, sun_dir), 0.0f) * 0.95f + 0.05f;
+	particle->sun_intensity = clamp(max(dot(normal, sun_dir), 0.0f), 0.0f, 1.0f);
+}
 
-	particle->temperature = glm::mix(particle->night_temperature, particle->day_temperature, particle->sun_intensity);
+void Kernel::calculateThermodynamics(CPU_Particle* particle) const {
+	const vec1 solar_heat_gain = particle->sun_intensity * (1.0f - particle->albedo);
+
+	const vec1 radiative_loss = 0.0f;
+	const vec1 convective_loss = 0.0f;
+
+	const vec1 net_heat = solar_heat_gain - radiative_loss - convective_loss;
+	particle->temperature += net_heat * SDT;
 }
 
 vec3 Kernel::rotateGeoloc(const vec3& point, const vec2& geoloc) const {
 	const vec1 phi = glm::radians(geoloc.x - 90.0f);
 	const vec1 theta = glm::radians(geoloc.y + 90.0f);
-	const vec1 axialTilt = -glm::radians(params_float.at("EARTH_TILT"));
+	const vec1 axialTilt = -glm::radians(EARTH_TILT);
 
 	const quat tiltRotation = glm::angleAxis(axialTilt, glm::vec3(0, 0, 1));
 	const quat latRotation  = glm::angleAxis(phi, glm::vec3(1, 0, 0));
@@ -271,7 +284,7 @@ vec3 Kernel::rotateGeoloc(const vec3& point, const vec2& geoloc) const {
 }
 
 vec3 Kernel::sunDir() const {
-	const vec2 time = vec2(0, params_float.at("DATE_TIME") * TWO_PI);
+	const vec2 time = vec2(0, DATE_TIME * TWO_PI);
 	const vec2 c = cos(time);
 	const vec2 s = sin(time);
 

@@ -24,6 +24,7 @@ struct Renderer {
 	dvec1 render_aspect_ratio;
 	uvec2 display_resolution;
 	uvec2 render_resolution;
+	vec1 render_scale;
 
 	uint64 runframe;
 
@@ -52,10 +53,6 @@ struct Renderer {
 
 	bool  run_sim;
 	bool  lock_settings;
-
-	unordered_map<string, float> params_float;
-	unordered_map<string, bool> params_bool;
-	unordered_map<string, int> params_int;
 
 	Renderer();
 	~Renderer();

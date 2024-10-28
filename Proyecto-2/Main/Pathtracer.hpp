@@ -15,9 +15,17 @@ struct PathTracer {
 	vector<GPU_Texture> textures;
 	uint texture_size;
 
-	unordered_map<string, float> params_float;
-	unordered_map<string, bool> params_bool;
-	unordered_map<string, int> params_int;
+	bool render_planet;
+	bool render_lighting;
+	bool render_atmosphere;
+	bool render_octree;
+	bool render_octree_hue;
+	bool render_octree_debug;
+	bool render_particles;
+	int render_octree_debug_index;
+	int render_particle_color_mode;
+	int render_planet_texture;
+	float render_particle_radius;
 
 	PathTracer(Renderer* renderer = nullptr);
 

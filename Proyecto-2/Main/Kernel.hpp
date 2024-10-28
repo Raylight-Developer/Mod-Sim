@@ -10,15 +10,17 @@
 enum struct Texture_Field;
 
 struct Kernel {
-	unordered_map<string, float> params_float;
-	unordered_map<string, bool> params_bool;
-	unordered_map<string, int> params_int;
 	vec1 PARTICLE_RADIUS;
 	uint PARTICLE_COUNT;
 	uint MAX_OCTREE_DEPTH;
 	vec1 POLE_BIAS;
 	vec1 POLE_BIAS_POWER;
 	vec2 POLE_GEOLOCATION;
+	vec1 EARTH_TILT;
+	vec1 DATE_TIME;
+	vec1 TIME_SCALE;
+	int CALENDAR_MONTH;
+	int CALENDAR_DAY;
 
 	vec1 DT;
 	uint RUNFRAME;
@@ -38,20 +40,20 @@ struct Kernel {
 
 	Kernel();
 
-	void preInit(const unordered_map<string, float>& params_float, const unordered_map<string, bool>& params_bool,const unordered_map<string, int>& params_int);
+	void preInit();
 	void preInitParticles();
+	void traceInitProperties(CPU_Particle* particle) const;
 
 	void init();
 	void initParticles();
 	void initBvh();
 
-	void simulate(const dvec1& delta_time, const vec1& date_time);
-
-	void traceInitProperties(CPU_Particle* particle) const;
+	void simulate(const dvec1& delta_time);
 	void calculateSunlight(CPU_Particle* particle) const;
+	void calculateThermodynamics(CPU_Particle* particle) const;
 
-	vec3 rotateGeoloc(const vec3& point, const vec2& geoloc) const;
 	vec3 sunDir() const;
+	vec3 rotateGeoloc(const vec3& point, const vec2& geoloc) const;
 };
 
 vec1 dateToFloat(const int& month, const int& day);

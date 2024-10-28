@@ -8,21 +8,21 @@ PathTracer::PathTracer(Renderer* renderer) :
 	texture_size = 0;
 	compute_layout = uvec2(0);
 
-	params_bool["render_planet"]     = true;
-	params_bool["render_lighting"]   = false;
-	params_bool["render_atmosphere"] = true;
-	params_bool["render_octree"]     = false;
+	render_planet     = true;
+	render_lighting   = false;
+	render_atmosphere = true;
+	render_octree     = false;
 	{
-		params_bool["render_octree_hue"]        = false;
-		params_bool["render_octree_debug"]      = false;
-		params_int["render_octree_debug_index"] = 0;
+		render_octree_hue        = false;
+		render_octree_debug      = false;
+		render_octree_debug_index = 0;
 	}
-	params_bool["render_particles"] = false;
+	render_particles = false;
 	{
-		params_float["render_particle_radius"] = 0.015f;
-		params_int["render_particle_color_mode"] = 0;
+		render_particle_radius = 0.015f;
+		render_particle_color_mode = 0;
 	}
-	params_int["render_planet_texture"] = 0;
+	render_planet_texture = 0;
 }
 
 void PathTracer::f_initialize() {
@@ -89,7 +89,7 @@ void PathTracer::f_initialize() {
 	gl_data["raw_render_layer"] = renderLayer(renderer->render_resolution);
 
 	vector<uint> texture_data;
-	vector<string> texture_names = { "Albedo", "Topography", "Bathymetry", "Sea Surface Temperature LR", "Sea Surface Temperature Night LR", "Land Surface Temperature LR", "Land Surface Temperature Night LR", "MODIS/Humidity After Moist CAF", "Water Vapor LR", "Cloud Fraction", "Cloud Water Content LR", "Cloud Particle Radius LR", "Cloud Optical Thickness LR", "Ozone LR", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation" };
+	vector<string> texture_names = { "Blue Marble", "Topography", "Bathymetry", "Sea Surface Temperature LR", "Sea Surface Temperature Night LR", "Land Surface Temperature LR", "Land Surface Temperature Night LR", "MODIS/Humidity After Moist CAF", "Water Vapor LR", "Cloud Fraction", "Cloud Water Content LR", "Cloud Particle Radius LR", "Cloud Optical Thickness LR", "Ozone LR", "Albedo LR", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation" };
 	for (const string& tex : texture_names) {
 		Texture texture = Texture::fromFile("./Resources/Nasa Earth Data/" + tex + ".png", Texture_Format::RGBA_8);
 		textures.push_back(GPU_Texture(ul_to_u(texture_data.size()), texture.resolution.x, texture.resolution.y, 0));
@@ -116,40 +116,42 @@ void PathTracer::f_changeSettings() {
 
 void PathTracer::f_guiUpdate() {
 	ImGui::SeparatorText("Pathtraced Rendering");
-	ImGui::Checkbox("Render Planet", &params_bool["render_planet"]);
-	if (params_bool["render_planet"]) {
-		const char* items_b[] = { "Albedo", "Topography", "Bathymetry", "Sea Temperature Day", "Sea Temperature Night", "Land Temperature Day", "Land Temperature Night", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation" };
-		ImGui::Combo("Planet Texture", &params_int["render_planet_texture"], items_b, IM_ARRAYSIZE(items_b));
+	ImGui::Checkbox("Render Planet", &render_planet);
+	if (render_planet) {
+		const char* items_b[] = { "Blue Marble", "Topography", "Bathymetry", "Sea Temperature Day", "Sea Temperature Night", "Land Temperature Day", "Land Temperature Night", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "Albedo", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation" };
+		ImGui::Combo("Planet Texture", &render_planet_texture, items_b, IM_ARRAYSIZE(items_b));
 	}
 
-	ImGui::Checkbox("Render Lighting", &params_bool["render_lighting"]);
-	if (params_bool["render_lighting"]) {
-		ImGui::Checkbox("Render Atmosphere", &params_bool["render_atmosphere"]);
+	ImGui::Checkbox("Render Lighting", &render_lighting);
+	if (render_lighting) {
+		ImGui::Checkbox("Render Atmosphere", &render_atmosphere);
 	}
 
-	ImGui::Checkbox("Render Octree", &params_bool["render_octree"]);
-	if (params_bool["render_octree"]) {
-		ImGui::Checkbox("Hue", &params_bool["render_octree_hue"]);
-		ImGui::Checkbox("Debug", &params_bool["render_octree_debug"]);
-		if (params_bool["render_octree_debug"]) {
-			ImGui::SliderInt("Index", &params_int["render_octree_debug_index"], 0, ul_to_i(renderer->kernel.bvh_nodes.size()));
+	ImGui::Checkbox("Render Octree", &render_octree);
+	if (render_octree) {
+		ImGui::Checkbox("Hue", &render_octree_hue);
+		ImGui::Checkbox("Debug", &render_octree_debug);
+		if (render_octree_debug) {
+			ImGui::SliderInt("Index", &render_octree_debug_index, 0, ul_to_i(renderer->kernel.bvh_nodes.size()));
 		}
 	}
 
-	ImGui::Checkbox("Render Particles", &params_bool["render_particles"]);
-	if (params_bool["render_particles"]) {
-		ImGui::SliderFloat("Particle Radius", &params_float["render_particle_radius"], 0.005f, 0.025f, "%.4f");
+	ImGui::Checkbox("Render Particles", &render_particles);
+	if (render_particles) {
+		ImGui::SliderFloat("Particle Radius", &render_particle_radius, 0.005f, 0.025f, "%.4f");
 
-		const char* items_b[] = { "Sun Intensity", "Height", "Pressure", "Current Temperature", "Day Temperature", "Night Temperature", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation"};
-		ImGui::Combo("Particle Color Mode", &params_int["render_particle_color_mode"], items_b, IM_ARRAYSIZE(items_b));
+		const char* items_b[] = { "Sun Intensity", "Height", "Pressure", "Current Temperature", "Day Temperature", "Night Temperature", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "Albedo", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation"};
+		ImGui::Combo("Particle Color Mode", &render_particle_color_mode, items_b, IM_ARRAYSIZE(items_b));
 	}
 
 	ImGui::SeparatorText("Pathtracing Optimization Settings");
-	if (ImGui::SliderFloat("Render Scale", &renderer->params_float["RENDER_SCALE"], 0.1f, 1.0f, "%.3f")) {
+	if (ImGui::SliderFloat("Render Scale", &renderer->render_scale, 0.1f, 1.0f, "%.3f")) {
 		f_resize();
 	}
 	if (!renderer->lock_settings) {
-		if (ImGui::SliderInt("Max Octree Depth", &renderer->params_int["MAX_OCTREE_DEPTH"], 0, 5)) {
+		int MAX_OCTREE_DEPTH = 4;
+		if (ImGui::SliderInt("Max Octree Depth", &MAX_OCTREE_DEPTH, 0, 5)) {
+			renderer->kernel.MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
 			renderer->kernel.initBvh();
 			f_changeSettings();
 		}
@@ -159,7 +161,7 @@ void PathTracer::f_guiUpdate() {
 
 	ImGui::Text(string("Octree VRAM: " + to_string((renderer->kernel.bvh_nodes.size() * sizeof(GPU_Bvh)) / 1024) + "kb ").c_str());
 	ImGui::Text(string("Texture VRAM: " + to_string((texture_size * sizeof(uint)) / 1024 / 1024) + "mb ").c_str());
-	ImGui::Text(string("Particle VRAM: " + to_string((renderer->params_int["PARTICLE_COUNT"] * sizeof(GPU_Particle)) / 1024) + "kb ").c_str());
+	ImGui::Text(string("Particle VRAM: " + to_string((renderer->kernel.PARTICLE_COUNT * sizeof(GPU_Particle)) / 1024) + "kb ").c_str());
 }
 
 void PathTracer::f_recompile() {
@@ -235,25 +237,25 @@ void PathTracer::f_render() {
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_p_u"), 1, value_ptr(projection_u));
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"), 1, value_ptr(projection_v));
 
-	glUniform1f  (glGetUniformLocation(compute_program, "earth_tilt"), renderer->params_float["EARTH_TILT"]);
-	glUniform1f  (glGetUniformLocation(compute_program, "date_time"), renderer->params_float["DATE_TIME"]);
+	glUniform1f  (glGetUniformLocation(compute_program, "earth_tilt"), renderer->kernel.EARTH_TILT);
+	glUniform1f  (glGetUniformLocation(compute_program, "date_time"), renderer->kernel.DATE_TIME);
 
-	glUniform1ui (glGetUniformLocation(compute_program, "render_planet"), params_bool["render_planet"]);
+	glUniform1ui (glGetUniformLocation(compute_program, "render_planet"), render_planet);
 	{
-		glUniform1i(glGetUniformLocation(compute_program, "render_planet_texture"), params_int["render_planet_texture"]);
+		glUniform1i(glGetUniformLocation(compute_program, "render_planet_texture"), render_planet_texture);
 	}
-	glUniform1ui (glGetUniformLocation(compute_program, "render_lighting"), params_bool["render_lighting"]);
-	glUniform1ui (glGetUniformLocation(compute_program, "render_atmosphere"), params_bool["render_atmosphere"]);
-	glUniform1ui (glGetUniformLocation(compute_program, "render_octree"), params_bool["render_octree"]);
+	glUniform1ui (glGetUniformLocation(compute_program, "render_lighting"), render_lighting);
+	glUniform1ui (glGetUniformLocation(compute_program, "render_atmosphere"), render_atmosphere);
+	glUniform1ui (glGetUniformLocation(compute_program, "render_octree"), render_octree);
 	{
-		glUniform1ui (glGetUniformLocation(compute_program, "render_octree_hue"), params_bool["render_octree_hue"]);
-		glUniform1ui (glGetUniformLocation(compute_program, "render_octree_debug"), params_bool["render_octree_debug"]);
-		glUniform1i  (glGetUniformLocation(compute_program, "render_octree_debug_index"), params_bool["render_octree_debug_index"]);
+		glUniform1ui (glGetUniformLocation(compute_program, "render_octree_hue"), render_octree_hue);
+		glUniform1ui (glGetUniformLocation(compute_program, "render_octree_debug"), render_octree_debug);
+		glUniform1i  (glGetUniformLocation(compute_program, "render_octree_debug_index"), render_octree_debug_index);
 	}
-	glUniform1ui (glGetUniformLocation(compute_program, "render_particles"), params_bool["render_particles"]);
+	glUniform1ui (glGetUniformLocation(compute_program, "render_particles"), render_particles);
 	{
-		glUniform1f  (glGetUniformLocation(compute_program, "render_particle_radius"), params_float["render_particle_radius"]);
-		glUniform1i(glGetUniformLocation(compute_program, "render_particle_color_mode"), params_int["render_particle_color_mode"]);
+		glUniform1f  (glGetUniformLocation(compute_program, "render_particle_radius"), render_particle_radius);
+		glUniform1i(glGetUniformLocation(compute_program, "render_particle_color_mode"), render_particle_color_mode);
 	}
 
 	glBindImageTexture(0, gl_data["raw_render_layer"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
