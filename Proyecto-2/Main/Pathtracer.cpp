@@ -6,6 +6,7 @@ PathTracer::PathTracer(Renderer* renderer) :
 	renderer(renderer)
 {
 	texture_size = 0;
+	compute_layout = uvec2(0);
 
 	params_bool["render_planet"]     = true;
 	params_bool["render_lighting"]   = false;
@@ -88,7 +89,7 @@ void PathTracer::f_initialize() {
 	gl_data["raw_render_layer"] = renderLayer(renderer->render_resolution);
 
 	vector<uint> texture_data;
-	vector<string> texture_names = { "Albedo", "Sea Surface Temperature CAF", "Land Surface Temperature CAF" };
+	vector<string> texture_names = { "Albedo", "Topography", "Bathymetry", "Sea Surface Temperature LR", "Sea Surface Temperature Night LR", "Land Surface Temperature LR", "Land Surface Temperature Night LR", "MODIS/Humidity After Moist CAF", "Water Vapor LR", "Cloud Fraction", "Cloud Water Content LR", "Cloud Particle Radius LR", "Cloud Optical Thickness LR", "Ozone LR", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation" };
 	for (const string& tex : texture_names) {
 		Texture texture = Texture::fromFile("./Resources/Nasa Earth Data/" + tex + ".png", Texture_Format::RGBA_8);
 		textures.push_back(GPU_Texture(ul_to_u(texture_data.size()), texture.resolution.x, texture.resolution.y, 0));
@@ -117,7 +118,7 @@ void PathTracer::f_guiUpdate() {
 	ImGui::SeparatorText("Pathtraced Rendering");
 	ImGui::Checkbox("Render Planet", &params_bool["render_planet"]);
 	if (params_bool["render_planet"]) {
-		const char* items_b[] = { "Albedo", "Sea Surface Temperature", "Land Surface Temperature", "Pressure Map 1", "Pressure Map 2", "Pressure Map 3", "Pressure Map 4", "Wind Map" };
+		const char* items_b[] = { "Albedo", "Topography", "Bathymetry", "Sea Temperature Day", "Sea Temperature Night", "Land Temperature Day", "Land Temperature Night", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation" };
 		ImGui::Combo("Planet Texture", &params_int["render_planet_texture"], items_b, IM_ARRAYSIZE(items_b));
 	}
 
@@ -139,7 +140,7 @@ void PathTracer::f_guiUpdate() {
 	if (params_bool["render_particles"]) {
 		ImGui::SliderFloat("Particle Radius", &params_float["render_particle_radius"], 0.005f, 0.025f, "%.4f");
 
-		const char* items_b[] = { "Temperature" };
+		const char* items_b[] = { "Sun Intensity", "Height", "Pressure", "Current Temperature", "Day Temperature", "Night Temperature", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation"};
 		ImGui::Combo("Particle Color Mode", &params_int["render_particle_color_mode"], items_b, IM_ARRAYSIZE(items_b));
 	}
 
@@ -156,9 +157,9 @@ void PathTracer::f_guiUpdate() {
 
 	ImGui::SeparatorText("Theoretical Performance Stats");
 
-	ImGui::Text(string("Octree VRAM: " + to_string((renderer->kernel.bvh_nodes.size() * sizeof(GPU_Bvh)) / 1024) + "mb ").c_str());
-	ImGui::Text(string("Texture VRAM: " + to_string((texture_size * sizeof(uint)) / 1024) + "mb ").c_str());
-	ImGui::Text(string("Particle VRAM: " + to_string((renderer->params_int["PARTICLE_COUNT"] * sizeof(GPU_Particle)) / 1024) + "mb ").c_str());
+	ImGui::Text(string("Octree VRAM: " + to_string((renderer->kernel.bvh_nodes.size() * sizeof(GPU_Bvh)) / 1024) + "kb ").c_str());
+	ImGui::Text(string("Texture VRAM: " + to_string((texture_size * sizeof(uint)) / 1024 / 1024) + "mb ").c_str());
+	ImGui::Text(string("Particle VRAM: " + to_string((renderer->params_int["PARTICLE_COUNT"] * sizeof(GPU_Particle)) / 1024) + "kb ").c_str());
 }
 
 void PathTracer::f_recompile() {
@@ -252,7 +253,7 @@ void PathTracer::f_render() {
 	glUniform1ui (glGetUniformLocation(compute_program, "render_particles"), params_bool["render_particles"]);
 	{
 		glUniform1f  (glGetUniformLocation(compute_program, "render_particle_radius"), params_float["render_particle_radius"]);
-		glUniform1i(glGetUniformLocation(compute_program, "render_particle_color_mode"), params_bool["render_particle_color_mode"]);
+		glUniform1i(glGetUniformLocation(compute_program, "render_particle_color_mode"), params_int["render_particle_color_mode"]);
 	}
 
 	glBindImageTexture(0, gl_data["raw_render_layer"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
@@ -260,11 +261,6 @@ void PathTracer::f_render() {
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, gl_data["ssbo 2"]);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, gl_data["ssbo 3"]);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, gl_data["ssbo 4"]);
-	bindRenderLayer(compute_program, 0, renderer->kernel.gl_data["pass1"], "pass_1");
-	bindRenderLayer(compute_program, 1, renderer->kernel.gl_data["pass2"], "pass_2");
-	bindRenderLayer(compute_program, 2, renderer->kernel.gl_data["pass3"], "pass_3");
-	bindRenderLayer(compute_program, 3, renderer->kernel.gl_data["pass4"], "pass_4");
-	bindRenderLayer(compute_program, 4, renderer->kernel.gl_data["passW"], "pass_W");
 
 	glDispatchCompute(compute_layout.x, compute_layout.y, 1);
 
@@ -277,11 +273,6 @@ void PathTracer::f_render() {
 	glUniform2uiv(glGetUniformLocation(display_program, "display_resolution"), 1, value_ptr(renderer->display_resolution));
 	glUniform2uiv(glGetUniformLocation(display_program, "render_resolution") , 1, value_ptr(renderer->render_resolution));
 	bindRenderLayer(display_program, 0, gl_data["raw_render_layer"], "raw_render_layer");
-	bindRenderLayer(display_program, 1, renderer->kernel.gl_data["pass1"], "pass_1");
-	bindRenderLayer(display_program, 2, renderer->kernel.gl_data["pass2"], "pass_2");
-	bindRenderLayer(display_program, 3, renderer->kernel.gl_data["pass3"], "pass_3");
-	bindRenderLayer(display_program, 4, renderer->kernel.gl_data["pass4"], "pass_4");
-	bindRenderLayer(display_program, 5, renderer->kernel.gl_data["passW"], "pass_W");
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
 	glUseProgram(0);

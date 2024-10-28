@@ -66,46 +66,45 @@ vec3 f_temperatureToColor(float temp) {
 vec3 f_particleColor(in Particle particle, in float dist) {
 	float distance_factor = clamp(f_mapfloat(39.0, 32.0, 0.0, 1.0, dist), 0, 1);
 	switch (render_particle_color_mode) {
-		case 0: return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.temperature));
+		case 0: return vec3(particle.sun_intensity);
+		case 1: return vec3(f_mapfloat(-8000.0, 6400.0, 0.0, 1.0, particle.height));
+		case 2: return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0,particle.pressure));
+		case 3: return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.temperature));
+		case 4: return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.day_temperature));
+		case 5: return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.night_temperature));
+		case 6: return vec3(f_mapfloat(0.1, 0.9, 0.0, 1.0, particle.humidity));
+		case 7: return vec3(f_mapfloat(0.0, 6.0, 0.0, 1.0, particle.water_vapor));
+		case 8: return vec3(particle.cloud_coverage);
+		case 9: return vec3(f_mapfloat(0.0, 1000.0, 0.0, 1.0, particle.cloud_water_content));
+		case 10: return vec3(f_mapfloat(4.0, 40.0, 0.0, 1.0, particle.cloud_particle_radius));
+		case 11: return vec3(f_mapfloat(0.0, 0.5, 0.0, 1.0, particle.cloud_optical_thickness));
+		case 12: return vec3(f_mapfloat(100.0, 500.0, 0.0, 1.0, particle.ozone));
+		case 13: return vec3(f_mapfloat(0.0, 16.0, 0.0, 1.0, particle.uv_index));
+		case 14: return vec3(f_mapfloat(-280.0, 280.0, 0.0, 1.0, particle.net_radiation));
+		case 15: return vec3(f_mapfloat(0.0, 550.0, 0.0, 1.0, particle.solar_insolation));
+		case 16: return vec3(f_mapfloat(85.0, 350.0, 0.0, 1.0, particle.outgoing_longwave_radiation)); 
+		case 17: return vec3(f_mapfloat(0.0, 425.0, 0.0, 1.0, particle.reflected_shortwave_radiation)); 
 	}
 	return vec3(1,0,1);
 }
 
-#define LOW_PRESSURE  vec3(1.0, 0.5, 0.0)
-#define HIGH_PRESSURE vec3(0.0, 0.5, 1.0)
-
 vec4 f_earthColor(in vec2 uv) {
 	vec4 color;
-	if (render_planet_texture <= 2) {
-		color = sampleTextureRgba8u(textures[render_planet_texture], uv);
-	}
+	color = sampleTextureRgba8u(textures[render_planet_texture], uv);
 	switch (render_planet_texture) {
 		case 0: {
 			return color;
 		}
-		case 1: {
+		case 3:
+		case 4: {
 			float mappedValue1 = f_mapfloat(-25.0, 45.0, 0.0, 1.0, -2.0);
 			float mappedValue2 = f_mapfloat(-25.0, 45.0, 0.0, 1.0, 35.0);
 			return vec4(f_temperatureToColor(f_mapfloat(0.0, 1.0, mappedValue1, mappedValue2, color.x)), 1.0);
 		}
-		case 2: {
+		case 5:
+		case 6: {
 			return vec4(f_temperatureToColor(color.x), 1.0);
 		}
-		case 3: {
-			return texture(pass_1, uv);
-		}
-		case 4: {
-			return texture(pass_2, uv);
-		}
-		case 5: {
-			return texture(pass_3, uv);
-		}
-		case 6: {
-			return texture(pass_4, uv);
-		}
-		case 7: {
-			return texture(pass_W, uv);
-		}
 	}
-	return vec4(1,0,1, 1);
+	return color;
 }

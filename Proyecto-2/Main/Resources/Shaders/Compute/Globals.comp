@@ -2,7 +2,30 @@
 //-------------------------------------------------------------------------------------------------
 struct Particle {
 	vec3  position;
+	float height;
+
+	vec3  wind_vector;
+	float sun_intensity;
+
+	float pressure;
 	float temperature;
+	float day_temperature;
+	float night_temperature;
+
+	float humidity;
+	float water_vapor;
+	float cloud_coverage;
+	float cloud_water_content;
+
+	float cloud_particle_radius;
+	float cloud_optical_thickness;
+	float ozone;
+	float uv_index;
+
+	float net_radiation;
+	float solar_insolation;
+	float outgoing_longwave_radiation;
+	float reflected_shortwave_radiation;
 };
 
 struct Texture {

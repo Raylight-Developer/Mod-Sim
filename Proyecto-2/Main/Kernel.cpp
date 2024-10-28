@@ -38,12 +38,28 @@ Kernel::Kernel() {
 	SDT                = 0;
 	time               = 0;
 	frame_count        = 0;
-	compute_layout     = uvec2(0);
-	compute_resolution = uvec2(0);
 
-	textures[Texture_Field::TOPOGRAPHY] = Texture::fromFile("./Resources/Nasa Earth Data/Topography.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::SST] = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature CAF.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::LST] = Texture::fromFile("./Resources/Nasa Earth Data/Land Surface Temperature CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::TOPOGRAPHY]                     = Texture::fromFile("./Resources/Nasa Earth Data/Topography.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::BATHYMETRY]                     = Texture::fromFile("./Resources/Nasa Earth Data/Bathymetry.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::SURFACE_PRESSURE]               = Texture::fromFile("./Resources/Nasa Earth Data/MODIS/Surface Pressure CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::SEA_SURFACE_TEMPERATURE_DAY]    = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::SEA_SURFACE_TEMPERATURE_NIGHT]  = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature Night CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::LAND_SURFACE_TEMPERATURE_DAY]   = Texture::fromFile("./Resources/Nasa Earth Data/Land Surface Temperature CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::LAND_SURFACE_TEMPERATURE_NIGHT] = Texture::fromFile("./Resources/Nasa Earth Data/Land Surface Temperature Night CAF.png", Texture_Format::MONO_FLOAT);
+	
+	textures[Texture_Field::HUMIDITY]                = Texture::fromFile("./Resources/Nasa Earth Data/MODIS/Humidity After Moist CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::WATER_VAPOR]             = Texture::fromFile("./Resources/Nasa Earth Data/Water Vapor CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::CLOUD_COVERAGE]          = Texture::fromFile("./Resources/Nasa Earth Data/Cloud Fraction.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::CLOUD_WATER_CONTENT]     = Texture::fromFile("./Resources/Nasa Earth Data/Cloud Water Content CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::CLOUD_PARTICLE_RADIUS]   = Texture::fromFile("./Resources/Nasa Earth Data/Cloud Particle Radius CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::CLOUD_OPTICAL_THICKNESS] = Texture::fromFile("./Resources/Nasa Earth Data/Cloud Optical Thickness CAF.png", Texture_Format::MONO_FLOAT);
+	
+	textures[Texture_Field::OZONE]                         = Texture::fromFile("./Resources/Nasa Earth Data/Ozone CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::UV_INDEX]                      = Texture::fromFile("./Resources/Nasa Earth Data/UV Index.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::NET_RADIATION]                 = Texture::fromFile("./Resources/Nasa Earth Data/Net Radiation.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::SOLAR_INSOLATION]              = Texture::fromFile("./Resources/Nasa Earth Data/Solar Insolation.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::OUTGOING_LONGWAVE_RADIATION]   = Texture::fromFile("./Resources/Nasa Earth Data/Outgoing Longwave Radiation.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::REFLECTED_SHORTWAVE_RADIATION] = Texture::fromFile("./Resources/Nasa Earth Data/Reflected Shortwave Radiation.png", Texture_Format::MONO_FLOAT);
 }
 
 void Kernel::preInit(const unordered_map<string, float>& params_float, const unordered_map<string, bool>& params_bool,const unordered_map<string, int>& params_int) {
@@ -90,74 +106,10 @@ void Kernel::preInitParticles() {
 }
 
 void Kernel::init() {
-	//initParticles();
+	textures.clear();
+	initParticles();
 	time = 0.0f;
 	frame_count = 0;
-	compute_resolution = uvec2(1920, 1080);
-
-	compute_layout.x = d_to_u(ceil(u_to_d(compute_resolution.x) / 32.0));
-	compute_layout.y = d_to_u(ceil(u_to_d(compute_resolution.y) / 32.0));
-
-	glDeleteTextures(1, &gl_data["pass1"]);
-	glDeleteTextures(1, &gl_data["pass2"]);
-	glDeleteTextures(1, &gl_data["pass3"]);
-	glDeleteTextures(1, &gl_data["pass4"]);
-	glDeleteTextures(1, &gl_data["passW"]);
-	glDeleteTextures(1, &gl_data["lastPassW"]);
-	gl_data["pass1"] = renderLayer(compute_resolution);
-	gl_data["pass2"] = renderLayer(compute_resolution);
-	gl_data["pass3"] = renderLayer(compute_resolution);
-	gl_data["pass4"] = renderLayer(compute_resolution);
-	gl_data["passW"] = renderLayer(compute_resolution);
-	gl_data["lastPassW"] = renderLayer(compute_resolution);
-
-	{
-		auto confirmation = computeShaderProgram("Simulation/Pressure Pass1");
-		if (confirmation) {
-			glDeleteProgram(gl_data["prog 1"]);
-			gl_data["prog 1"] =  confirmation.data;
-		}
-	}
-	{
-		auto confirmation = computeShaderProgram("Simulation/Pressure Pass2");
-		if (confirmation) {
-			glDeleteProgram(gl_data["prog 2"]);
-			gl_data["prog 2"] =  confirmation.data;
-		}
-	}
-	{
-		auto confirmation = computeShaderProgram("Simulation/Pressure Pass3");
-		if (confirmation) {
-			glDeleteProgram(gl_data["prog 3"]);
-			gl_data["prog 3"] =  confirmation.data;
-		}
-	}
-	{
-		auto confirmation = computeShaderProgram("Simulation/Pressure Pass4");
-		if (confirmation) {
-			glDeleteProgram(gl_data["prog 4"]);
-			gl_data["prog 4"] =  confirmation.data;
-		}
-	}
-	{
-		auto confirmation = computeShaderProgram("Simulation/Wind");
-		if (confirmation) {
-			glDeleteProgram(gl_data["prog W"]);
-			gl_data["prog W"] =  confirmation.data;
-		}
-	}
-
-	vector<uint> texture_data;
-	vector<GPU_Texture> textures;
-	vector<string> texture_names = { "Topography" };
-	for (const string& tex : texture_names) {
-		Texture texture = Texture::fromFile("./Resources/Nasa Earth Data/" + tex + ".png", Texture_Format::RGBA_8);
-		textures.push_back(GPU_Texture(ul_to_u(texture_data.size()), texture.resolution.x, texture.resolution.y, 0));
-		auto data = texture.toRgba8Texture();
-		texture_data.insert(texture_data.end(), data.begin(), data.end());
-	}
-	gl_data["ssbo 1"] = ssboBinding(ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
-	gl_data["ssbo 2"] = ssboBinding(ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
 }
 
 void Kernel::initParticles() {
@@ -177,7 +129,7 @@ void Kernel::initParticles() {
 
 		sort(neighbors.begin(), neighbors.end(), [](const CPU_Neighbor& a, const CPU_Neighbor& b) {
 			return a.distance < b.distance;
-			});
+		});
 
 		particle.smoothing_radius = neighbors[2].distance * 2.0f;
 		for (uint k = 0; k < NUM_NEIGHBORS; k++) {
@@ -205,118 +157,7 @@ void Kernel::simulate(const dvec1& delta_time) {
 
 	time += DT;
 
-	const GLuint prog_1 = gl_data["prog 1"];
-	const GLuint prog_2 = gl_data["prog 2"];
-	const GLuint prog_3 = gl_data["prog 3"];
-	const GLuint prog_4 = gl_data["prog 4"];
-	const GLuint prog_W = gl_data["prog W"];
-
-	{
-		glUseProgram(prog_1);
-		glUniform1f(glGetUniformLocation(prog_1, "iTime"), time);
-		glUniform1ui(glGetUniformLocation(prog_1, "iFrame"), frame_count);
-		glUniform2ui(glGetUniformLocation(prog_1, "iResolution"), compute_resolution.x, compute_resolution.y);
-
-		glBindImageTexture(0, gl_data["pass1"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gl_data["ssbo 1"]);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, gl_data["ssbo 2"]);
-
-		glDispatchCompute(compute_layout.x, compute_layout.y, 1);
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-	}
-	{
-		glUseProgram(prog_2);
-		glUniform1f(glGetUniformLocation(prog_2, "iTime"), time);
-		glUniform1ui(glGetUniformLocation(prog_2, "iFrame"), frame_count);
-		glUniform2ui(glGetUniformLocation(prog_2, "iResolution"), compute_resolution.x, compute_resolution.y);
-
-		glBindImageTexture(0, gl_data["pass1"], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
-		glBindImageTexture(1, gl_data["pass2"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
-
-		glDispatchCompute(compute_layout.x, compute_layout.y, 1);
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-	}
-	{
-		glUseProgram(prog_3);
-		glUniform1f(glGetUniformLocation(prog_3, "iTime"), time);
-		glUniform1ui(glGetUniformLocation(prog_3, "iFrame"), frame_count);
-		glUniform2ui(glGetUniformLocation(prog_3, "iResolution"), compute_resolution.x, compute_resolution.y);
-
-		glBindImageTexture(0, gl_data["pass2"], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
-		glBindImageTexture(1, gl_data["pass3"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
-
-		glDispatchCompute(compute_layout.x, compute_layout.y, 1);
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-	}
-	{
-		glUseProgram(prog_4);
-		glUniform1f(glGetUniformLocation(prog_4, "iTime"), time);
-		glUniform1ui(glGetUniformLocation(prog_4, "iFrame"), frame_count);
-		glUniform2ui(glGetUniformLocation(prog_4, "iResolution"), compute_resolution.x, compute_resolution.y);
-
-		glBindImageTexture(0, gl_data["pass3"], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
-		glBindImageTexture(1, gl_data["pass4"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
-
-		glDispatchCompute(compute_layout.x, compute_layout.y, 1);
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-	}
-
-	{
-		glUseProgram(prog_W);
-		glUniform1f(glGetUniformLocation(prog_W, "iTime"), time);
-		glUniform1ui(glGetUniformLocation(prog_W, "iFrame"), frame_count);
-		glUniform2ui(glGetUniformLocation(prog_W, "iResolution"), compute_resolution.x, compute_resolution.y);
-
-		glBindImageTexture(0, gl_data["pass4"], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
-		glBindImageTexture(1, gl_data["passW"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
-		glBindImageTexture(2, gl_data["lastPassW"], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
-
-		glDispatchCompute(compute_layout.x, compute_layout.y, 1);
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-	}
-	glUseProgram(0);
-
-	copyRenderLayer(gl_data["passW"], gl_data["lastPassW"], compute_resolution);
-
 	frame_count++;
-}
-
-void Kernel::f_recompile() {
-	{
-		auto confirmation = computeShaderProgram("Simulation/Pressure Pass1");
-		if (confirmation) {
-			glDeleteProgram(gl_data["prog 1"]);
-			gl_data["prog 1"] =  confirmation.data;
-		}
-	}
-	{
-		auto confirmation = computeShaderProgram("Simulation/Pressure Pass2");
-		if (confirmation) {
-			glDeleteProgram(gl_data["prog 2"]);
-			gl_data["prog 2"] =  confirmation.data;
-		}
-	}
-	{
-		auto confirmation = computeShaderProgram("Simulation/Pressure Pass3");
-		if (confirmation) {
-			glDeleteProgram(gl_data["prog 3"]);
-			gl_data["prog 3"] =  confirmation.data;
-		}
-	}
-	{
-		auto confirmation = computeShaderProgram("Simulation/Pressure Pass4");
-		if (confirmation) {
-			glDeleteProgram(gl_data["prog 4"]);
-			gl_data["prog 4"] =  confirmation.data;
-		}
-	}
-	{
-		auto confirmation = computeShaderProgram("Simulation/Wind");
-		if (confirmation) {
-			glDeleteProgram(gl_data["prog W"]);
-			gl_data["prog W"] =  confirmation.data;
-		}
-	}
 }
 
 void Kernel::traceProperties(CPU_Particle* particle) const {
@@ -343,20 +184,61 @@ void Kernel::traceProperties(CPU_Particle* particle) const {
 
 	const vec2 uv = vec2(1.0 - ((phi + PI) / TWO_PI), (theta) / PI);
 
-	const vec1 topography_sample = textures.at(Texture_Field::TOPOGRAPHY).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
-	const vec1 sst_sample = textures.at(Texture_Field::SST).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
-	const vec1 lst_sample = textures.at(Texture_Field::LST).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 topography_sample = textures.at(Texture_Field::TOPOGRAPHY                    ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 bathymetry_sample = textures.at(Texture_Field::BATHYMETRY                    ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 pressure_sample   = textures.at(Texture_Field::SURFACE_PRESSURE              ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 sst_sample        = textures.at(Texture_Field::SEA_SURFACE_TEMPERATURE_DAY   ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 sst_night_sample  = textures.at(Texture_Field::SEA_SURFACE_TEMPERATURE_NIGHT ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 lst_sample        = textures.at(Texture_Field::LAND_SURFACE_TEMPERATURE_DAY  ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 lst_night_sample  = textures.at(Texture_Field::LAND_SURFACE_TEMPERATURE_NIGHT).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
 
-	const vec1 topography =  lut(Texture_Field::TOPOGRAPHY, topography_sample);
-	const vec1 sst =         lut(Texture_Field::SST, sst_sample);
-	const vec1 lst =         lut(Texture_Field::LST, lst_sample);
+	const vec1 humidity_sample                = textures.at(Texture_Field::HUMIDITY                  ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 water_vapor_sample             = textures.at(Texture_Field::WATER_VAPOR               ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 cloud_coverage_sample          = textures.at(Texture_Field::CLOUD_COVERAGE            ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 cloud_water_content_sample     = textures.at(Texture_Field::CLOUD_WATER_CONTENT       ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 cloud_particle_radius_sample   = textures.at(Texture_Field::CLOUD_PARTICLE_RADIUS     ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 cloud_optical_thickness_sample = textures.at(Texture_Field::CLOUD_OPTICAL_THICKNESS   ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
 
+	const vec1 ozone_sample                         = textures.at(Texture_Field::OZONE                        ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 uv_index_sample                      = textures.at(Texture_Field::UV_INDEX                     ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 net_radiation_sample                 = textures.at(Texture_Field::NET_RADIATION                ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 solar_insolation_sample              = textures.at(Texture_Field::SOLAR_INSOLATION             ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 outgoiing_longwave_radiation_sample  = textures.at(Texture_Field::OUTGOING_LONGWAVE_RADIATION  ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+	const vec1 reflected_shortwave_radiation_sample = textures.at(Texture_Field::REFLECTED_SHORTWAVE_RADIATION).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
+
+	const vec1 topography = lut(Texture_Field::TOPOGRAPHY, topography_sample);
+	const vec1 bathymetry = lut(Texture_Field::BATHYMETRY, bathymetry_sample);
+	particle->pressure    = lut(Texture_Field::SURFACE_PRESSURE, pressure_sample);
+	const vec1 sst        = lut(Texture_Field::SEA_SURFACE_TEMPERATURE_DAY, sst_sample);
+	const vec1 sst_night  = lut(Texture_Field::SEA_SURFACE_TEMPERATURE_NIGHT, sst_night_sample);
+	const vec1 lst        = lut(Texture_Field::LAND_SURFACE_TEMPERATURE_DAY, lst_sample);
+	const vec1 lst_night  = lut(Texture_Field::LAND_SURFACE_TEMPERATURE_NIGHT, lst_night_sample);
 	if (topography == -1.0f) { // Is at sea
-		particle->temperature = sst;
+		particle->day_temperature = sst;
+		particle->night_temperature = sst_night;
+		particle->on_water = true;
+		particle->height = bathymetry;
 	}
 	else { // Is on Land
-		particle->temperature = lst;
+		particle->day_temperature = lst;
+		particle->night_temperature = lst_night;
+		particle->on_water = false;
+		particle->height = topography;
 	}
+
+	particle->humidity                = lut(Texture_Field::HUMIDITY, humidity_sample);
+	particle->water_vapor             = lut(Texture_Field::WATER_VAPOR, water_vapor_sample);
+	particle->cloud_coverage          = lut(Texture_Field::CLOUD_COVERAGE, cloud_coverage_sample);
+	particle->cloud_water_content     = lut(Texture_Field::CLOUD_WATER_CONTENT, cloud_water_content_sample);
+	particle->cloud_particle_radius   = lut(Texture_Field::CLOUD_PARTICLE_RADIUS, cloud_particle_radius_sample);
+	particle->cloud_optical_thickness = lut(Texture_Field::CLOUD_OPTICAL_THICKNESS, cloud_optical_thickness_sample);
+
+	particle->ozone                         = lut(Texture_Field::OZONE, ozone_sample);
+	particle->uv_index                      = lut(Texture_Field::UV_INDEX, uv_index_sample);
+	particle->net_radiation                 = lut(Texture_Field::NET_RADIATION, net_radiation_sample);
+	particle->solar_insolation              = lut(Texture_Field::SOLAR_INSOLATION, solar_insolation_sample);
+	particle->outgoing_longwave_radiation   = lut(Texture_Field::OUTGOING_LONGWAVE_RADIATION, outgoiing_longwave_radiation_sample);
+	particle->reflected_shortwave_radiation = lut(Texture_Field::REFLECTED_SHORTWAVE_RADIATION, reflected_shortwave_radiation_sample);
 }
 
 vec3 Kernel::rotateGeoloc(const vec3& point, const vec2& geoloc) const {

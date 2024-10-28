@@ -28,7 +28,7 @@ Renderer::Renderer() {
 
 	camera_zoom_sensitivity = 2.0;
 	camera_orbit_sensitivity = 5.0;
-	inputs = vector(348, false);
+	inputs = vector(6, false);
 
 	sim_time_aggregate = 0.0;
 
@@ -185,15 +185,11 @@ void Renderer::systemInfo() {
 
 void Renderer::f_pipeline() {
 	pathtracer.f_initialize();
-	kernel.init();
-	kernel.simulate(0.01);
 	f_changeSettings();
 }
 
 void Renderer::f_recompile() {
 	pathtracer.f_recompile();
-	kernel.f_recompile();
-	kernel.simulate(0.01);
 }
 
 void Renderer::f_tickUpdate() {
@@ -323,17 +319,23 @@ void Renderer::f_frameUpdate() {
 }
 
 void Renderer::f_inputLoop() {
-	if (inputs[GLFW_KEY_W]) {
+	if (inputs[0]) {
 		camera_transform.orbit(dvec3(0.0), dvec2(-25, 0) * delta_time);
 	}
-	if (inputs[GLFW_KEY_A]) {
+	if (inputs[1]) {
 		camera_transform.orbit(dvec3(0.0), dvec2(0, -25) * delta_time);
 	}
-	if (inputs[GLFW_KEY_S]) {
+	if (inputs[2]) {
 		camera_transform.orbit(dvec3(0.0), dvec2(25, 0) * delta_time);
 	}
-	if (inputs[GLFW_KEY_D]) {
+	if (inputs[3]) {
 		camera_transform.orbit(dvec3(0.0), dvec2(0, 25) * delta_time);
+	}
+	if (inputs[4]) {
+		camera_transform.moveLocal(dvec3(0.0, 0.0, -15.0) * camera_zoom_sensitivity * delta_time);
+	}
+	if (inputs[5]) {
+		camera_transform.moveLocal(dvec3(0.0, 0.0, 15.0) * camera_zoom_sensitivity * delta_time);
 	}
 }
 
@@ -378,21 +380,13 @@ void Renderer::framebufferSize(GLFWwindow* window, int width, int height) {
 void Renderer::mouseButton(GLFWwindow* window, int button, int action, int mods) {
 	Renderer* instance = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
 	if (action == GLFW_PRESS) {
-		instance->inputs[button] = true;
 	}
 	else if (action == GLFW_RELEASE) {
-		instance->inputs[button] = false;
 	}
 }
 
 void Renderer::scroll(GLFWwindow* window, double xoffset, double yoffset) {
 	Renderer* instance = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
-	if (yoffset < 0) {
-		instance->camera_transform.moveLocal(dvec3(0.0, 0.0,  25.0) * instance->camera_zoom_sensitivity * instance->delta_time);
-	}
-	if (yoffset > 0) {
-		instance->camera_transform.moveLocal(dvec3(0.0, 0.0, -25.0) * instance->camera_zoom_sensitivity * instance->delta_time);
-	}
 }
 
 void Renderer::key(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -401,13 +395,35 @@ void Renderer::key(GLFWwindow* window, int key, int scancode, int action, int mo
 	if (key == GLFW_KEY_F5 && action == GLFW_PRESS) {
 		instance->f_recompile();
 	}
-	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-		glfwSetWindowShouldClose(window, GLFW_TRUE);
-	}
+	//if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+	//	glfwSetWindowShouldClose(window, GLFW_TRUE);
+	//}
 	if (action == GLFW_PRESS) {
-		instance->inputs[key] = true;
+		if (key == GLFW_KEY_W)
+			instance->inputs[0] = true;
+		if (key == GLFW_KEY_A)
+			instance->inputs[1] = true;
+		if (key == GLFW_KEY_S)
+			instance->inputs[2] = true;
+		if (key == GLFW_KEY_D)
+			instance->inputs[3] = true;
+		if (key == GLFW_KEY_UP)
+			instance->inputs[4] = true;
+		if (key == GLFW_KEY_DOWN)
+			instance->inputs[5] = true;
 	}
 	else if (action == GLFW_RELEASE) {
-		instance->inputs[key] = false;
+		if (key == GLFW_KEY_W)
+			instance->inputs[0] = false;
+		if (key == GLFW_KEY_A)
+			instance->inputs[1] = false;
+		if (key == GLFW_KEY_S)
+			instance->inputs[2] = false;
+		if (key == GLFW_KEY_D)
+			instance->inputs[3] = false;
+		if (key == GLFW_KEY_UP)
+			instance->inputs[4] = false;
+		if (key == GLFW_KEY_DOWN)
+			instance->inputs[5] = false;
 	}
 }

@@ -33,9 +33,6 @@ struct Kernel {
 
 	vec1  time;
 	uint  frame_count;
-	uvec2 compute_layout;
-	uvec2 compute_resolution;
-	unordered_map<string, GLuint> gl_data;
 
 	Kernel();
 
@@ -47,7 +44,6 @@ struct Kernel {
 	void initBvh();
 
 	void simulate(const dvec1& delta_time);
-	void f_recompile();
 
 	void traceProperties(CPU_Particle* particle) const;
 	vec3 rotateGeoloc(const vec3& point, const vec2& geoloc) const;
