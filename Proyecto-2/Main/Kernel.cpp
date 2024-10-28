@@ -78,6 +78,8 @@ void Kernel::preInit(const unordered_map<string, float>& params_float, const uno
 	SAMPLES          = 5;
 	SDT              = 0.016f / u_to_f(SAMPLES);
 
+	sun_dir = sunDir();
+
 	preInitParticles();
 	initBvh();
 }
@@ -100,14 +102,14 @@ void Kernel::preInitParticles() {
 
 		particle.position = rotateGeoloc(vec3(x, y, z), POLE_GEOLOCATION);
 
-		traceProperties(&particle);
+		traceInitProperties(&particle);
 		particles.push_back(particle);
 	}
 }
 
 void Kernel::init() {
 	textures.clear();
-	initParticles();
+	//initParticles();
 	time = 0.0f;
 	frame_count = 0;
 }
@@ -151,16 +153,22 @@ void Kernel::initBvh() {
 	}
 }
 
-void Kernel::simulate(const dvec1& delta_time) {
+void Kernel::simulate(const dvec1& delta_time, const vec1& date_time) {
+	params_float.at("DATE_TIME") = date_time;
 	DT = d_to_f(delta_time);
 	SDT = DT / u_to_f(SAMPLES);
+	gpu_particles.clear();
+	sun_dir = sunDir();
 
 	time += DT;
-
+	for (CPU_Particle& particle : particles) {
+		calculateSunlight(&particle);
+		gpu_particles.push_back(GPU_Particle(particle));
+	}
 	frame_count++;
 }
 
-void Kernel::traceProperties(CPU_Particle* particle) const {
+void Kernel::traceInitProperties(CPU_Particle* particle) const {
 	const vec3 ray_direction = glm::normalize(vec3(0) - particle->position);
 
 	const vec1 a = glm::dot(ray_direction, ray_direction);
@@ -239,6 +247,14 @@ void Kernel::traceProperties(CPU_Particle* particle) const {
 	particle->solar_insolation              = lut(Texture_Field::SOLAR_INSOLATION, solar_insolation_sample);
 	particle->outgoing_longwave_radiation   = lut(Texture_Field::OUTGOING_LONGWAVE_RADIATION, outgoiing_longwave_radiation_sample);
 	particle->reflected_shortwave_radiation = lut(Texture_Field::REFLECTED_SHORTWAVE_RADIATION, reflected_shortwave_radiation_sample);
+	calculateSunlight(particle);
+}
+
+void Kernel::calculateSunlight(CPU_Particle* particle) const {
+	const vec3 normal = glm::normalize(particle->position);
+	particle->sun_intensity = max(dot(normal, sun_dir), 0.0f) * 0.95f + 0.05f;
+
+	particle->temperature = glm::mix(particle->night_temperature, particle->day_temperature, particle->sun_intensity);
 }
 
 vec3 Kernel::rotateGeoloc(const vec3& point, const vec2& geoloc) const {

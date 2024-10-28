@@ -25,6 +25,8 @@ struct Kernel {
 	uint SAMPLES;
 	vec1 SDT;
 
+	vec3 sun_dir;
+
 	vector<CPU_Particle> particles;
 	unordered_map<Texture_Field, Texture> textures;
 
@@ -43,9 +45,11 @@ struct Kernel {
 	void initParticles();
 	void initBvh();
 
-	void simulate(const dvec1& delta_time);
+	void simulate(const dvec1& delta_time, const vec1& date_time);
 
-	void traceProperties(CPU_Particle* particle) const;
+	void traceInitProperties(CPU_Particle* particle) const;
+	void calculateSunlight(CPU_Particle* particle) const;
+
 	vec3 rotateGeoloc(const vec3& point, const vec2& geoloc) const;
 	vec3 sunDir() const;
 };

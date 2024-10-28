@@ -57,6 +57,7 @@ Renderer::Renderer() {
 
 	params_int["CALENDAR_DAY"]   = 22;
 	params_int["CALENDAR_MONTH"] = 12;
+	params_float["DATE_TIME"] = dateToFloat(params_int["CALENDAR_MONTH"], params_int["CALENDAR_DAY"]);
 
 	render_resolution = d_to_u(u_to_d(display_resolution) * f_to_d(params_float["RENDER_SCALE"]));
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
@@ -203,8 +204,9 @@ void Renderer::f_tickUpdate() {
 		if (*date_time < 0.0f) {
 			*date_time += 1.0f;
 		}
-		kernel.simulate(delta);
+		kernel.simulate(delta, *date_time);
 		sim_delta = glfwGetTime() - start;
+		pathtracer.f_tickUpdate();
 	}
 	else {
 		sim_delta = 0.0;
@@ -241,8 +243,7 @@ void Renderer::f_guiLoop() {
 
 		ImGui::Text(("Fps: " + to_str(frame_count, 0)).c_str());
 	}
-	ImGui::Text(("Zoom: " + to_str(camera_zoom_sensitivity, 1)).c_str());
-	ImGui::Text(("Orbit: " + to_str(camera_orbit_sensitivity, 1)).c_str());
+	ImGui::Text(("Zoom: " + to_str(camera_zoom_sensitivity, 1) + "    Orbit: " + to_str(camera_orbit_sensitivity, 1)).c_str());
 	ImGui::SeparatorText("Play / Pause");
 	if (run_sim) {
 		if (ImGui::Button("Pause")) {
@@ -329,9 +330,7 @@ void Renderer::f_inputLoop() {
 			input->y += delta_time / input_lerp;
 			if (input->y > 1.0)
 				input->y = 1.0;
-			//const dvec1 progress = easeInOut(input->y);
 			input->x = lerp(input->x, input->z, input->y);
-			//input->x = input->z == 1.0 ? progress : (1.0 - progress);
 		}
 		if (i == 0) {
 			camera_transform.orbit(dvec3(0), dvec2(-1, 0) * input->x * camera_orbit_sensitivity * delta_time);

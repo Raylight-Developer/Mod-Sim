@@ -102,8 +102,8 @@ void PathTracer::f_initialize() {
 }
 
 void PathTracer::f_tickUpdate() {
-	//glDeleteBuffers(1, &data["ssbo 1"]);
-	//data["ssbo 1"] = ssboBinding(1, ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
+	glDeleteBuffers(1, &gl_data["ssbo 1"]);
+	gl_data["ssbo 1"] = ssboBinding(ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
 }
 
 void PathTracer::f_changeSettings() {
