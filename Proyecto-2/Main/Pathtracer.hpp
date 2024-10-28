@@ -15,8 +15,10 @@ struct PathTracer {
 	vector<GPU_Texture> textures;
 	uint texture_size;
 
+	bool use_octree;
 	bool render_planet;
 	bool render_lighting;
+	bool render_particle_lighting;
 	bool render_atmosphere;
 	bool render_octree;
 	bool render_octree_hue;
@@ -30,6 +32,7 @@ struct PathTracer {
 	PathTracer(Renderer* renderer = nullptr);
 
 	void f_initialize();
+	void f_updateBvh();
 	void f_tickUpdate();
 	void f_changeSettings();
 

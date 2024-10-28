@@ -6,6 +6,7 @@ struct CPU_Particle;
 struct CPU_Neighbor;
 
 struct CPU_Particle {
+	vec3 base_position; // mm (mega) meters
 	vec3 position; // mm (mega) meters
 	vec3 wind_vector; // m/s
 	vec1 sun_intensity; // %

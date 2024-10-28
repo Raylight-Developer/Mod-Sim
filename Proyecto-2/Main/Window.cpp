@@ -46,20 +46,6 @@ Renderer::Renderer() {
 
 	run_sim = false;
 	lock_settings = false;
-
-	kernel.TIME_SCALE            = 10.0f;
-	kernel.PARTICLE_COUNT        = 8192;
-	kernel.MAX_OCTREE_DEPTH      = 4;
-	kernel.SAMPLES               = 4;
-
-	kernel.POLE_BIAS          = 0.9f;
-	kernel.POLE_BIAS_POWER    = 5.0f;
-	kernel.POLE_GEOLOCATION.x = 23.1510f;
-	kernel.POLE_GEOLOCATION.y = 93.0422f;
-	kernel.EARTH_TILT         = 23.5f;
-
-	kernel.CALENDAR_DAY   = 22;
-	kernel.CALENDAR_MONTH = 12;
 }
 
 Renderer::~Renderer() {
@@ -241,12 +227,16 @@ void Renderer::f_guiLoop() {
 	if (run_sim) {
 		if (ImGui::Button("Pause")) {
 			run_sim = false;
+			kernel.buildBvh();
+			pathtracer.f_changeSettings();
+			pathtracer.use_octree = true;
 		}
 	}
 	else {
 		if (lock_settings) {
 			if (ImGui::Button("Play")) {
 				run_sim = true;
+				pathtracer.use_octree = false;
 			}
 		}
 		else {
@@ -272,13 +262,13 @@ void Renderer::f_guiLoop() {
 				f_changeSettings();
 			}
 
-			if (ImGui::SliderInt("Day", &kernel.CALENDAR_DAY, 0, 31)) {
-				kernel.DATE_TIME = dateToFloat(kernel.CALENDAR_MONTH, kernel.CALENDAR_DAY);
-				f_changeSettings();
-			}
-			if (ImGui::SliderInt("Month", &kernel.CALENDAR_MONTH, 0, 12)) {
-				kernel.DATE_TIME = dateToFloat(kernel.CALENDAR_MONTH, kernel.CALENDAR_DAY);
-				f_changeSettings();
+			if (ImGui::SliderInt("Month", &kernel.CALENDAR_MONTH, 0, 12)
+				or ImGui::SliderInt("Day", &kernel.CALENDAR_DAY, 0, 31)
+				or ImGui::SliderInt("Hour", &kernel.CALENDAR_HOUR, 0, 24)
+				or ImGui::SliderInt("Minute", &kernel.CALENDAR_MINUTE, 0, 60)
+			) {
+				kernel.calculateDateTime();
+				pathtracer.f_changeSettings();
 			}
 
 			ImGui::SeparatorText("Simulation Settings");

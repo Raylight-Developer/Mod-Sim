@@ -22,7 +22,7 @@ void main() {
 
 	Ray ray = f_cameraRay(uv);
 
-	mat3 rot = rot3xy(vec2( 0.0, date_time * TWO_PI ));
+	mat3 rot = rot3xy(vec2( 0.0, year_time * TWO_PI ));
 	vec3 sun_dir = normalize(vec3(-1,0,0) * rot);
 
 	vec4 color = vec4(0,0,0,1);
@@ -35,6 +35,7 @@ void main() {
 		float t_length = MAX_DIST;
 		float t_dist = MAX_DIST;
 		vec2 earth_uv = vec2(0.5);
+		vec4 bg_color = vec4(0,0,0,1);
 		if (render_planet == 1) {
 			if (f_EarthIntersection(ray, t_dist, earth_uv)) {
 				if (t_dist < t_length && t_dist > EPSILON) {
@@ -43,12 +44,12 @@ void main() {
 						vec3 intersection = ray.origin + ray.direction * t_dist;
 						vec3 normal = normalize(intersection);
 						float diffuse = max(dot(normal, sun_dir), 0.0) * 0.95 + 0.05;
-
 						color = vec4(f_earthColor(earth_uv).xyz * diffuse, 1);
 					}
 					else {
 						color = f_earthColor(earth_uv);
 					}
+					bg_color = color;
 				}
 			}
 		}
@@ -56,8 +57,8 @@ void main() {
 		if (closest_particle_index != -1) {
 			if (t_dist < t_length && t_dist > EPSILON) {
 				color = vec4(f_particleColor(particles[closest_particle_index], t_dist), 1.0);
-				if (render_lighting == 1) {
-					color.xyz *= particles[closest_particle_index].sun_intensity * 0.8 + 0.2;
+				if (render_particle_lighting == 1) {
+					color = mix(bg_color, color, particles[closest_particle_index].sun_intensity * 0.8 + 0.2);
 				}
 			}
 		}
@@ -76,7 +77,6 @@ void main() {
 				color = f_earthColor(earth_uv);
 			}
 		}
-		
 	}
 
 	float octree_alpha = 1.0;

@@ -17,10 +17,14 @@ struct Kernel {
 	vec1 POLE_BIAS_POWER;
 	vec2 POLE_GEOLOCATION;
 	vec1 EARTH_TILT;
-	vec1 DATE_TIME;
+	vec1 YEAR_TIME;
+	vec1 DAY_TIME;
 	vec1 TIME_SCALE;
 	int CALENDAR_MONTH;
 	int CALENDAR_DAY;
+	int CALENDAR_HOUR;
+	int CALENDAR_MINUTE;
+	uint DAY;
 
 	vec1 DT;
 	uint RUNFRAME;
@@ -46,14 +50,18 @@ struct Kernel {
 
 	void init();
 	void initParticles();
-	void initBvh();
+	void buildBvh();
 
 	void simulate(const dvec1& delta_time);
+	void updateTime();
+	void rotateEarth(CPU_Particle* particle) const;
 	void calculateSunlight(CPU_Particle* particle) const;
 	void calculateThermodynamics(CPU_Particle* particle) const;
 
 	vec3 sunDir() const;
+	void calculateDate();
+	void calculateDateTime();
+	void calculateYearTime();
+	void calculateDayTime();
 	vec3 rotateGeoloc(const vec3& point, const vec2& geoloc) const;
 };
-
-vec1 dateToFloat(const int& month, const int& day);

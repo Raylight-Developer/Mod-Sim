@@ -26,19 +26,27 @@
 #define HEAT_TRANSFER_COEFFICIENT  0.05f
 
 Kernel::Kernel() {
-	PARTICLE_RADIUS    = 0;
-	PARTICLE_COUNT     = 0;
-	MAX_OCTREE_DEPTH   = 0;
-	POLE_BIAS          = 0;
-	POLE_BIAS_POWER    = 0;
-	POLE_GEOLOCATION   = vec2(0);
-	DATE_TIME          = 0;
+	PARTICLE_RADIUS    = 0.025f;
+	PARTICLE_COUNT     = 8192;
+	MAX_OCTREE_DEPTH   = 2;
+	POLE_BIAS          = 0.9f;
+	POLE_BIAS_POWER    = 5.0f;
+	POLE_GEOLOCATION   = vec2(23.1510f, 93.0422f);
+	EARTH_TILT         = 23.5f;
+	CALENDAR_DAY       = 21;
+	CALENDAR_MONTH     = 12;
+	YEAR_TIME          = 0;
+	DAY_TIME           = 0;
+	DAY                = 0;
+	TIME_SCALE         = 5.0f;
 	DT                 = 0;
 	RUNFRAME           = 0;
-	SAMPLES            = 0;
+	SAMPLES            = 4;
 	SDT                = 0;
 	time               = 0;
 	frame_count        = 0;
+	sun_dir            = vec3(0, 0, 1);
+	calculateDateTime();
 
 	textures[Texture_Field::TOPOGRAPHY]                     = Texture::fromFile("./Resources/Nasa Earth Data/Topography.png", Texture_Format::MONO_FLOAT);
 	textures[Texture_Field::BATHYMETRY]                     = Texture::fromFile("./Resources/Nasa Earth Data/Bathymetry.png", Texture_Format::MONO_FLOAT);
@@ -65,16 +73,13 @@ Kernel::Kernel() {
 }
 
 void Kernel::preInit() {
-	PARTICLE_RADIUS  = 0.025f;
-
-
 	sun_dir = sunDir();
-
 	preInitParticles();
-	initBvh();
+	buildBvh();
 }
 
 void Kernel::preInitParticles() {
+	cout << "Build Particles" << endl;
 	const vec1 radius = 6.371f + PARTICLE_RADIUS;
 
 	particles.clear();
@@ -90,7 +95,8 @@ void Kernel::preInitParticles() {
 		const vec1 y = radius * cos(theta);
 		const vec1 z = radius * sin(theta) * sin(phi);
 
-		particle.position = rotateGeoloc(vec3(x, y, z), POLE_GEOLOCATION);
+		particle.base_position = rotateGeoloc(vec3(x, y, z), POLE_GEOLOCATION);
+		rotateEarth(&particle);
 
 		traceInitProperties(&particle);
 		particles.push_back(particle);
@@ -98,13 +104,15 @@ void Kernel::preInitParticles() {
 }
 
 void Kernel::init() {
-	textures.clear();
+	cout << "Build Locked Settings" << endl;
+	//textures.clear();
 	//initParticles();
 	time = 0.0f;
 	frame_count = 0;
 }
 
 void Kernel::initParticles() {
+	cout << "Build Full Particles" << endl;
 	const int NUM_NEIGHBORS = 3;
 
 	for (uint i = 0; i < PARTICLE_COUNT; i++) {
@@ -130,7 +138,8 @@ void Kernel::initParticles() {
 	}
 }
 
-void Kernel::initBvh() {
+void Kernel::buildBvh() {
+	cout << "Build Bvh" << endl;
 	const uint bvh_depth = d_to_u(glm::log2(ul_to_d(particles.size()) / 64.0));
 
 	const Builder bvh_build = Builder(particles, PARTICLE_RADIUS, MAX_OCTREE_DEPTH);
@@ -150,12 +159,10 @@ void Kernel::simulate(const dvec1& delta_time) {
 
 	for (uint i = 0; i < SAMPLES; i++) {
 		time += SDT;
-		DATE_TIME -= d_to_f(SDT) * 0.05f;
-		if (DATE_TIME < 0.0f) {
-			DATE_TIME += 1.0f;
-		}
+		updateTime();
 		sun_dir = sunDir();
 		for (CPU_Particle& particle : particles) {
+			rotateEarth(&particle);
 			calculateSunlight(&particle);
 			calculateThermodynamics(&particle);
 
@@ -163,10 +170,39 @@ void Kernel::simulate(const dvec1& delta_time) {
 
 
 
-			gpu_particles.push_back(GPU_Particle(particle));
 		}
 		frame_count++;
 	}
+
+	for (const CPU_Particle& particle : particles) {
+		gpu_particles.push_back(GPU_Particle(particle));
+	}
+}
+
+void Kernel::updateTime() {
+	const array<int, 12> daysInMonth = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+	DAY_TIME += SDT * 0.05f;
+	if (DAY_TIME > 1.0f) {
+		DAY_TIME -= 1.0f;
+		if (DAY < 365)
+			DAY++;
+		else DAY = 0;
+		YEAR_TIME = u_to_f(DAY) / 365.0f;
+		cout << YEAR_TIME << endl;
+	}
+}
+
+void Kernel::rotateEarth(CPU_Particle* particle) const {
+	const vec1 phi = 0.0f;
+	const vec1 theta = glm::radians(DAY_TIME * 360.0f);
+	const vec1 axialTilt = -glm::radians(EARTH_TILT);
+
+	const quat tiltRotation = glm::angleAxis(axialTilt, glm::vec3(0, 0, 1));
+	const quat latRotation  = glm::angleAxis(phi, glm::vec3(1, 0, 0));
+	const quat lonRotation  = glm::angleAxis(theta, glm::vec3(0, 1, 0));
+	const quat combinedRotation = tiltRotation * lonRotation * latRotation;
+
+	particle->position = combinedRotation * particle->base_position;
 }
 
 void Kernel::traceInitProperties(CPU_Particle* particle) const {
@@ -284,7 +320,7 @@ vec3 Kernel::rotateGeoloc(const vec3& point, const vec2& geoloc) const {
 }
 
 vec3 Kernel::sunDir() const {
-	const vec2 time = vec2(0, DATE_TIME * TWO_PI);
+	const vec2 time = vec2(0, YEAR_TIME * TWO_PI);
 	const vec2 c = cos(time);
 	const vec2 s = sin(time);
 
@@ -296,14 +332,37 @@ vec3 Kernel::sunDir() const {
 	return glm::normalize(vec3(-1,0,0) * rot);
 }
 
-vec1 dateToFloat(const int& month, const int& day) {
+void Kernel::calculateDate() {
 	const array<int, 12> daysInMonth = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+	YEAR_TIME = 1.0f - YEAR_TIME;
+	if (YEAR_TIME < 0.0f) {
+		YEAR_TIME += 1.0f;
+	}
 
+	const int dayOfYear = f_to_i(round(YEAR_TIME * 365.0f));
+	int daysPassed = 0;
+	for (CALENDAR_MONTH = 0; CALENDAR_MONTH < 12; ++CALENDAR_MONTH) {
+		if (dayOfYear <= daysPassed + daysInMonth[CALENDAR_MONTH]) {
+			CALENDAR_DAY = dayOfYear - daysPassed;
+			++CALENDAR_MONTH;
+			return;
+		}
+		daysPassed += daysInMonth[CALENDAR_MONTH];
+	}
+}
+
+void Kernel::calculateDateTime() {
+	calculateYearTime();
+	calculateDayTime();
+}
+
+void Kernel::calculateYearTime() {
+	const array<int, 12> daysInMonth = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 	int dayOfYear = 0;
-	for (int i = 0; i < month - 1; ++i) {
+	for (int i = 0; i < CALENDAR_MONTH - 1; ++i) {
 		dayOfYear += daysInMonth[i];
 	}
-	dayOfYear += day;
+	dayOfYear += CALENDAR_DAY;
 
 	const int totalDaysInYear = 365;
 	vec1 adjustedValue = (355 - dayOfYear + 1) / static_cast<vec1>(totalDaysInYear); // Start in solstice december 21
@@ -311,5 +370,9 @@ vec1 dateToFloat(const int& month, const int& day) {
 	if (adjustedValue < 0) {
 		adjustedValue = 1.0f + adjustedValue;
 	}
-	return adjustedValue;
+	YEAR_TIME = adjustedValue;
+}
+
+void Kernel::calculateDayTime() {
+	DAY_TIME = (i_to_f(CALENDAR_HOUR) + (i_to_f(CALENDAR_MINUTE) / 60.0f)) / 24.0f;
 }

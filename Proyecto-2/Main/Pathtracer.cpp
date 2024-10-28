@@ -8,10 +8,12 @@ PathTracer::PathTracer(Renderer* renderer) :
 	texture_size = 0;
 	compute_layout = uvec2(0);
 
-	render_planet     = true;
-	render_lighting   = false;
-	render_atmosphere = true;
-	render_octree     = false;
+	use_octree = true;
+	render_planet            = true;
+	render_lighting          = true;
+	render_particle_lighting = true;
+	render_atmosphere        = true;
+	render_octree            = false;
 	{
 		render_octree_hue        = false;
 		render_octree_debug      = false;
@@ -101,6 +103,11 @@ void PathTracer::f_initialize() {
 	gl_data["ssbo 4"] = ssboBinding(ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
 }
 
+void PathTracer::f_updateBvh() {
+	glDeleteBuffers(1, &gl_data["ssbo 2"]);
+	gl_data["ssbo 2"] = ssboBinding(ul_to_u(renderer->kernel.bvh_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.bvh_nodes.data());
+}
+
 void PathTracer::f_tickUpdate() {
 	glDeleteBuffers(1, &gl_data["ssbo 1"]);
 	gl_data["ssbo 1"] = ssboBinding(ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
@@ -126,13 +133,19 @@ void PathTracer::f_guiUpdate() {
 	if (render_lighting) {
 		ImGui::Checkbox("Render Atmosphere", &render_atmosphere);
 	}
+	ImGui::Checkbox("Render Particle Lighting", &render_particle_lighting);
 
-	ImGui::Checkbox("Render Octree", &render_octree);
-	if (render_octree) {
-		ImGui::Checkbox("Hue", &render_octree_hue);
-		ImGui::Checkbox("Debug", &render_octree_debug);
-		if (render_octree_debug) {
-			ImGui::SliderInt("Index", &render_octree_debug_index, 0, ul_to_i(renderer->kernel.bvh_nodes.size()));
+	if (!renderer->run_sim) {
+		ImGui::Checkbox("Use Octree", &use_octree);
+		if (use_octree) {
+			ImGui::Checkbox("Render Octree", &render_octree);
+			if (render_octree) {
+				ImGui::Checkbox("Hue", &render_octree_hue);
+				ImGui::Checkbox("Debug", &render_octree_debug);
+				if (render_octree_debug) {
+					ImGui::SliderInt("Index", &render_octree_debug_index, 0, ul_to_i(renderer->kernel.bvh_nodes.size()));
+				}
+			}
 		}
 	}
 
@@ -146,15 +159,7 @@ void PathTracer::f_guiUpdate() {
 
 	ImGui::SeparatorText("Pathtracing Optimization Settings");
 	if (ImGui::SliderFloat("Render Scale", &renderer->render_scale, 0.1f, 1.0f, "%.3f")) {
-		f_resize();
-	}
-	if (!renderer->lock_settings) {
-		int MAX_OCTREE_DEPTH = 4;
-		if (ImGui::SliderInt("Max Octree Depth", &MAX_OCTREE_DEPTH, 0, 5)) {
-			renderer->kernel.MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
-			renderer->kernel.initBvh();
-			f_changeSettings();
-		}
+		renderer->f_resize();
 	}
 
 	ImGui::SeparatorText("Theoretical Performance Stats");
@@ -238,13 +243,16 @@ void PathTracer::f_render() {
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"), 1, value_ptr(projection_v));
 
 	glUniform1f  (glGetUniformLocation(compute_program, "earth_tilt"), renderer->kernel.EARTH_TILT);
-	glUniform1f  (glGetUniformLocation(compute_program, "date_time"), renderer->kernel.DATE_TIME);
+	glUniform1f  (glGetUniformLocation(compute_program, "year_time"), d_to_f(renderer->kernel.YEAR_TIME));
+	glUniform1f  (glGetUniformLocation(compute_program, "day_time"), d_to_f(renderer->kernel.DAY_TIME));
 
+	glUniform1ui (glGetUniformLocation(compute_program, "use_octree"), use_octree);
 	glUniform1ui (glGetUniformLocation(compute_program, "render_planet"), render_planet);
 	{
 		glUniform1i(glGetUniformLocation(compute_program, "render_planet_texture"), render_planet_texture);
 	}
 	glUniform1ui (glGetUniformLocation(compute_program, "render_lighting"), render_lighting);
+	glUniform1ui (glGetUniformLocation(compute_program, "render_particle_lighting"), render_particle_lighting);
 	glUniform1ui (glGetUniformLocation(compute_program, "render_atmosphere"), render_atmosphere);
 	glUniform1ui (glGetUniformLocation(compute_program, "render_octree"), render_octree);
 	{

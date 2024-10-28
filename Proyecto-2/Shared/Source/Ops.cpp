@@ -399,6 +399,7 @@ void Transform::rotate(const dvec3& value) {
 
 			quat_rotation = yaw * pitch * roll * quat_rotation;
 			quat_rotation = glm::normalize(quat_rotation);
+			euler_rotation = glm::eulerAngles(quat_rotation);
 			break;
 		}
 		case Rotation_Type::XYZ: {
@@ -406,6 +407,7 @@ void Transform::rotate(const dvec3& value) {
 
 			if (euler_rotation.x > 89.0)  euler_rotation.x = 89.0;
 			if (euler_rotation.x < -89.0) euler_rotation.x = -89.0;
+			break;
 		}
 	}
 }
@@ -413,25 +415,22 @@ void Transform::rotate(const dvec3& value) {
 void Transform::orbit(const dvec3& pivot, const dvec2& py_rotation) {
 	switch (rotation_type) {
 		case Rotation_Type::QUATERNION: {
-			rotate(glm::vec3(py_rotation.x, py_rotation.y, 0.0));
+			rotate(dvec3(py_rotation.x, py_rotation.y, 0.0));
 
-			const dvec3 forward   = glm::normalize(glm::inverse(quat_rotation) * dvec3(0, 0, -1));
-			const dvec3 direction = glm::normalize(position - pivot);
-			const dvec1 z_distance  = glm::length(position - pivot);
+			const dvec3 z_vector = glm::mat4_cast(quat_rotation)[2];
+			const dvec1 z_distance = glm::length(position - pivot);
 
-			position = pivot - forward * z_distance;
+			position = pivot + z_vector * z_distance;
 			break;
 		}
 		case Rotation_Type::XYZ: {
 			rotate(dvec3(py_rotation.x, py_rotation.y, 0.0));
 
 			const dmat4 matrix = glm::yawPitchRoll(glm::radians(euler_rotation.y), glm::radians(euler_rotation.x), glm::radians(euler_rotation.z));
-			const dvec3 z_vector = -matrix[2];
+			const dvec3 z_vector = matrix[2];
 
 			const dvec1 z_distance = glm::length(pivot - position);
-			const dvec3 camera_position = position - z_vector * z_distance;
-
-			position = pivot - z_vector * z_distance;
+			position = pivot + z_vector * z_distance;
 			break;
 		}
 	}
