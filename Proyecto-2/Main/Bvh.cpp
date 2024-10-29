@@ -44,7 +44,7 @@ GPU_Bvh::GPU_Bvh() :
 {}
 
 void CPU_Bvh::growToInclude(const CPU_Particle& particle, const vec1& radius) {
-	growToInclude(particle.position - radius, particle.position + radius);
+	growToInclude(particle.transformed_position - radius, particle.transformed_position + radius);
 }
 
 void CPU_Bvh::growToInclude(const vec3& min, const vec3& max) {
@@ -65,7 +65,7 @@ vec3 CPU_Bvh::getCenter() const {
 }
 
 bool CPU_Bvh::contains(const CPU_Particle& particle) {
-	const vec3 pos = particle.position;
+	const vec3 pos = particle.transformed_position;
 	return (pos.x >= p_min.x && pos.x <= p_max.x) &&
 		(pos.y >= p_min.y && pos.y <= p_max.y) &&
 		(pos.z >= p_min.z && pos.z <= p_max.z);
@@ -96,9 +96,9 @@ Builder::Builder(const vector<CPU_Particle>& particles, const vec1& particle_rad
 	particle_radius(particle_radius * 2.0f)
 {
 	for (uint i = 0; i < particles.size(); i++) {
-		const vec3 center = (particles[i].position);
-		const vec3 max = particles[i].position + particle_radius;
-		const vec3 min = particles[i].position - particle_radius;
+		const vec3 center = (particles[i].transformed_position);
+		const vec3 max = particles[i].transformed_position + particle_radius;
+		const vec3 min = particles[i].transformed_position - particle_radius;
 		root_node.growToInclude(min, max);
 	}
 	root_node.discard = false;

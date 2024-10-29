@@ -1,6 +1,6 @@
 #include "Particle.hpp"
 
-CPU_Particle::CPU_Particle() {
+CPU_Particle_Data::CPU_Particle_Data() {
 	position = vec3(0);
 	wind_vector  = vec3(0);
 	sun_intensity = 0;
@@ -24,7 +24,15 @@ CPU_Particle::CPU_Particle() {
 	outgoing_longwave_radiation = 0;
 	reflected_shortwave_radiation = 0;
 	on_water = false;
+}
 
+CPU_Particle::CPU_Particle() :
+	data(CPU_Particle_Data()),
+	sph(CPU_Particle_Data())
+{
+	gen_index = 0;
+
+	transformed_position = vec3(0);
 	smoothing_radius = 0.0f;
 }
 
@@ -51,31 +59,34 @@ GPU_Particle::GPU_Particle() {
 	solar_insolation = 0;
 	outgoing_longwave_radiation = 0;
 	reflected_shortwave_radiation = 0;
+	gen_index = 0;
 }
 
 GPU_Particle::GPU_Particle(const CPU_Particle& particle) {
-	position = particle.position;
-	wind_vector = particle.wind_vector;
-	sun_intensity = particle.sun_intensity;
+	gen_index = particle.gen_index;
 
-	height = particle.height;
-	pressure = particle.pressure;
-	temperature = particle.temperature;
-	day_temperature = particle.day_temperature;
-	night_temperature = particle.night_temperature;
-	humidity = particle.humidity;
-	water_vapor = particle.water_vapor;
-	cloud_coverage = particle.cloud_coverage;
-	cloud_water_content = particle.cloud_water_content;
-	cloud_particle_radius = particle.cloud_particle_radius;
-	cloud_optical_thickness = particle.cloud_optical_thickness;
-	ozone = particle.ozone;
-	albedo = particle.albedo;
-	uv_index = particle.uv_index;
-	net_radiation = particle.net_radiation;
-	solar_insolation = particle.solar_insolation;
-	outgoing_longwave_radiation = particle.outgoing_longwave_radiation;
-	reflected_shortwave_radiation = particle.reflected_shortwave_radiation;
+	position = particle.transformed_position;
+	wind_vector = particle.data.wind_vector;
+	sun_intensity = particle.data.sun_intensity;
+
+	height = particle.data.height;
+	pressure = particle.data.pressure;
+	temperature = particle.data.temperature;
+	day_temperature = particle.data.day_temperature;
+	night_temperature = particle.data.night_temperature;
+	humidity = particle.data.humidity;
+	water_vapor = particle.data.water_vapor;
+	cloud_coverage = particle.data.cloud_coverage;
+	cloud_water_content = particle.data.cloud_water_content;
+	cloud_particle_radius = particle.data.cloud_particle_radius;
+	cloud_optical_thickness = particle.data.cloud_optical_thickness;
+	ozone = particle.data.ozone;
+	albedo = particle.data.albedo;
+	uv_index = particle.data.uv_index;
+	net_radiation = particle.data.net_radiation;
+	solar_insolation = particle.data.solar_insolation;
+	outgoing_longwave_radiation = particle.data.outgoing_longwave_radiation;
+	reflected_shortwave_radiation = particle.data.reflected_shortwave_radiation;
 }
 
 CPU_Neighbor::CPU_Neighbor(const vec1& distance, CPU_Particle* neighbor) :

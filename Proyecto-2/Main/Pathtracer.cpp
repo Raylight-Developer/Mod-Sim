@@ -11,7 +11,7 @@ PathTracer::PathTracer(Renderer* renderer) :
 	use_octree = true;
 	render_planet            = true;
 	render_lighting          = true;
-	render_particle_lighting = true;
+	render_particle_lighting = false;
 	render_atmosphere        = true;
 	render_octree            = false;
 	{
@@ -19,10 +19,10 @@ PathTracer::PathTracer(Renderer* renderer) :
 		render_octree_debug      = false;
 		render_octree_debug_index = 0;
 	}
-	render_particles = false;
+	render_particles = true;
 	{
-		render_particle_radius = 0.015f;
-		render_particle_color_mode = 0;
+		render_particle_radius = 0.01f;
+		render_particle_color_mode = 3;
 	}
 	render_planet_texture = 0;
 }
@@ -152,11 +152,12 @@ void PathTracer::f_guiUpdate() {
 	if (render_particles) {
 		ImGui::Checkbox("Use Octree", &use_octree);
 		if (use_octree) {
-			int MAX_OCTREE_DEPTH = 4;
+			int MAX_OCTREE_DEPTH = u_to_i(renderer->kernel.MAX_OCTREE_DEPTH);
 			if (ImGui::SliderInt("Max Octree Depth", &MAX_OCTREE_DEPTH, 0, 6)) {
 				renderer->kernel.MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
 				renderer->kernel.buildBvh();
 				f_updateBvh();
+				f_updateParticles();
 			}
 		}
 		ImGui::SliderFloat("Particle Radius", &render_particle_radius, 0.005f, 0.025f, "%.4f");

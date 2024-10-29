@@ -2,33 +2,16 @@
 
 #include "Lut.hpp"
 
-#define WARM_REGION        0.8f    // Bottom 1-N of half simulation_height
-#define COLD_REGION        0.8f    // Bottom N of half simulation_height
+#define STEFAN_BOLZMANN 5.67e-8
+#define AIR_SPECIFIC_HEAT_CAPACITY 1005.0 // J/kg°C
+#define AIR_DENSITY                1.225 // kg/m³
 
-#define AIR_GAS_CONSTANT   287.05f // J/(kg·K)
-#define AIR_DENSITY        1.225f  // kg/m^3 (at sea level)
-
-#define PARTICLE_RESTITUTION       0.95f
-#define RESTITUTION                0.95f
-#define GRAVITY                    vec3(0.0)
-
-#define ATMOSPHERE_TEMP    5.5f        // C
-#define SEA_SURFACE_TEMP   28.5f       // C
-#define AMBIENT_TEMP       15.5f       // C
-
-#define AIR_SPECIFIC_HEAT_CAPACITY 1005.0f // J/kg°C
-#define AIR_DENSITY                1.225f // kg/m³
-
-#define CORIOLIS           vec3(15.0f, 0, 0)
-
-#define CELL_HEAT_GAIN             1.0f
-#define CELL_AMBIENT_HEAT_TRANSFER 0.05f
-#define HEAT_TRANSFER_COEFFICIENT  0.05f
+#define CORIOLIS           vec3(15.0, 0, 0)
 
 Kernel::Kernel() {
 	PARTICLE_RADIUS    = 0.025f;
-	PARTICLE_COUNT     = 8192;
-	MAX_OCTREE_DEPTH   = 4;
+	PARTICLE_COUNT     = 8192*2;
+	MAX_OCTREE_DEPTH   = 2;
 	POLE_BIAS          = 0.975f;
 	POLE_BIAS_POWER    = 5.0f;
 	POLE_GEOLOCATION   = vec2(23.1510f, 93.0422f);
@@ -96,17 +79,18 @@ void Kernel::preInitParticles() {
 		const vec1 y = radius * cos(theta);
 		const vec1 z = radius * sin(theta) * sin(phi);
 
-		particle.base_position = rotateGeoloc(vec3(x, y, z), POLE_GEOLOCATION);
+		particle.data.position = rotateGeoloc(vec3(x, y, z), POLE_GEOLOCATION);
 		rotateEarth(&particle);
 
 		traceInitProperties(&particle);
+		particle.gen_index = i;
 		particles.push_back(particle);
 	}
 }
 
 void Kernel::init() {
 	textures.clear();
-	//initParticles();
+	initParticles();
 	time = 0.0f;
 	frame_count = 0;
 }
@@ -114,14 +98,17 @@ void Kernel::init() {
 void Kernel::initParticles() {
 	const int NUM_NEIGHBORS = 3;
 
-	for (uint i = 0; i < PARTICLE_COUNT; i++) {
+	int i = 0;
+	int i_size = u_to_i(PARTICLE_COUNT);
+	#pragma omp parallel for private(i) num_threads(12)
+	for (i = 0; i < i_size; i++) {
 		CPU_Particle& particle = particles[i];
 
 		vector<CPU_Neighbor> neighbors;
 
 		for (uint j = 0; j < PARTICLE_COUNT; j++) {
 			if (i != j) {
-				const vec1 distSq = glm::distance2(particle.position, particles[j].position);
+				const vec1 distSq = glm::distance2(particle.data.position, particles[j].data.position);
 				neighbors.push_back(CPU_Neighbor(distSq, &particles[j]));
 			}
 		}
@@ -134,6 +121,11 @@ void Kernel::initParticles() {
 		for (uint k = 0; k < NUM_NEIGHBORS; k++) {
 			particle.neighbors.push_back(neighbors[k]);
 		}
+
+		//#pragma omp critical
+		//if ((i % (PARTICLE_COUNT / 10)) == 0) {
+		//	cout << f_to_u(round(u_to_f(i) / u_to_f(PARTICLE_COUNT) * 100.0f)) << "%" << endl;
+		//}
 	}
 }
 
@@ -158,7 +150,12 @@ void Kernel::simulate(const dvec1& delta_time) {
 		updateTime();
 		sun_dir = sunDir();
 		for (CPU_Particle& particle : particles) {
+			particle.new_data = particle.data;
+		}
+
+		for (CPU_Particle& particle : particles) {
 			rotateEarth(&particle);
+			calculateSPH(&particle);
 			calculateSunlight(&particle);
 			calculateThermodynamics(&particle);
 
@@ -166,6 +163,10 @@ void Kernel::simulate(const dvec1& delta_time) {
 
 
 
+		}
+
+		for (CPU_Particle& particle : particles) {
+			particle.data = particle.new_data;
 		}
 		frame_count++;
 	}
@@ -197,21 +198,35 @@ void Kernel::rotateEarth(CPU_Particle* particle) const {
 	const quat lonRotation  = glm::angleAxis(theta, glm::vec3(0, 1, 0));
 	const quat combinedRotation = tiltRotation * lonRotation * latRotation;
 
-	particle->position = combinedRotation * particle->base_position;
+	particle->transformed_position = combinedRotation * particle->data.position;
+}
+
+void Kernel::calculateSPH(CPU_Particle* particle) const {
+	particle->sph = CPU_Particle_Data();
+	if (particle->neighbors.size() > 0) {
+		for (CPU_Neighbor& neighbor : particle->neighbors) {
+			const vec1 smoothing_kernel = pow(glm::max(0.0f, particle->smoothing_radius - neighbor.distance), 3.0f);
+			particle->sph.temperature += neighbor.neighbor->data.temperature;
+		}
+		particle->sph.temperature /= ul_to_f(particle->neighbors.size());
+	}
+	else {
+		particle->sph = particle->data;
+	}
 }
 
 void Kernel::traceInitProperties(CPU_Particle* particle) const {
-	const vec3 ray_direction = glm::normalize(vec3(0) - particle->position);
+	const vec3 ray_direction = glm::normalize(vec3(0) - particle->data.position);
 
 	const vec1 a = glm::dot(ray_direction, ray_direction);
-	const vec1 b = 2.0f * dot(ray_direction, particle->position);
-	const vec1 c = dot(particle->position, particle->position) - 40.589641f; // Earth Radius ^2
+	const vec1 b = 2.0f * dot(ray_direction, particle->data.position);
+	const vec1 c = dot(particle->data.position, particle->data.position) - 40.589641f; // Earth Radius ^2
 	const vec1 delta = b * b - 4.0f * a * c;
 	if (delta < 0.0f) {
 		return;
 	}
 
-	const vec3 intersectionPoint = particle->position + ((-b - sqrt(delta)) / (2.0f * a)) * ray_direction;
+	const vec3 intersectionPoint = particle->data.position + ((-b - sqrt(delta)) / (2.0f * a)) * ray_direction;
 	const vec1 axialTilt = -glm::radians(EARTH_TILT);
 	const mat3 tiltRotation = mat3(
 		vec3(cos(axialTilt), -sin(axialTilt), 0),
@@ -249,56 +264,56 @@ void Kernel::traceInitProperties(CPU_Particle* particle) const {
 
 	const vec1 topography = lut(Texture_Field::TOPOGRAPHY, topography_sample);
 	const vec1 bathymetry = lut(Texture_Field::BATHYMETRY, bathymetry_sample);
-	particle->pressure    = lut(Texture_Field::SURFACE_PRESSURE, pressure_sample);
+	particle->data.pressure    = lut(Texture_Field::SURFACE_PRESSURE, pressure_sample);
 	const vec1 sst        = lut(Texture_Field::SEA_SURFACE_TEMPERATURE_DAY, sst_sample);
 	const vec1 sst_night  = lut(Texture_Field::SEA_SURFACE_TEMPERATURE_NIGHT, sst_night_sample);
 	const vec1 lst        = lut(Texture_Field::LAND_SURFACE_TEMPERATURE_DAY, lst_sample);
 	const vec1 lst_night  = lut(Texture_Field::LAND_SURFACE_TEMPERATURE_NIGHT, lst_night_sample);
 	if (topography == -1.0f) { // Is at sea
-		particle->day_temperature = sst;
-		particle->night_temperature = sst_night;
-		particle->on_water = true;
-		particle->height = bathymetry;
-		particle->albedo = 0.135f;
+		particle->data.day_temperature = sst;
+		particle->data.night_temperature = sst_night;
+		particle->data.on_water = true;
+		particle->data.height = bathymetry;
+		particle->data.albedo = 0.135f;
 	}
 	else { // Is on Land
-		particle->day_temperature = lst;
-		particle->night_temperature = lst_night;
-		particle->on_water = false;
-		particle->height = topography;
-		particle->albedo = lut(Texture_Field::ALBEDO, albedo_sample);
+		particle->data.day_temperature = lst;
+		particle->data.night_temperature = lst_night;
+		particle->data.on_water = false;
+		particle->data.height = topography;
+		particle->data.albedo = lut(Texture_Field::ALBEDO, albedo_sample);
 	}
 
-	particle->humidity                = lut(Texture_Field::HUMIDITY, humidity_sample);
-	particle->water_vapor             = lut(Texture_Field::WATER_VAPOR, water_vapor_sample);
-	particle->cloud_coverage          = lut(Texture_Field::CLOUD_COVERAGE, cloud_coverage_sample);
-	particle->cloud_water_content     = lut(Texture_Field::CLOUD_WATER_CONTENT, cloud_water_content_sample);
-	particle->cloud_particle_radius   = lut(Texture_Field::CLOUD_PARTICLE_RADIUS, cloud_particle_radius_sample);
-	particle->cloud_optical_thickness = lut(Texture_Field::CLOUD_OPTICAL_THICKNESS, cloud_optical_thickness_sample);
+	particle->data.humidity                = lut(Texture_Field::HUMIDITY, humidity_sample);
+	particle->data.water_vapor             = lut(Texture_Field::WATER_VAPOR, water_vapor_sample);
+	particle->data.cloud_coverage          = lut(Texture_Field::CLOUD_COVERAGE, cloud_coverage_sample);
+	particle->data.cloud_water_content     = lut(Texture_Field::CLOUD_WATER_CONTENT, cloud_water_content_sample);
+	particle->data.cloud_particle_radius   = lut(Texture_Field::CLOUD_PARTICLE_RADIUS, cloud_particle_radius_sample);
+	particle->data.cloud_optical_thickness = lut(Texture_Field::CLOUD_OPTICAL_THICKNESS, cloud_optical_thickness_sample);
 
-	particle->ozone                         = lut(Texture_Field::OZONE, ozone_sample);
-	particle->uv_index                      = lut(Texture_Field::UV_INDEX, uv_index_sample);
-	particle->net_radiation                 = lut(Texture_Field::NET_RADIATION, net_radiation_sample);
-	particle->solar_insolation              = lut(Texture_Field::SOLAR_INSOLATION, solar_insolation_sample);
-	particle->outgoing_longwave_radiation   = lut(Texture_Field::OUTGOING_LONGWAVE_RADIATION, outgoiing_longwave_radiation_sample);
-	particle->reflected_shortwave_radiation = lut(Texture_Field::REFLECTED_SHORTWAVE_RADIATION, reflected_shortwave_radiation_sample);
+	particle->data.ozone                         = lut(Texture_Field::OZONE, ozone_sample);
+	particle->data.uv_index                      = lut(Texture_Field::UV_INDEX, uv_index_sample);
+	particle->data.net_radiation                 = lut(Texture_Field::NET_RADIATION, net_radiation_sample);
+	particle->data.solar_insolation              = lut(Texture_Field::SOLAR_INSOLATION, solar_insolation_sample);
+	particle->data.outgoing_longwave_radiation   = lut(Texture_Field::OUTGOING_LONGWAVE_RADIATION, outgoiing_longwave_radiation_sample);
+	particle->data.reflected_shortwave_radiation = lut(Texture_Field::REFLECTED_SHORTWAVE_RADIATION, reflected_shortwave_radiation_sample);
 	calculateSunlight(particle);
-	particle->temperature = glm::mix(particle->night_temperature, particle->day_temperature, particle->sun_intensity);
+	particle->data.temperature = glm::mix(particle->data.night_temperature, particle->data.day_temperature, particle->data.sun_intensity);
 }
 
 void Kernel::calculateSunlight(CPU_Particle* particle) const {
-	const vec3 normal = glm::normalize(particle->position);
-	particle->sun_intensity = clamp(max(dot(normal, sun_dir), 0.0f), 0.0f, 1.0f);
+	const vec3 normal = glm::normalize(particle->transformed_position);
+	particle->new_data.sun_intensity = clamp(max(dot(normal, sun_dir), 0.0f), 0.0f, 1.0f);
 }
 
 void Kernel::calculateThermodynamics(CPU_Particle* particle) const {
-	const vec1 solar_heat_gain = particle->sun_intensity * (1.0f - particle->albedo);
+	const vec1 solar_heat_gain = particle->data.sun_intensity * (1.0f - particle->data.albedo);
 
-	const vec1 radiative_loss = 0.0f;
+	const vec1 radiative_loss = float(STEFAN_BOLZMANN) * (pow(particle->data.temperature, 4.0f) - pow(particle->sph.temperature, 4.0f));
 	const vec1 convective_loss = 0.0f;
 
 	const vec1 net_heat = solar_heat_gain - radiative_loss - convective_loss;
-	particle->temperature += net_heat * SDT;
+	particle->new_data.temperature += net_heat * SDT;
 }
 
 vec3 Kernel::rotateGeoloc(const vec3& point, const vec2& geoloc) const {

@@ -144,12 +144,14 @@ int f_visitBvh(in Ray ray, inout float result_raylength) {
 	else {
 		float t_length = MAX_DIST;
 		float t_dist = MAX_DIST;
-		for (uint i = 0; i < particles.length(); i += 16) {
-			if (f_raySphereIntersection(ray, particles[i].position, t_dist)) {
-				if (t_dist < t_length) {
-					t_length = t_dist;
-					result_raylength = t_dist;
-					closest_particle = int(i);
+		for (uint i = 0; i < particles.length(); i ++) {
+			if (i % 16 == 0) {
+				if (f_raySphereIntersection(ray, particles[i].position, t_dist)) {
+					if (t_dist < t_length) {
+						t_length = t_dist;
+						result_raylength = t_dist;
+						closest_particle = int(i);
+					}
 				}
 			}
 		}

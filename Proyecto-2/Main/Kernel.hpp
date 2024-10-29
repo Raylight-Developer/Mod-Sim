@@ -55,6 +55,7 @@ struct Kernel {
 	void simulate(const dvec1& delta_time);
 	void updateTime();
 	void rotateEarth(CPU_Particle* particle) const;
+	void calculateSPH(CPU_Particle* particle) const;
 	void calculateSunlight(CPU_Particle* particle) const;
 	void calculateThermodynamics(CPU_Particle* particle) const;
 
@@ -65,3 +66,4 @@ struct Kernel {
 	void calculateDayTime();
 	vec3 rotateGeoloc(const vec3& point, const vec2& geoloc) const;
 };
+

@@ -5,8 +5,7 @@
 struct CPU_Particle;
 struct CPU_Neighbor;
 
-struct CPU_Particle {
-	vec3 base_position; // mm (mega) meters
+struct CPU_Particle_Data {
 	vec3 position; // mm (mega) meters
 	vec3 wind_vector; // m/s
 	vec1 sun_intensity; // %
@@ -33,6 +32,16 @@ struct CPU_Particle {
 	vec1 reflected_shortwave_radiation; // W/m^2
 
 	bool on_water;
+
+	CPU_Particle_Data();
+};
+
+struct CPU_Particle {
+	uint gen_index;
+	CPU_Particle_Data new_data;
+	CPU_Particle_Data data;
+	CPU_Particle_Data sph;
+	vec3 transformed_position;
 
 	vec1 smoothing_radius;
 	vector<CPU_Neighbor> neighbors;
@@ -75,7 +84,7 @@ struct alignas(16) GPU_Particle {
 	vec1 outgoing_longwave_radiation;
 
 	vec1 reflected_shortwave_radiation;
-	vec1 pad_a = 0;
+	uint gen_index;
 	vec1 pad_b = 0;
 	vec1 pad_c = 0;
 

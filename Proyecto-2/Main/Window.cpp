@@ -32,7 +32,7 @@ Renderer::Renderer() {
 
 	camera_zoom_sensitivity = 7.5;
 	camera_orbit_sensitivity = 20.0;
-	input_lerp = 15.0;
+	input_lerp = 10.0;
 	inputs = vector(6, false);
 	input_lerps = vector(6, dvec3(0.0));
 
@@ -285,7 +285,7 @@ void Renderer::f_guiLoop() {
 			ImGui::SeparatorText("Simulation Settings");
 
 			int PARTICLE_COUNT = u_to_i(kernel.PARTICLE_COUNT);
-			if (ImGui::SliderInt("Particle Count", &PARTICLE_COUNT, 128,4096*4)) {
+			if (ImGui::SliderInt("Particle Count", &PARTICLE_COUNT, 128, 8192*4)) {
 				kernel.PARTICLE_COUNT = i_to_u(PARTICLE_COUNT);
 				f_changeSettings();
 			}

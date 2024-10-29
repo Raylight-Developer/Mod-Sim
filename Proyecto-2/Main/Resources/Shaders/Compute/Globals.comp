@@ -28,7 +28,7 @@ struct Particle {
 	float outgoing_longwave_radiation;
 
 	float reflected_shortwave_radiation;
-	float pad_a;
+	uint  gen_index;
 	float pad_b;
 	float pad_c;
 };
