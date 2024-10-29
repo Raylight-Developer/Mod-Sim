@@ -153,7 +153,7 @@ void PathTracer::f_guiUpdate() {
 		}
 		ImGui::SliderFloat("Particle Radius", &render_particle_radius, 0.005f, 0.025f, "%.4f");
 
-		const char* items_b[] = { "Sun Intensity", "SPH", "Height", "Pressure", "Current Temperature", "Day Temperature", "Night Temperature", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "Albedo", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation" };
+		const char* items_b[] = { "Sun Intensity", "Wind", "Height", "Pressure", "Current Temperature", "Day Temperature", "Night Temperature", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "Albedo", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation", "SPH.Wind", "SPH.Pressure", "SPH.Temperature" };
 		ImGui::Combo("Particle Color Mode", &render_particle_color_mode, items_b, IM_ARRAYSIZE(items_b));
 	}
 

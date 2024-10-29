@@ -30,7 +30,11 @@ struct Particle {
 	float reflected_shortwave_radiation;
 	uint  gen_index;
 	float smoothing_radius;
-	float pad_c;
+
+	float sph_pressure;
+
+	vec3  sph_wind_vector;
+	float sph_temperature;
 };
 
 struct Texture {

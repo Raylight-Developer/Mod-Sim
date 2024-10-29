@@ -23,9 +23,9 @@ vec4 blendColors(vec4 bottomLayer, vec4 topLayer) {
 	return vec4(outColor, outAlpha);
 }
 
-vec3 velocityToColor(vec3 velocity) {
+vec3 f_windToColor(vec3 wind) {
 	vec3 color;
-	float speed = length(velocity);
+	float speed = length(wind);
 	float normalizedSpeed = clamp(f_mapfloat(0.0, 1.0, 0.0, 1.0, speed), 0.0, 1.0);
 
 	if (normalizedSpeed <= 0.5) {
@@ -67,7 +67,7 @@ vec3 f_particleColor(in Particle particle, in float dist) {
 	float distance_factor = clamp(f_mapfloat(39.0, 32.0, 0.0, 1.0, dist), 0, 1);
 	switch (render_particle_color_mode) {
 		case 0:  return vec3(particle.sun_intensity);
-		case 1:  return vec3(particle.smoothing_radius);
+		case 1:  return f_windToColor(particle.wind_vector);
 		case 2:  return vec3(f_mapfloat(-8000.0, 6400.0, 0.0, 1.0, particle.height));
 		case 3:  return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0,particle.pressure));
 		case 4:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.temperature));
@@ -86,6 +86,10 @@ vec3 f_particleColor(in Particle particle, in float dist) {
 		case 17: return vec3(f_mapfloat(0.0, 550.0, 0.0, 1.0, particle.solar_insolation));
 		case 18: return vec3(f_mapfloat(85.0, 350.0, 0.0, 1.0, particle.outgoing_longwave_radiation));
 		case 19: return vec3(f_mapfloat(0.0, 425.0, 0.0, 1.0, particle.reflected_shortwave_radiation));
+// SPH
+		case 20: return f_windToColor(particle.sph_wind_vector);
+		case 21: return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0,particle.sph_pressure));
+		case 22: return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.sph_temperature));
 	}
 	return vec3(1,0,1);
 }

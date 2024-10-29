@@ -61,6 +61,10 @@ GPU_Particle::GPU_Particle() {
 	reflected_shortwave_radiation = 0;
 	gen_index = 0;
 	smoothing_radius = 0;
+
+	sph_pressure = 0;
+	sph_wind_vector = vec3(0);
+	sph_temperature = 0;
 }
 
 GPU_Particle::GPU_Particle(const CPU_Particle& particle) {
@@ -89,6 +93,10 @@ GPU_Particle::GPU_Particle(const CPU_Particle& particle) {
 	solar_insolation = particle.data.solar_insolation;
 	outgoing_longwave_radiation = particle.data.outgoing_longwave_radiation;
 	reflected_shortwave_radiation = particle.data.reflected_shortwave_radiation;
+
+	sph_pressure = particle.sph.pressure;
+	sph_wind_vector = particle.sph.wind_vector;
+	sph_temperature = particle.sph.temperature;
 }
 
 CPU_Neighbor::CPU_Neighbor(const vec1& distance, CPU_Particle* neighbor) :

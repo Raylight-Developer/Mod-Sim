@@ -10,7 +10,7 @@
 
 Kernel::Kernel() {
 	PARTICLE_RADIUS    = 0.025f;
-	PARTICLE_COUNT     = 8192*2;
+	PARTICLE_COUNT     = 1024;// 8192 * 2;
 	MAX_OCTREE_DEPTH   = 2;
 	POLE_BIAS          = 0.975f;
 	POLE_BIAS_POWER    = 5.0f;
@@ -103,8 +103,8 @@ void Kernel::lockParticles() {
 
 		for (uint j = 0; j < PARTICLE_COUNT; j++) {
 			if (i != j) {
-				const vec1 distSq = glm::distance2(particle.data.position, particles[j].data.position);
-				neighbors.push_back(CPU_Neighbor(distSq, &particles[j]));
+				const vec1 dist = glm::distance(particle.data.position, particles[j].data.position);
+				neighbors.push_back(CPU_Neighbor(dist, &particles[j]));
 			}
 		}
 
@@ -112,15 +112,15 @@ void Kernel::lockParticles() {
 			return a.distance < b.distance;
 		});
 
-		particle.smoothing_radius = neighbors[2].distance * 2.0f;
+		particle.smoothing_radius = neighbors[6].distance;
 		for (uint k = 0; k < NUM_NEIGHBORS; k++) {
 			particle.neighbors.push_back(neighbors[k]);
 		}
 
-		//#pragma omp critical
-		//if ((i % (PARTICLE_COUNT / 10)) == 0) {
-		//	cout << f_to_u(round(u_to_f(i) / u_to_f(PARTICLE_COUNT) * 100.0f)) << "%" << endl;
-		//}
+		#pragma omp critical
+		if ((i % (PARTICLE_COUNT / 5)) == 0) {
+			cout << f_to_u(round(u_to_f(i) / u_to_f(PARTICLE_COUNT) * 100.0f)) << "%" << endl;
+		}
 	}
 }
 
