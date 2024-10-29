@@ -85,7 +85,7 @@ struct alignas(16) GPU_Particle {
 
 	vec1 reflected_shortwave_radiation;
 	uint gen_index;
-	vec1 pad_b = 0;
+	vec1 smoothing_radius;
 	vec1 pad_c = 0;
 
 	GPU_Particle();

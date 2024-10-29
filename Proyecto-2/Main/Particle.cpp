@@ -60,10 +60,12 @@ GPU_Particle::GPU_Particle() {
 	outgoing_longwave_radiation = 0;
 	reflected_shortwave_radiation = 0;
 	gen_index = 0;
+	smoothing_radius = 0;
 }
 
 GPU_Particle::GPU_Particle(const CPU_Particle& particle) {
 	gen_index = particle.gen_index;
+	smoothing_radius = particle.smoothing_radius;
 
 	position = particle.transformed_position;
 	wind_vector = particle.data.wind_vector;

@@ -113,14 +113,6 @@ void PathTracer::f_updateParticles() {
 	gl_data["ssbo 1"] = ssboBinding(ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
 }
 
-void PathTracer::f_changeSettings() {
-	glDeleteBuffers(1, &gl_data["ssbo 1"]);
-	glDeleteBuffers(1, &gl_data["ssbo 2"]);
-
-	gl_data["ssbo 1"] = ssboBinding(ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
-	gl_data["ssbo 2"] = ssboBinding(ul_to_u(renderer->kernel.bvh_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.bvh_nodes.data());
-}
-
 void PathTracer::f_guiUpdate() {
 	ImGui::SeparatorText("Pathtraced Rendering");
 	ImGui::Checkbox("Render Planet", &render_planet);
@@ -155,14 +147,13 @@ void PathTracer::f_guiUpdate() {
 			int MAX_OCTREE_DEPTH = u_to_i(renderer->kernel.MAX_OCTREE_DEPTH);
 			if (ImGui::SliderInt("Max Octree Depth", &MAX_OCTREE_DEPTH, 0, 6)) {
 				renderer->kernel.MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
-				renderer->kernel.buildBvh();
-				f_updateBvh();
+				renderer->f_updateBvh();
 				f_updateParticles();
 			}
 		}
 		ImGui::SliderFloat("Particle Radius", &render_particle_radius, 0.005f, 0.025f, "%.4f");
 
-		const char* items_b[] = { "Sun Intensity", "Height", "Pressure", "Current Temperature", "Day Temperature", "Night Temperature", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "Albedo", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation"};
+		const char* items_b[] = { "Sun Intensity", "SPH", "Height", "Pressure", "Current Temperature", "Day Temperature", "Night Temperature", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "Albedo", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation" };
 		ImGui::Combo("Particle Color Mode", &render_particle_color_mode, items_b, IM_ARRAYSIZE(items_b));
 	}
 

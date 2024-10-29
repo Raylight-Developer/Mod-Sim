@@ -117,8 +117,11 @@ void Builder::splitBvh(CPU_Bvh* parent, const uint& max_depth) {
 		CPU_Bvh& child = *it;
 		for (const CPU_Particle& particle : particles) {
 			if (child.contains(particle)) {
-				child.particle_count++;
 				child.discard = false;
+				child.particle_count++;
+				if (child.particle_count > 16) {
+					break;
+				}
 			}
 		}
 		if (child.discard == false) {

@@ -32,9 +32,9 @@ struct PathTracer {
 	PathTracer(Renderer* renderer = nullptr);
 
 	void f_initialize();
+
 	void f_updateBvh();
 	void f_updateParticles();
-	void f_changeSettings();
 
 	void f_guiUpdate();
 	void f_recompile();

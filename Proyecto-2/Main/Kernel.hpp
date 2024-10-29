@@ -44,12 +44,11 @@ struct Kernel {
 
 	Kernel();
 
-	void preInit();
-	void preInitParticles();
+	void buildParticles();
 	void traceInitProperties(CPU_Particle* particle) const;
 
-	void init();
-	void initParticles();
+	void lock();
+	void lockParticles();
 	void buildBvh();
 
 	void simulate(const dvec1& delta_time);

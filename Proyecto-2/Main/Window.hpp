@@ -52,26 +52,26 @@ struct Renderer {
 	dvec1 last_time;
 
 	bool  run_sim;
+	bool  next_frame;
 	bool  lock_settings;
 
 	Renderer();
 	~Renderer();
 
-	void preInit();
-
+	void init();
 	void initGlfw();
 	void initImGui();
 	void systemInfo();
 
 	void f_pipeline();
-	void f_recompile();
 	void f_tickUpdate();
 
 	void f_frameUpdate();
 	void f_inputLoop();
 	void f_timings();
 
-	void f_changeSettings();
+	void f_updateBvh();
+	void f_updateParticles();
 
 	void f_guiLoop();
 	void f_displayLoop();

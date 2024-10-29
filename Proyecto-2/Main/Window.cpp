@@ -45,6 +45,7 @@ Renderer::Renderer() {
 	last_time = 0.0;
 
 	run_sim = false;
+	next_frame = false;
 	lock_settings = false;
 }
 
@@ -58,7 +59,7 @@ Renderer::~Renderer() {
 	glfwTerminate();
 }
 
-void Renderer::preInit() {
+void Renderer::init() {
 	initGlfw();
 	initImGui();
 	//systemInfo();
@@ -172,16 +173,18 @@ void Renderer::systemInfo() {
 
 void Renderer::f_pipeline() {
 	pathtracer.f_initialize();
-	f_changeSettings();
-}
-
-void Renderer::f_recompile() {
-	pathtracer.f_recompile();
+	f_updateParticles();
+	f_updateBvh();
 }
 
 void Renderer::f_tickUpdate() {
-	if (run_sim) {
-		kernel.simulate(delta_time);
+	if (run_sim or next_frame) {
+		if (next_frame) {
+			kernel.simulate(FPS_60);
+		}
+		else {
+			kernel.simulate(delta_time);
+		}
 
 		if (pathtracer.render_particles && pathtracer.use_octree) {
 			kernel.buildBvh();
@@ -192,12 +195,19 @@ void Renderer::f_tickUpdate() {
 		const dvec1 start = glfwGetTime();
 		pathtracer.f_updateParticles();
 		gpu_delta += glfwGetTime() - start;
+		next_frame = false;
 	}
 }
 
-void Renderer::f_changeSettings() {
-	kernel.preInit();
-	pathtracer.f_changeSettings();
+void Renderer::f_updateBvh() {
+	kernel.buildBvh();
+	pathtracer.f_updateBvh();
+}
+
+void Renderer::f_updateParticles() {
+	kernel.buildParticles();
+	f_updateBvh();
+	pathtracer.f_updateParticles();
 }
 
 void Renderer::f_guiLoop() {
@@ -230,56 +240,56 @@ void Renderer::f_guiLoop() {
 	if (run_sim) {
 		if (ImGui::Button("Pause")) {
 			run_sim = false;
-			kernel.buildBvh();
-			pathtracer.use_octree = true;
-			pathtracer.f_updateBvh();
 		}
 	}
 	else {
 		if (lock_settings) {
 			if (ImGui::Button("Play")) {
 				run_sim = true;
-				pathtracer.use_octree = false;
+			}
+			if (ImGui::Button("Next Frame")) {
+				next_frame = true;
 			}
 		}
 		else {
 			if (ImGui::Button("Lock n Load Settings")) {
 				lock_settings = true;
-				f_changeSettings();
-				kernel.init();
+				f_updateParticles();
+				kernel.lock();
+				next_frame = true;
 			}
 			ImGui::SeparatorText("Earth Settings");
 			if (ImGui::SliderFloat("Latitude", &kernel.POLE_GEOLOCATION.x, -90.0f, 90.0f, "%.4f")) {
-				f_changeSettings();
+				f_updateParticles();
 			}
 			if (ImGui::SliderFloat("Longitude", &kernel.POLE_GEOLOCATION.y, -180.0f, 180.0f, "%.4f")) {
-				f_changeSettings();
+				f_updateParticles();
 			}
 			if (ImGui::SliderFloat("Pole Bias", &kernel.POLE_BIAS, 0.0f, 1.0f, "%.5f")) {
-				f_changeSettings();
+				f_updateParticles();
 			}
 			if (ImGui::SliderFloat("Pole Power", &kernel.POLE_BIAS_POWER, 1.0f, 10.0f)) {
-				f_changeSettings();
+				f_updateParticles();
 			}
 			if (ImGui::SliderFloat("Earth Tilt", &kernel.EARTH_TILT, -180.0f, 180.0f, "%.2f")) {
-				f_changeSettings();
+				f_updateParticles();
 			}
 
 			if (ImGui::SliderInt("Month", &kernel.CALENDAR_MONTH, 0, 12)) {
 				kernel.calculateDateTime();
-				pathtracer.f_changeSettings();
+				f_updateParticles();
 			}
 			if (ImGui::SliderInt("Day", &kernel.CALENDAR_DAY, 0, 31)) {
 				kernel.calculateDateTime();
-				pathtracer.f_changeSettings();
+				f_updateParticles();
 			}
 			if (ImGui::SliderInt("Hour", &kernel.CALENDAR_HOUR, 0, 24)) {
 				kernel.calculateDateTime();
-				pathtracer.f_changeSettings();
+				f_updateParticles();
 			}
 			if (ImGui::SliderInt("Minute", &kernel.CALENDAR_MINUTE, 0, 60)) {
 				kernel.calculateDateTime();
-				pathtracer.f_changeSettings();
+				f_updateParticles();
 			}
 
 			ImGui::SeparatorText("Simulation Settings");
@@ -287,11 +297,11 @@ void Renderer::f_guiLoop() {
 			int PARTICLE_COUNT = u_to_i(kernel.PARTICLE_COUNT);
 			if (ImGui::SliderInt("Particle Count", &PARTICLE_COUNT, 128, 8192*4)) {
 				kernel.PARTICLE_COUNT = i_to_u(PARTICLE_COUNT);
-				f_changeSettings();
+				f_updateParticles();
 			}
 		}
 	}
-	ImGui::SliderFloat("Time Scale", &kernel.TIME_SCALE, 0.01f, 20.0f, "%.4f");
+	ImGui::SliderFloat("Time Scale", &kernel.TIME_SCALE, 0.01f, 100.0f, "%.3f");
 	int SAMPLES = kernel.SAMPLES;
 	if (ImGui::SliderInt("Samples", &SAMPLES, 1, 10)) {
 		kernel.SAMPLES = SAMPLES;
@@ -410,7 +420,7 @@ void Renderer::key(GLFWwindow* window, int key, int scancode, int action, int mo
 	Renderer* instance = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
 	// Input Handling
 	if (key == GLFW_KEY_F5 && action == GLFW_PRESS) {
-		instance->f_recompile();
+		instance->pathtracer.f_recompile();
 	}
 	//if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
 	//	glfwSetWindowShouldClose(window, GLFW_TRUE);

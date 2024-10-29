@@ -36,17 +36,40 @@ bool f_rayBvhIntersection(in Ray ray, in Bvh box) {
 	return false;
 }
 
-bool f_raySphereIntersection(in Ray ray, in vec3 position, out float t) {
-	vec3 CO = ray.origin - position;
-	float a = dot(ray.direction, ray.direction);
-	float b = 2.0*dot(ray.direction, CO);
-	float c = dot(CO, CO) - render_particle_radius * render_particle_radius;
-	float delta = b*b - 4.0*a*c;
-	if(delta < 0.0) {
+bool f_raySphereIntersection(in Ray ray, in vec3 position, in float radius, out float t) {
+	if (render_particle_color_mode == 1) {
+		vec3 diskNormal = normalize(position);
+		float denom = dot(ray.direction, diskNormal);
+		if (abs(denom) < 1e-6) {
+			return false;
+		}
+
+		float dist = dot(position - ray.origin, diskNormal) / denom;
+
+		if (dist < 0.0) {
+			return false;
+		}
+		vec3 hitPoint = ray.origin + dist * ray.direction;
+		float distToCenter = length(hitPoint - position);
+		if (distToCenter <= radius) {
+			t = dist;
+			return true;
+		}
 		return false;
 	}
-	t = (-b-sqrt(delta)) / (2.0*a);
-	return true;
+	else {
+		vec3 CO = ray.origin - position;
+		float a = dot(ray.direction, ray.direction);
+		float b = 2.0*dot(ray.direction, CO);
+		float c = dot(CO, CO) - render_particle_radius * render_particle_radius;
+		float delta = b*b - 4.0*a*c;
+		if(delta < 0.0) {
+			return false;
+		}
+		t = (-b-sqrt(delta)) / (2.0*a);
+		return true;
+	}
+	return false;
 }
 
 vec2 f_AtmosphereIntersection(in Ray ray, in float radius) {
@@ -114,7 +137,7 @@ int f_visitBvh(in Ray ray, inout float result_raylength) {
 			}
 			if (node.particle_end > 0) { // Leaf
 				for (uint i = node.particle_start; i < node.particle_end; ++i) {
-					if (f_raySphereIntersection(ray, particles[i].position, t_dist)) {
+					if (f_raySphereIntersection(ray, particles[i].position, particles[i].smoothing_radius, t_dist)) {
 						if (t_dist < t_length) {
 							t_length = t_dist;
 							result_raylength = t_dist;
@@ -146,7 +169,7 @@ int f_visitBvh(in Ray ray, inout float result_raylength) {
 		float t_dist = MAX_DIST;
 		for (uint i = 0; i < particles.length(); i ++) {
 			if (i % 16 == 0) {
-				if (f_raySphereIntersection(ray, particles[i].position, t_dist)) {
+				if (f_raySphereIntersection(ray, particles[i].position, particles[i].smoothing_radius, t_dist)) {
 					if (t_dist < t_length) {
 						t_length = t_dist;
 						result_raylength = t_dist;

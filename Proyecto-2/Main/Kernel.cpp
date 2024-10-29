@@ -14,7 +14,7 @@ Kernel::Kernel() {
 	MAX_OCTREE_DEPTH   = 2;
 	POLE_BIAS          = 0.975f;
 	POLE_BIAS_POWER    = 5.0f;
-	POLE_GEOLOCATION   = vec2(23.1510f, 93.0422f);
+	POLE_GEOLOCATION   = vec2(25.0f, 90.0f);
 	EARTH_TILT         = 23.5f;
 	CALENDAR_DAY       = 21;
 	CALENDAR_MONTH     = 12;
@@ -23,7 +23,7 @@ Kernel::Kernel() {
 	YEAR_TIME          = 0;
 	DAY_TIME           = 0;
 	DAY                = 0;
-	TIME_SCALE         = 5.0f;
+	TIME_SCALE         = 1.0f;
 	DT                 = 0;
 	RUNFRAME           = 0;
 	SAMPLES            = 4;
@@ -57,14 +57,9 @@ Kernel::Kernel() {
 	textures[Texture_Field::REFLECTED_SHORTWAVE_RADIATION] = Texture::fromFile("./Resources/Nasa Earth Data/Reflected Shortwave Radiation.png", Texture_Format::MONO_FLOAT);
 }
 
-void Kernel::preInit() {
-	sun_dir = sunDir();
-	preInitParticles();
-	buildBvh();
-}
-
-void Kernel::preInitParticles() {
+void Kernel::buildParticles() {
 	const vec1 radius = 6.371f + PARTICLE_RADIUS;
+	sun_dir = sunDir();
 
 	particles.clear();
 	for (uint i = 0; i < PARTICLE_COUNT; i++) {
@@ -88,14 +83,14 @@ void Kernel::preInitParticles() {
 	}
 }
 
-void Kernel::init() {
+void Kernel::lock() {
 	textures.clear();
-	initParticles();
+	lockParticles();
 	time = 0.0f;
 	frame_count = 0;
 }
 
-void Kernel::initParticles() {
+void Kernel::lockParticles() {
 	const int NUM_NEIGHBORS = 3;
 
 	int i = 0;
@@ -178,7 +173,7 @@ void Kernel::simulate(const dvec1& delta_time) {
 
 void Kernel::updateTime() {
 	const array<int, 12> daysInMonth = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-	DAY_TIME += SDT * 0.05f;
+	DAY_TIME += SDT * 0.01f;
 	if (DAY_TIME > 1.0f) {
 		DAY_TIME -= 1.0f;
 		if (DAY < 365)
@@ -189,14 +184,12 @@ void Kernel::updateTime() {
 }
 
 void Kernel::rotateEarth(CPU_Particle* particle) const {
-	const vec1 phi = 0.0f;
-	const vec1 theta = glm::radians(DAY_TIME * 360.0f);
 	const vec1 axialTilt = -glm::radians(EARTH_TILT);
+	const vec1 theta = glm::radians(DAY_TIME * 360.0f);
 
 	const quat tiltRotation = glm::angleAxis(axialTilt, glm::vec3(0, 0, 1));
-	const quat latRotation  = glm::angleAxis(phi, glm::vec3(1, 0, 0));
-	const quat lonRotation  = glm::angleAxis(theta, glm::vec3(0, 1, 0));
-	const quat combinedRotation = tiltRotation * lonRotation * latRotation;
+	const quat timeRotation = glm::angleAxis(theta, glm::vec3(0, 1, 0));
+	const quat combinedRotation = tiltRotation * timeRotation;
 
 	particle->transformed_position = combinedRotation * particle->data.position;
 }
@@ -216,28 +209,30 @@ void Kernel::calculateSPH(CPU_Particle* particle) const {
 }
 
 void Kernel::traceInitProperties(CPU_Particle* particle) const {
-	const vec3 ray_direction = glm::normalize(vec3(0) - particle->data.position);
+	const vec3 ray_direction = glm::normalize(vec3(0) - particle->transformed_position);
 
 	const vec1 a = glm::dot(ray_direction, ray_direction);
-	const vec1 b = 2.0f * dot(ray_direction, particle->data.position);
-	const vec1 c = dot(particle->data.position, particle->data.position) - 40.589641f; // Earth Radius ^2
+	const vec1 b = 2.0f * dot(ray_direction, particle->transformed_position);
+	const vec1 c = dot(particle->transformed_position, particle->transformed_position) - 40.589641f; // Earth Radius ^2
 	const vec1 delta = b * b - 4.0f * a * c;
 	if (delta < 0.0f) {
 		return;
 	}
 
-	const vec3 intersectionPoint = particle->data.position + ((-b - sqrt(delta)) / (2.0f * a)) * ray_direction;
+	const vec3 intersectionPoint = particle->transformed_position + ((-b - sqrt(delta)) / (2.0f * a)) * ray_direction;
 	const vec1 axialTilt = -glm::radians(EARTH_TILT);
 	const mat3 tiltRotation = mat3(
 		vec3(cos(axialTilt), -sin(axialTilt), 0),
 		vec3(sin(axialTilt), cos(axialTilt), 0),
 		vec3(0, 0, 1));
+
+
 	const vec3 normal = tiltRotation * glm::normalize(intersectionPoint);
 
 	const vec1 theta = acos(normal.y);
 	const vec1 phi = glm::atan(normal.z, normal.x);
 
-	const vec2 uv = vec2(1.0 - ((phi + PI) / TWO_PI), (theta) / PI);
+	const vec2 uv = vec2(glm::fract(1.0 - ((phi + PI) / TWO_PI) - DAY_TIME), (theta) / PI);
 
 	const vec1 topography_sample = textures.at(Texture_Field::TOPOGRAPHY                    ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
 	const vec1 bathymetry_sample = textures.at(Texture_Field::BATHYMETRY                    ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
@@ -319,12 +314,10 @@ void Kernel::calculateThermodynamics(CPU_Particle* particle) const {
 vec3 Kernel::rotateGeoloc(const vec3& point, const vec2& geoloc) const {
 	const vec1 phi = glm::radians(geoloc.x - 90.0f);
 	const vec1 theta = glm::radians(geoloc.y + 90.0f);
-	const vec1 axialTilt = -glm::radians(EARTH_TILT);
 
-	const quat tiltRotation = glm::angleAxis(axialTilt, glm::vec3(0, 0, 1));
 	const quat latRotation  = glm::angleAxis(phi, glm::vec3(1, 0, 0));
 	const quat lonRotation  = glm::angleAxis(theta, glm::vec3(0, 1, 0));
-	const quat combinedRotation = tiltRotation * lonRotation * latRotation;
+	const quat combinedRotation =  lonRotation * latRotation;
 
 	return combinedRotation * point;
 }
