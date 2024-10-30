@@ -10,6 +10,12 @@ Renderer::Renderer() {
 	window = nullptr;
 	kernel = Kernel();
 	pathtracer = PathTracer(this);
+	if (pathtracer.render_particle_color_mode < SPH) {
+		kernel.BVH_SPH = false;
+	}
+	else {
+		kernel.BVH_SPH = true;
+	}
 
 	camera_transform = Transform(dvec3(0, 0, 37.5), dvec3(0));
 

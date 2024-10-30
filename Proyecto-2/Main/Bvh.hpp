@@ -58,6 +58,9 @@ struct Builder {
 
 	Builder(const vector<CPU_Particle>& particles, const vec1& particle_radius, const uint& max_depth);
 
-	void splitBvh(CPU_Bvh* parent, const uint& depth);
-	uint convertBvh(CPU_Bvh* parent);
+	void splitBvh(CPU_Bvh* node, const uint& depth);
+	uint convertBvh(CPU_Bvh* node);
+	void splitBvhSPH(CPU_Bvh* node, const uint& depth);
+	void growBvhSPH(CPU_Bvh* node);
+	uint convertBvhSPH(CPU_Bvh* node);
 };

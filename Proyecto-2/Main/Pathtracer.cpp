@@ -2,8 +2,6 @@
 
 #include "Window.hpp"
 
-#define SPH 20
-
 PathTracer::PathTracer(Renderer* renderer) :
 	renderer(renderer)
 {

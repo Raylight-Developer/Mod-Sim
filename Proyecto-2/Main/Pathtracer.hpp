@@ -4,6 +4,8 @@
 
 #include "OpenGL.hpp"
 
+#define SPH 20
+
 struct Renderer;
 
 struct PathTracer {
