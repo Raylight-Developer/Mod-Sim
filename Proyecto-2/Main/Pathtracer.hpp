@@ -27,7 +27,6 @@ struct PathTracer {
 	int render_octree_debug_index;
 	int render_particle_color_mode;
 	int render_planet_texture;
-	float render_particle_radius;
 
 	PathTracer(Renderer* renderer = nullptr);
 
@@ -37,7 +36,7 @@ struct PathTracer {
 	void f_updateParticles();
 	void f_updateTextures(const bool& high_res);
 
-	void f_guiUpdate();
+	void f_guiUpdate(const vec1& availableWidth, const vec1& spacing, const vec1& itemWidth, const vec1& halfWidth, const vec1& thirdWidth, const vec1& halfPos);
 	void f_recompile();
 	void f_cleanup();
 	void f_resize();

@@ -94,7 +94,7 @@ bool f_EarthIntersection(in Ray ray, out float t, out vec2 uv) {
 	float b = 2.0*dot(ray.direction, ray.origin);
 	float c = dot(ray.origin, ray.origin) - EARTH_RADIUS_SQ;
 	float delta = b*b - 4.0*a*c;
-	if(delta < 0.0) {
+	if (delta < 0.0) {
 		return false;
 	}
 	t = (-b-sqrt(delta)) / (2.0 * a);
@@ -112,14 +112,15 @@ bool f_EarthIntersection(in Ray ray, out float t, out vec2 uv) {
 	float theta = acos(normal.y);
 	float phi = atan(normal.z, normal.x);
 
-	uv.x = fract(1.0 - ((phi + PI) / TWO_PI ) - day_time);
+	uv.x = 1.0 - ((phi + PI) / TWO_PI ) - day_time;
+	uv.x = uv.x - floor(uv.x);
 	uv.y = (theta) / PI;
 	return true;
 }
 
 int f_visitBvh(in Ray ray, inout float result_raylength) {
 	int closest_particle = -1;
-	if (use_octree == 1 && render_particle_color_mode < SPH) {
+	if (use_octree == 1) {
 		Ray bvh_ray = Ray(ray.origin, normalize(1.0 / ray.direction));
 
 		float t_length = MAX_DIST;

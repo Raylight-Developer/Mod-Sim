@@ -10,28 +10,29 @@
 enum struct Texture_Field;
 
 struct Kernel {
-	vec1 PARTICLE_RADIUS;
-	uint PARTICLE_COUNT;
-	uint MAX_OCTREE_DEPTH;
-	vec1 POLE_BIAS;
-	vec1 POLE_BIAS_POWER;
-	vec2 POLE_GEOLOCATION;
-	vec1 EARTH_TILT;
-	vec1 YEAR_TIME;
-	vec1 DAY_TIME;
-	vec1 TIME_SCALE;
-	int CALENDAR_MONTH;
-	int CALENDAR_DAY;
-	int CALENDAR_HOUR;
-	int CALENDAR_MINUTE;
-	uint DAY;
+	vec1  PARTICLE_RADIUS;
+	uint  PARTICLE_COUNT;
+	uint  MAX_OCTREE_DEPTH;
+	dvec1 POLE_BIAS;
+	dvec1 POLE_BIAS_POWER;
+	dvec2 POLE_GEOLOCATION;
+	dvec1 EARTH_TILT;
+	dvec1 YEAR_TIME;
+	dvec1 DAY_TIME;
+	dvec1 TIME_SCALE;
+	int   CALENDAR_MONTH;
+	int   CALENDAR_DAY;
+	int   CALENDAR_HOUR;
+	int   CALENDAR_MINUTE;
+	uint  DAY;
+	bool  BVH_SPH;
 
-	vec1 DT;
-	uint RUNFRAME;
-	uint SAMPLES;
-	vec1 SDT;
+	dvec1 DT;
+	uint  RUNFRAME;
+	uint  SAMPLES;
+	dvec1 SDT;
 
-	vec3 sun_dir;
+	dvec3 sun_dir;
 
 	vector<CPU_Particle> particles;
 	unordered_map<Texture_Field, Texture> textures;
@@ -40,7 +41,7 @@ struct Kernel {
 	vector<GPU_Particle> gpu_particles;
 	vector<GPU_Bvh> bvh_nodes;
 
-	vec1  time;
+	dvec1 time;
 	uint  frame_count;
 
 	Kernel();
@@ -56,14 +57,17 @@ struct Kernel {
 	void simulate(const dvec1& delta_time);
 	void updateTime();
 	void rotateEarth(CPU_Particle* particle) const;
-	void calculateSPH(CPU_Particle* particle) const;
 	void calculateSunlight(CPU_Particle* particle) const;
-	void calculateThermodynamics(CPU_Particle* particle) const;
 
-	vec3 sunDir() const;
+	void scatterSPH(CPU_Particle* particle) const;
+	void scatterPressure(CPU_Particle* particle) const;
+	void gatherPressure(CPU_Particle* particle) const;
+	void gatherThermodynamics(CPU_Particle* particle) const;
+
+	dvec3 sunDir() const;
 	void calculateDate();
 	void calculateDateTime();
 	void calculateYearTime();
 	void calculateDayTime();
-	vec3 rotateGeoloc(const vec3& point, const vec2& geoloc) const;
+	dvec3 rotateGeoloc(const dvec3& point, const dvec2& geoloc) const;
 };

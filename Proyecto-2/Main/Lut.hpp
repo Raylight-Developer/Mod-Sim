@@ -40,10 +40,10 @@ vec1 lut(const Texture_Field& field, const vec1& color) {
 			return f_map(0.0f, 1.0f, 800.0f, 1020.0f, color);
 		case Texture_Field::SEA_SURFACE_TEMPERATURE_DAY:
 		case Texture_Field::SEA_SURFACE_TEMPERATURE_NIGHT:
-			return f_map(0.0f, 1.0f, -2.0f, 35.0f, color);
+			return f_map(0.0f, 1.0f, -2.0f, 35.0f, color) + 273.15f;
 		case Texture_Field::LAND_SURFACE_TEMPERATURE_DAY:
 		case Texture_Field::LAND_SURFACE_TEMPERATURE_NIGHT:
-			return f_map(0.0f, 1.0f, -25.0f, 45.0f, color);
+			return f_map(0.0f, 1.0f, -25.0f, 45.0f, color) + 273.15f;
 		case Texture_Field::HUMIDITY:
 			return f_map(0.0f, 1.0f, 0.1f, 0.9f, color);
 		case Texture_Field::WATER_VAPOR:
@@ -59,7 +59,7 @@ vec1 lut(const Texture_Field& field, const vec1& color) {
 		case Texture_Field::OZONE:
 			return f_map(0.0f, 1.0f, 100.0f, 500.0f, color);
 		case Texture_Field::ALBEDO:
-			return f_map(0.0f, 1.0f, 0.0f, 0.9f, color);
+			return clamp(f_map(0.0f, 1.0f, 0.0f, 0.9f, color), 0.0f, 1.0f);
 		case Texture_Field::UV_INDEX:
 			return f_map(0.0f, 1.0f, 0.0f, 16.0f, color);
 		case Texture_Field::NET_RADIATION:

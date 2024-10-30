@@ -44,7 +44,7 @@ GPU_Bvh::GPU_Bvh() :
 {}
 
 void CPU_Bvh::growToInclude(const CPU_Particle& particle, const vec1& radius) {
-	growToInclude(particle.transformed_position - radius, particle.transformed_position + radius);
+	growToInclude(d_to_f(particle.transformed_position) - radius, d_to_f(particle.transformed_position) + radius);
 }
 
 void CPU_Bvh::growToInclude(const vec3& min, const vec3& max) {
@@ -91,22 +91,31 @@ void CPU_Bvh::split() {
 }
 
 
-Builder::Builder(const vector<CPU_Particle>& particles, const vec1& particle_radius, const uint& max_depth) :
-	particles(particles),
-	particle_radius(particle_radius * 2.0f)
+Builder::Builder(const vector<CPU_Particle>& parts, const vec1& particle_rad, const uint& max_depth) :
+	particles(parts),
+	particle_radius(particle_rad * 1.25f)
 {
+	depth_cutoff = max_depth;
+	if (particle_radius <= 0.0f) {
+		cout << "Build SPH BVH" << endl;
+		vec1 radius = 0.0f;
+		for (uint i = 0; i < particles.size(); i++) {
+			radius = max(radius, d_to_f(particles[i].smoothing_radius));
+		}
+		particle_radius = radius * 2.0f;
+	}
+
 	for (uint i = 0; i < particles.size(); i++) {
 		const vec3 center = (particles[i].transformed_position);
-		const vec3 max = particles[i].transformed_position + particle_radius;
-		const vec3 min = particles[i].transformed_position - particle_radius;
+		const vec3 max = d_to_f(particles[i].transformed_position) + particle_radius;
+		const vec3 min = d_to_f(particles[i].transformed_position) - particle_radius;
 		root_node.growToInclude(min, max);
 	}
 	root_node.discard = false;
-	depth_cutoff = max_depth;
 
 	splitBvh(&root_node, 0);
 
-	this->particles.clear();
+	particles.clear();
 	convertBvh(&root_node);
 }
 

@@ -40,15 +40,9 @@ void main() {
 			if (f_EarthIntersection(ray, t_dist, earth_uv)) {
 				if (t_dist < t_length && t_dist > EPSILON) {
 					t_length = t_dist;
-					if (render_lighting == 1) {
-						vec3 intersection = ray.origin + ray.direction * t_dist;
-						vec3 normal = normalize(intersection);
-						float diffuse = max(dot(normal, sun_dir), 0.0) * 0.9 + 0.1;
-						color = vec4(f_earthColor(earth_uv).xyz * diffuse, 1);
-					}
-					else {
-						color = f_earthColor(earth_uv);
-					}
+					vec3 intersection = ray.origin + ray.direction * t_dist;
+					vec3 normal = normalize(intersection);
+					color = f_earthColor(earth_uv, normal, sun_dir);
 					bg_color = color;
 				}
 			}
@@ -67,15 +61,9 @@ void main() {
 		float earth_dist = MAX_DIST;
 		vec2 earth_uv = vec2(0.5);
 		if (f_EarthIntersection(ray, earth_dist, earth_uv)) {
-			if (render_lighting == 1) {
-				vec3 intersection = ray.origin + ray.direction * earth_dist;
-				vec3 normal = normalize(intersection);
-				float diffuse = max(dot(normal, sun_dir), 0.0) * 0.95 + 0.05;
-				color = vec4(f_earthColor(earth_uv).xyz * diffuse, 1);
-			}
-			else {
-				color = f_earthColor(earth_uv);
-			}
+			vec3 intersection = ray.origin + ray.direction * earth_dist;
+			vec3 normal = normalize(intersection);
+			color = f_earthColor(earth_uv, normal, sun_dir);
 		}
 	}
 

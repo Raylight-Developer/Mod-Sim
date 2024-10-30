@@ -45,7 +45,7 @@ float phase_ray( float cc ) {
 // scatter const
 
 const int NUM_OUT_SCATTER = 8;
-const int NUM_IN_SCATTER = 100;
+const int NUM_IN_SCATTER = 80;
 
 float density( vec3 p, float ph ) {
 	return exp( -max( length( p ) - EARTH_RADIUS, 0.0 ) / ph );

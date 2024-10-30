@@ -221,109 +221,182 @@ void Renderer::f_guiLoop() {
 	ImGui::Begin("Info");
 	ImGui::SetWindowPos(ImVec2(0, 0));
 	const vec1 availableWidth = ImGui::GetContentRegionAvail().x;
+	const vec1 spacing = ImGui::GetStyle().ItemSpacing.x;
+	const vec1 itemWidth = availableWidth;
+	const vec1 halfWidth = itemWidth * 0.5f - spacing * 0.5f;
+	const vec1 thirdWidth = itemWidth / 3.0f - spacing / 3.0f;
+	const vec1 halfPos = halfWidth + spacing * 2.0f;
+	const vec1 thirdPos = thirdWidth + spacing * 2.0f;
 
-	ImGui::SeparatorText("Average Stats");
-	{
-		const dvec1 percent = round((gpu_time_aggregate / current_time) * 100.0);
-		ImGui::Text(("~GPU[" + to_str(percent, 0) + "]%%").c_str(), ImVec2(availableWidth * 0.5f, 0));
-		ImGui::SameLine();
-		ImGui::Text(("~CPU[" + to_str(100.0 - percent, 0) + "]%%").c_str(), ImVec2(availableWidth * 0.5f, 0));
-
-		ImGui::Text(("Fps: " + to_str(ul_to_d(runframe) / current_time, 0)).c_str());
+	ImGui::PushItemWidth(itemWidth);
+	ImGui::SeparatorText("Sampling Settings");
+	ImGui::Text("Time Scale");
+	float TIME_SCALE = d_to_f(kernel.TIME_SCALE);
+	if (ImGui::SliderFloat("##time_scale", &TIME_SCALE, 0.01f, 3650.0f, "%.3f")) {
+		kernel.TIME_SCALE = f_to_d(TIME_SCALE);
 	}
-	ImGui::SeparatorText("Stats");
-	{
-		const dvec1 percent = round((gpu_time / frame_time) * 100.0);
-		ImGui::Text(("~GPU[" + to_str(percent, 0) + "]%%").c_str(), ImVec2(availableWidth * 0.5f, 0));
-		ImGui::SameLine();
-		ImGui::Text(("~CPU[" + to_str(100.0 - percent, 0) + "]%%").c_str(), ImVec2(availableWidth * 0.5f, 0));
 
-		ImGui::Text(("Fps: " + to_str(frame_count, 0)).c_str());
+	int SAMPLES = kernel.SAMPLES;
+	ImGui::Text("Samples");
+	if (ImGui::SliderInt("##samples", &SAMPLES, 1, 10)) {
+		kernel.SAMPLES = SAMPLES;
 	}
-	ImGui::SeparatorText("Info");
-	ImGui::Text(("Month:  " + to_str(kernel.CALENDAR_MONTH, 0)).c_str()), ImVec2(availableWidth * 0.5f, 0);
-	ImGui::SameLine();
-	ImGui::Text(("Day:    " + to_str(kernel.CALENDAR_DAY, 0)).c_str(), ImVec2(availableWidth * 0.5f, 0));
-	ImGui::Text(("Hour:   " + to_str(kernel.CALENDAR_HOUR, 0)).c_str(), ImVec2(availableWidth * 0.5f, 0));
-	ImGui::SameLine();
-	ImGui::Text(("Minute: " + to_str(kernel.CALENDAR_MINUTE, 0)).c_str(), ImVec2(availableWidth * 0.5f, 0));
-	ImGui::Text(("Zoom:   " + to_str(camera_zoom_sensitivity, 1)).c_str(), ImVec2(availableWidth * 0.5f, 0));
-	ImGui::SameLine();
-	ImGui::Text(("Orbit:  " + to_str(camera_orbit_sensitivity, 1)).c_str()), ImVec2(availableWidth * 0.5f, 0);
+	ImGui::PopItemWidth();
+
 	ImGui::SeparatorText("Play / Pause");
 	if (run_sim) {
-		if (ImGui::Button("Pause")) {
+		if (ImGui::Button("Pause", ImVec2(itemWidth, 0))) {
 			run_sim = false;
 		}
 	}
 	else {
 		if (lock_settings) {
-			if (ImGui::Button("Play")) {
+			if (ImGui::Button("Play", ImVec2(halfWidth, 0))) {
 				run_sim = true;
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("Next Frame")) {
+			ImGui::SetCursorPosX(halfPos);
+			if (ImGui::Button("Next Frame", ImVec2(halfWidth, 0))) {
 				next_frame = true;
 			}
 		}
 		else {
-			if (ImGui::Button("Lock n Load Settings")) {
+			if (ImGui::Button("Lock n Load Settings", ImVec2(itemWidth, 0))) {
 				lock_settings = true;
 				kernel.lock();
 				next_frame = true;
 			}
-			ImGui::SeparatorText("Earth Settings");
-			if (ImGui::SliderFloat("Latitude", &kernel.POLE_GEOLOCATION.x, -90.0f, 90.0f, "%.4f")) {
-				f_updateParticles();
-			}
-			ImGui::SameLine();
-			if (ImGui::SliderFloat("Longitude", &kernel.POLE_GEOLOCATION.y, -180.0f, 180.0f, "%.4f")) {
-				f_updateParticles();
-			}
-			if (ImGui::SliderFloat("Pole Bias", &kernel.POLE_BIAS, 0.0f, 1.0f, "%.5f")) {
-				f_updateParticles();
-			}
-			ImGui::SameLine();
-			if (ImGui::SliderFloat("Pole Power", &kernel.POLE_BIAS_POWER, 1.0f, 10.0f)) {
-				f_updateParticles();
-			}
-			if (ImGui::SliderFloat("Earth Tilt", &kernel.EARTH_TILT, -180.0f, 180.0f, "%.2f")) {
-				f_updateParticles();
-			}
 
-			if (ImGui::SliderInt("Month", &kernel.CALENDAR_MONTH, 0, 12)) {
-				kernel.calculateDateTime();
-				f_updateParticles();
-			}
-			if (ImGui::SliderInt("Day", &kernel.CALENDAR_DAY, 0, 31)) {
-				kernel.calculateDateTime();
-				f_updateParticles();
-			}
-			if (ImGui::SliderInt("Hour", &kernel.CALENDAR_HOUR, 0, 24)) {
-				kernel.calculateDateTime();
-				f_updateParticles();
-			}
-			if (ImGui::SliderInt("Minute", &kernel.CALENDAR_MINUTE, 0, 60)) {
-				kernel.calculateDateTime();
-				f_updateParticles();
-			}
-
-			ImGui::SeparatorText("Simulation Settings");
-
+			ImGui::PushItemWidth(itemWidth);
 			int PARTICLE_COUNT = u_to_i(kernel.PARTICLE_COUNT);
-			if (ImGui::SliderInt("Particle Count", &PARTICLE_COUNT, 128, 8192*4)) {
+			ImGui::Text("Particle Count");
+			if (ImGui::SliderInt("##slider1", &PARTICLE_COUNT, 128, 8192*4)) {
 				kernel.PARTICLE_COUNT = i_to_u(PARTICLE_COUNT);
 				f_updateParticles();
 			}
+			ImGui::PopItemWidth();
+			ImGui::SeparatorText("Earth Settings");
+			ImGui::PushItemWidth(halfWidth);
+
+			ImGui::Text("Latitude");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(halfPos);
+			ImGui::Text("Longitude");
+			float lon = d_to_f(kernel.POLE_GEOLOCATION.x);
+			if (ImGui::SliderFloat("##slider2", &lon, -90.0f, 90.0f, "%.4f")) {
+				kernel.POLE_GEOLOCATION.x = f_to_d(lon);
+				f_updateParticles();
+			}
+			ImGui::SameLine();
+			float lat = d_to_f(kernel.POLE_GEOLOCATION.y);
+			if (ImGui::SliderFloat("##slider3", &lat, -180.0f, 180.0f, "%.4f")) {
+				kernel.POLE_GEOLOCATION.y = f_to_d(lat);
+				f_updateParticles();
+			}
+
+			ImGui::Text("Pole Bias");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(halfPos);
+			ImGui::Text("Pole Power");
+			float pole_bias = d_to_f(kernel.POLE_BIAS);
+			if (ImGui::SliderFloat("##slider4", &pole_bias, 0.0f, 1.0f, "%.5f")) {
+				kernel.POLE_BIAS = f_to_d(pole_bias);
+				f_updateParticles();
+			}
+			ImGui::SameLine();
+			float pole_power = d_to_f(kernel.POLE_BIAS_POWER);
+			if (ImGui::SliderFloat("##slider5", &pole_power, 1.0f, 10.0f)) {
+				kernel.POLE_BIAS_POWER = f_to_d(pole_power);
+				f_updateParticles();
+			}
+
+			ImGui::PopItemWidth();
+			ImGui::PushItemWidth(itemWidth);
+			ImGui::Text("Earth Tilt");
+			float tilt = d_to_f(kernel.EARTH_TILT);
+			if (ImGui::SliderFloat("##slider6", &tilt, -180.0f, 180.0f, "%.2f")) {
+				kernel.EARTH_TILT = f_to_d(tilt);
+				f_updateParticles();
+			}
+			ImGui::PopItemWidth();
+			ImGui::PushItemWidth(halfWidth);
+
+			ImGui::Text("Month");
+			ImGui::SameLine();
+			ImGui::Text("Day");
+			if (ImGui::SliderInt("##slider7", &kernel.CALENDAR_MONTH, 0, 12)) {
+				kernel.calculateDateTime();
+				f_updateParticles();
+			}
+			ImGui::SameLine();
+			if (ImGui::SliderInt("##slider8", &kernel.CALENDAR_DAY, 0, 31)) {
+				kernel.calculateDateTime();
+				f_updateParticles();
+			}
+
+			ImGui::Text("Hour");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(halfPos);
+			ImGui::Text("Minute");
+			if (ImGui::SliderInt("##slider9", &kernel.CALENDAR_HOUR, 0, 24)) {
+				kernel.calculateDateTime();
+				f_updateParticles();
+			}
+			ImGui::SameLine();
+			if (ImGui::SliderInt("##slider10", &kernel.CALENDAR_MINUTE, 0, 60)) {
+				kernel.calculateDateTime();
+				f_updateParticles();
+			}
+
+			ImGui::PopItemWidth();
 		}
 	}
-	ImGui::SliderFloat("Time Scale", &kernel.TIME_SCALE, 0.01f, 3650.0f, "%.3f");
-	int SAMPLES = kernel.SAMPLES;
-	if (ImGui::SliderInt("Samples", &SAMPLES, 1, 10)) {
-		kernel.SAMPLES = SAMPLES;
+	if (ImGui::CollapsingHeader("Performance")) {
+		ImGui::SeparatorText("Average Stats");
+		{
+			ImGui::PushItemWidth(thirdWidth);
+			const dvec1 percent = round((gpu_time_aggregate / current_time) * 100.0);
+			ImGui::Text(("~GPU[" + to_str(percent, 0) + "]%%").c_str());
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos);
+			ImGui::Text(("~CPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::Text(("Fps: " + to_str(ul_to_d(runframe) / current_time, 0)).c_str());
+			ImGui::PopItemWidth();
+		}
+		ImGui::SeparatorText("Stats");
+		{
+			ImGui::PushItemWidth(thirdWidth);
+			const dvec1 percent = round((gpu_time / frame_time) * 100.0);
+			ImGui::Text(("~GPU[" + to_str(percent, 0) + "]%%").c_str());
+			ImGui::SameLine();
+			//ImGui::SetCursorPosX(thirdPos);
+			ImGui::Text(("~CPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
+			ImGui::SameLine();
+			//ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::Text(("Fps: " + to_str(frame_count, 0)).c_str());
+			ImGui::PopItemWidth();
+		}
+	}
+	if (ImGui::CollapsingHeader("Info")) {
+		ImGui::PushItemWidth(halfWidth);
+		ImGui::Text(("Month:  " + to_str(kernel.CALENDAR_MONTH, 0)).c_str());
+		ImGui::SameLine();
+		//ImGui::SetCursorPosX(halfPos);
+		ImGui::Text(("Day:    " + to_str(kernel.CALENDAR_DAY, 0)).c_str());
+		ImGui::Text(("Hour:   " + to_str(kernel.CALENDAR_HOUR, 0)).c_str());
+		ImGui::SameLine();
+		//ImGui::SetCursorPosX(halfPos);
+		ImGui::Text(("Minute: " + to_str(kernel.CALENDAR_MINUTE, 0)).c_str());
+		ImGui::Text(("Zoom:   " + to_str(camera_zoom_sensitivity, 1)).c_str());
+		ImGui::SameLine();
+		//ImGui::SetCursorPosX(halfPos);
+		ImGui::Text(("Orbit:  " + to_str(camera_orbit_sensitivity, 1)).c_str());
+		ImGui::PopItemWidth();
 	}
 
-	pathtracer.f_guiUpdate();
+	pathtracer.f_guiUpdate(availableWidth, spacing, itemWidth, halfWidth, thirdWidth, halfPos);
 
 	ImGui::End();
 	ImGui::Render();

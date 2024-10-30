@@ -70,9 +70,9 @@ vec3 f_particleColor(in Particle particle, in float dist) {
 		case 1:  return f_windToColor(particle.wind_vector);
 		case 2:  return vec3(f_mapfloat(-8000.0, 6400.0, 0.0, 1.0, particle.height));
 		case 3:  return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0,particle.pressure));
-		case 4:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.temperature));
-		case 5:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.day_temperature));
-		case 6:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.night_temperature));
+		case 4:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.temperature - 273.15));
+		case 5:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.day_temperature - 273.15));
+		case 6:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.night_temperature - 273.15));
 		case 7:  return vec3(f_mapfloat(0.1, 0.9, 0.0, 1.0, particle.humidity));
 		case 8:  return vec3(f_mapfloat(0.0, 6.0, 0.0, 1.0, particle.water_vapor));
 		case 9:  return vec3(particle.cloud_coverage);
@@ -89,28 +89,44 @@ vec3 f_particleColor(in Particle particle, in float dist) {
 // SPH
 		case 20: return f_windToColor(particle.sph_wind_vector);
 		case 21: return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0, particle.sph_pressure));
-		case 22: return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.sph_temperature));
+		case 22: return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.sph_temperature - 273.15));
 	}
 	return vec3(1,0,1);
 }
 
-vec4 f_earthColor(in vec2 uv) {
-	vec4 color;
-	color = sampleTextureRgba8u(textures[render_planet_texture], uv);
+vec4 f_earthColor(in vec2 uv, in vec3 normal, in vec3 sun_dir) {
+	vec4 color = vec4(1,0,1,1);
+	float diffuse = clamp(f_mapfloat(-1.0, 1.0, -0.2, 1.0, dot(normal, sun_dir)), 0, 1);
+	const int tex_index = render_planet_texture - 1;
+	if (tex_index >= 0) {
+		color = sampleTextureRgba8u(textures[tex_index], uv);
+	}
 	switch (render_planet_texture) {
 		case 0: {
-			return color;
+			vec4 blue_marble = sampleTextureRgba8u(textures[0], uv);
+			vec4 black_marble = sampleTextureRgba8u(textures[1], uv);
+			black_marble.x = pow(black_marble.x, 1.8) * 0.9;
+			black_marble.y = pow(black_marble.y, 1.8) * 0.9;
+			black_marble.z = pow(black_marble.z, 1.8) * 0.9;
+			color = mix(black_marble, blue_marble, diffuse);
+			break;
 		}
-		case 3:
-		case 4: {
+		case 6:
+		case 7: {
 			float mappedValue1 = f_mapfloat(-25.0, 45.0, 0.0, 1.0, -2.0);
 			float mappedValue2 = f_mapfloat(-25.0, 45.0, 0.0, 1.0, 35.0);
-			return vec4(f_temperatureToColor(f_mapfloat(0.0, 1.0, mappedValue1, mappedValue2, color.x)), 1.0);
+			color = vec4(f_temperatureToColor(f_mapfloat(0.0, 1.0, mappedValue1, mappedValue2, color.x)), 1.0);
+			break;
 		}
-		case 5:
-		case 6: {
-			return vec4(f_temperatureToColor(color.x), 1.0);
+		case 8:
+		case 9: {
+			color = vec4(f_temperatureToColor(color.x), 1.0);
+			break;
 		}
+	}
+	
+	if (render_lighting == 1 && render_planet_texture != 0) {
+		color.xyz *= diffuse;
 	}
 	return color;
 }
