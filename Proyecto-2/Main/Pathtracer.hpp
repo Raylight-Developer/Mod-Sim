@@ -35,6 +35,7 @@ struct PathTracer {
 
 	void f_updateBvh();
 	void f_updateParticles();
+	void f_updateTextures(const bool& high_res);
 
 	void f_guiUpdate();
 	void f_recompile();

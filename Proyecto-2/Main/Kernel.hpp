@@ -35,6 +35,7 @@ struct Kernel {
 
 	vector<CPU_Particle> particles;
 	unordered_map<Texture_Field, Texture> textures;
+	Texture sph_texture;
 
 	vector<GPU_Particle> gpu_particles;
 	vector<GPU_Bvh> bvh_nodes;
@@ -44,12 +45,13 @@ struct Kernel {
 
 	Kernel();
 
+	void buildBvh();
 	void buildParticles();
 	void traceInitProperties(CPU_Particle* particle) const;
 
 	void lock();
 	void lockParticles();
-	void buildBvh();
+	void generateSPHTexture();
 
 	void simulate(const dvec1& delta_time);
 	void updateTime();
@@ -65,4 +67,3 @@ struct Kernel {
 	void calculateDayTime();
 	vec3 rotateGeoloc(const vec3& point, const vec2& geoloc) const;
 };
-

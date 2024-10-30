@@ -217,25 +217,39 @@ void Renderer::f_guiLoop() {
 	ImGui::NewFrame();
 
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(400, FLT_MAX));
 	ImGui::Begin("Info");
+	ImGui::SetWindowPos(ImVec2(0, 0));
+	const vec1 availableWidth = ImGui::GetContentRegionAvail().x;
 
 	ImGui::SeparatorText("Average Stats");
 	{
 		const dvec1 percent = round((gpu_time_aggregate / current_time) * 100.0);
-		ImGui::Text(("~GPU[" + to_str(percent, 0) + "]%%").c_str());
-		ImGui::Text(("~CPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
+		ImGui::Text(("~GPU[" + to_str(percent, 0) + "]%%").c_str(), ImVec2(availableWidth * 0.5f, 0));
+		ImGui::SameLine();
+		ImGui::Text(("~CPU[" + to_str(100.0 - percent, 0) + "]%%").c_str(), ImVec2(availableWidth * 0.5f, 0));
 
 		ImGui::Text(("Fps: " + to_str(ul_to_d(runframe) / current_time, 0)).c_str());
 	}
 	ImGui::SeparatorText("Stats");
 	{
 		const dvec1 percent = round((gpu_time / frame_time) * 100.0);
-		ImGui::Text(("~GPU[" + to_str(percent, 0) + "]%%").c_str());
-		ImGui::Text(("~CPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
+		ImGui::Text(("~GPU[" + to_str(percent, 0) + "]%%").c_str(), ImVec2(availableWidth * 0.5f, 0));
+		ImGui::SameLine();
+		ImGui::Text(("~CPU[" + to_str(100.0 - percent, 0) + "]%%").c_str(), ImVec2(availableWidth * 0.5f, 0));
 
 		ImGui::Text(("Fps: " + to_str(frame_count, 0)).c_str());
 	}
-	ImGui::Text(("Zoom: " + to_str(camera_zoom_sensitivity, 1) + "    Orbit: " + to_str(camera_orbit_sensitivity, 1)).c_str());
+	ImGui::SeparatorText("Info");
+	ImGui::Text(("Month:  " + to_str(kernel.CALENDAR_MONTH, 0)).c_str()), ImVec2(availableWidth * 0.5f, 0);
+	ImGui::SameLine();
+	ImGui::Text(("Day:    " + to_str(kernel.CALENDAR_DAY, 0)).c_str(), ImVec2(availableWidth * 0.5f, 0));
+	ImGui::Text(("Hour:   " + to_str(kernel.CALENDAR_HOUR, 0)).c_str(), ImVec2(availableWidth * 0.5f, 0));
+	ImGui::SameLine();
+	ImGui::Text(("Minute: " + to_str(kernel.CALENDAR_MINUTE, 0)).c_str(), ImVec2(availableWidth * 0.5f, 0));
+	ImGui::Text(("Zoom:   " + to_str(camera_zoom_sensitivity, 1)).c_str(), ImVec2(availableWidth * 0.5f, 0));
+	ImGui::SameLine();
+	ImGui::Text(("Orbit:  " + to_str(camera_orbit_sensitivity, 1)).c_str()), ImVec2(availableWidth * 0.5f, 0);
 	ImGui::SeparatorText("Play / Pause");
 	if (run_sim) {
 		if (ImGui::Button("Pause")) {
@@ -247,6 +261,7 @@ void Renderer::f_guiLoop() {
 			if (ImGui::Button("Play")) {
 				run_sim = true;
 			}
+			ImGui::SameLine();
 			if (ImGui::Button("Next Frame")) {
 				next_frame = true;
 			}
@@ -254,7 +269,6 @@ void Renderer::f_guiLoop() {
 		else {
 			if (ImGui::Button("Lock n Load Settings")) {
 				lock_settings = true;
-				f_updateParticles();
 				kernel.lock();
 				next_frame = true;
 			}
@@ -262,12 +276,14 @@ void Renderer::f_guiLoop() {
 			if (ImGui::SliderFloat("Latitude", &kernel.POLE_GEOLOCATION.x, -90.0f, 90.0f, "%.4f")) {
 				f_updateParticles();
 			}
+			ImGui::SameLine();
 			if (ImGui::SliderFloat("Longitude", &kernel.POLE_GEOLOCATION.y, -180.0f, 180.0f, "%.4f")) {
 				f_updateParticles();
 			}
 			if (ImGui::SliderFloat("Pole Bias", &kernel.POLE_BIAS, 0.0f, 1.0f, "%.5f")) {
 				f_updateParticles();
 			}
+			ImGui::SameLine();
 			if (ImGui::SliderFloat("Pole Power", &kernel.POLE_BIAS_POWER, 1.0f, 10.0f)) {
 				f_updateParticles();
 			}
@@ -301,7 +317,7 @@ void Renderer::f_guiLoop() {
 			}
 		}
 	}
-	ImGui::SliderFloat("Time Scale", &kernel.TIME_SCALE, 0.01f, 100.0f, "%.3f");
+	ImGui::SliderFloat("Time Scale", &kernel.TIME_SCALE, 0.01f, 3650.0f, "%.3f");
 	int SAMPLES = kernel.SAMPLES;
 	if (ImGui::SliderInt("Samples", &SAMPLES, 1, 10)) {
 		kernel.SAMPLES = SAMPLES;

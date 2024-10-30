@@ -43,7 +43,7 @@ void main() {
 					if (render_lighting == 1) {
 						vec3 intersection = ray.origin + ray.direction * t_dist;
 						vec3 normal = normalize(intersection);
-						float diffuse = max(dot(normal, sun_dir), 0.0) * 0.95 + 0.05;
+						float diffuse = max(dot(normal, sun_dir), 0.0) * 0.9 + 0.1;
 						color = vec4(f_earthColor(earth_uv).xyz * diffuse, 1);
 					}
 					else {
@@ -58,7 +58,7 @@ void main() {
 			if (t_dist < t_length && t_dist > EPSILON) {
 				color = vec4(f_particleColor(particles[closest_particle_index], t_dist), 1.0);
 				if (render_particle_lighting == 1) {
-					color = mix(bg_color, color, particles[closest_particle_index].sun_intensity * 0.8 + 0.2);
+					color = mix(bg_color, color, particles[closest_particle_index].sun_intensity * 0.7 + 0.3);
 				}
 			}
 		}
@@ -107,7 +107,7 @@ void main() {
 		octree_alpha *= 0.95;
 	}
 
-	if (render_lighting == 1 && render_atmosphere == 1) {
+	if (render_lighting == 1 && render_atmosphere == 1 && render_particle_color_mode < SPH) {
 		vec2 e = ray_vs_sphere( ray.origin, ray.direction, ATMOSPHERE_RADIUS );
 		if ( e.x <= e.y ) {
 			vec2 f = ray_vs_sphere( ray.origin, ray.direction, EARTH_RADIUS );

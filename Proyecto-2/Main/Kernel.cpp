@@ -33,31 +33,57 @@ Kernel::Kernel() {
 	sun_dir            = vec3(0, 0, 1);
 	calculateDateTime();
 
-	textures[Texture_Field::TOPOGRAPHY]                     = Texture::fromFile("./Resources/Nasa Earth Data/Topography.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::BATHYMETRY]                     = Texture::fromFile("./Resources/Nasa Earth Data/Bathymetry.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::SURFACE_PRESSURE]               = Texture::fromFile("./Resources/Nasa Earth Data/MODIS/Surface Pressure CAF.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::SEA_SURFACE_TEMPERATURE_DAY]    = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature CAF.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::SEA_SURFACE_TEMPERATURE_NIGHT]  = Texture::fromFile("./Resources/Nasa Earth Data/Sea Surface Temperature Night CAF.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::LAND_SURFACE_TEMPERATURE_DAY]   = Texture::fromFile("./Resources/Nasa Earth Data/Land Surface Temperature CAF.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::LAND_SURFACE_TEMPERATURE_NIGHT] = Texture::fromFile("./Resources/Nasa Earth Data/Land Surface Temperature Night CAF.png", Texture_Format::MONO_FLOAT);
+#ifdef NDEBUG
+	textures[Texture_Field::TOPOGRAPHY]                     = Texture::fromFile("./Resources/Data/Topography.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::BATHYMETRY]                     = Texture::fromFile("./Resources/Data/Bathymetry.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::SURFACE_PRESSURE]               = Texture::fromFile("./Resources/Data/Pressure CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::SEA_SURFACE_TEMPERATURE_DAY]    = Texture::fromFile("./Resources/Data/Sea Surface Temperature CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::SEA_SURFACE_TEMPERATURE_NIGHT]  = Texture::fromFile("./Resources/Data/Sea Surface Temperature Night CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::LAND_SURFACE_TEMPERATURE_DAY]   = Texture::fromFile("./Resources/Data/Land Surface Temperature CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::LAND_SURFACE_TEMPERATURE_NIGHT] = Texture::fromFile("./Resources/Data/Land Surface Temperature Night CAF.png", Texture_Format::MONO_FLOAT);
 	
-	textures[Texture_Field::HUMIDITY]                = Texture::fromFile("./Resources/Nasa Earth Data/MODIS/Humidity After Moist CAF.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::WATER_VAPOR]             = Texture::fromFile("./Resources/Nasa Earth Data/Water Vapor CAF.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::CLOUD_COVERAGE]          = Texture::fromFile("./Resources/Nasa Earth Data/Cloud Fraction.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::CLOUD_WATER_CONTENT]     = Texture::fromFile("./Resources/Nasa Earth Data/Cloud Water Content CAF.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::CLOUD_PARTICLE_RADIUS]   = Texture::fromFile("./Resources/Nasa Earth Data/Cloud Particle Radius CAF.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::CLOUD_OPTICAL_THICKNESS] = Texture::fromFile("./Resources/Nasa Earth Data/Cloud Optical Thickness CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::HUMIDITY]                = Texture::fromFile("./Resources/Data/Humidity CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::WATER_VAPOR]             = Texture::fromFile("./Resources/Data/Water Vapor CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::CLOUD_COVERAGE]          = Texture::fromFile("./Resources/Data/Cloud Fraction.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::CLOUD_WATER_CONTENT]     = Texture::fromFile("./Resources/Data/Cloud Water Content CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::CLOUD_PARTICLE_RADIUS]   = Texture::fromFile("./Resources/Data/Cloud Particle Radius CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::CLOUD_OPTICAL_THICKNESS] = Texture::fromFile("./Resources/Data/Cloud Optical Thickness CAF.png", Texture_Format::MONO_FLOAT);
 	
-	textures[Texture_Field::OZONE]                         = Texture::fromFile("./Resources/Nasa Earth Data/Ozone CAF.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::ALBEDO]                        = Texture::fromFile("./Resources/Nasa Earth Data/Albedo CAF.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::UV_INDEX]                      = Texture::fromFile("./Resources/Nasa Earth Data/UV Index.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::NET_RADIATION]                 = Texture::fromFile("./Resources/Nasa Earth Data/Net Radiation.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::SOLAR_INSOLATION]              = Texture::fromFile("./Resources/Nasa Earth Data/Solar Insolation.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::OUTGOING_LONGWAVE_RADIATION]   = Texture::fromFile("./Resources/Nasa Earth Data/Outgoing Longwave Radiation.png", Texture_Format::MONO_FLOAT);
-	textures[Texture_Field::REFLECTED_SHORTWAVE_RADIATION] = Texture::fromFile("./Resources/Nasa Earth Data/Reflected Shortwave Radiation.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::OZONE]                         = Texture::fromFile("./Resources/Data/Ozone CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::ALBEDO]                        = Texture::fromFile("./Resources/Data/Albedo CAF.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::UV_INDEX]                      = Texture::fromFile("./Resources/Data/UV Index.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::NET_RADIATION]                 = Texture::fromFile("./Resources/Data/Net Radiation.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::SOLAR_INSOLATION]              = Texture::fromFile("./Resources/Data/Solar Insolation.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::OUTGOING_LONGWAVE_RADIATION]   = Texture::fromFile("./Resources/Data/Outgoing Longwave Radiation.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::REFLECTED_SHORTWAVE_RADIATION] = Texture::fromFile("./Resources/Data/Reflected Shortwave Radiation.png", Texture_Format::MONO_FLOAT);
+#else
+	textures[Texture_Field::TOPOGRAPHY]                     = Texture::fromFile("./Resources/Data/Topography LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::BATHYMETRY]                     = Texture::fromFile("./Resources/Data/Bathymetry LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::SURFACE_PRESSURE]               = Texture::fromFile("./Resources/Data/Pressure LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::SEA_SURFACE_TEMPERATURE_DAY]    = Texture::fromFile("./Resources/Data/Sea Surface Temperature LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::SEA_SURFACE_TEMPERATURE_NIGHT]  = Texture::fromFile("./Resources/Data/Sea Surface Temperature Night LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::LAND_SURFACE_TEMPERATURE_DAY]   = Texture::fromFile("./Resources/Data/Land Surface Temperature LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::LAND_SURFACE_TEMPERATURE_NIGHT] = Texture::fromFile("./Resources/Data/Land Surface Temperature Night LR.png", Texture_Format::MONO_FLOAT);
+
+	textures[Texture_Field::HUMIDITY]                = Texture::fromFile("./Resources/Data/Humidity LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::WATER_VAPOR]             = Texture::fromFile("./Resources/Data/Water Vapor LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::CLOUD_COVERAGE]          = Texture::fromFile("./Resources/Data/Cloud Fraction LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::CLOUD_WATER_CONTENT]     = Texture::fromFile("./Resources/Data/Cloud Water Content LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::CLOUD_PARTICLE_RADIUS]   = Texture::fromFile("./Resources/Data/Cloud Particle Radius LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::CLOUD_OPTICAL_THICKNESS] = Texture::fromFile("./Resources/Data/Cloud Optical Thickness LR.png", Texture_Format::MONO_FLOAT);
+
+	textures[Texture_Field::OZONE]                         = Texture::fromFile("./Resources/Data/Ozone LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::ALBEDO]                        = Texture::fromFile("./Resources/Data/Albedo LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::UV_INDEX]                      = Texture::fromFile("./Resources/Data/UV Index LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::NET_RADIATION]                 = Texture::fromFile("./Resources/Data/Net Radiation LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::SOLAR_INSOLATION]              = Texture::fromFile("./Resources/Data/Solar Insolation LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::OUTGOING_LONGWAVE_RADIATION]   = Texture::fromFile("./Resources/Data/Outgoing Longwave Radiation LR.png", Texture_Format::MONO_FLOAT);
+	textures[Texture_Field::REFLECTED_SHORTWAVE_RADIATION] = Texture::fromFile("./Resources/Data/Reflected Shortwave Radiation LR.png", Texture_Format::MONO_FLOAT);
+#endif
 }
 
 void Kernel::buildParticles() {
+	cout << "Rebuild Particles" << endl;
 	const vec1 radius = 6.371f + PARTICLE_RADIUS;
 	sun_dir = sunDir();
 
@@ -119,9 +145,15 @@ void Kernel::lockParticles() {
 
 		#pragma omp critical
 		if ((i % (PARTICLE_COUNT / 5)) == 0) {
-			cout << f_to_u(round(u_to_f(i) / u_to_f(PARTICLE_COUNT) * 100.0f)) << "%" << endl;
+			cout << "Lock Particles: " << f_to_u(round(u_to_f(i) / u_to_f(PARTICLE_COUNT) * 100.0f)) << "%" << endl;
 		}
 	}
+}
+
+void Kernel::generateSPHTexture() {
+	sph_texture = Texture();
+	sph_texture.resolution = uvec2(3600, 1800);
+	sph_texture.uint_data;
 }
 
 void Kernel::buildBvh() {
@@ -140,6 +172,9 @@ void Kernel::simulate(const dvec1& delta_time) {
 	SDT = DT / u_to_f(SAMPLES);
 	gpu_particles.clear();
 
+	const vec1 day_time = DAY_TIME * 24.0f;
+	CALENDAR_HOUR = int(round(day_time - glm::fract(day_time)));
+	CALENDAR_MINUTE = int(round(glm::fract(day_time) * 60.0f));
 	for (uint i = 0; i < SAMPLES; i++) {
 		time += SDT;
 		updateTime();
@@ -180,6 +215,7 @@ void Kernel::updateTime() {
 			DAY++;
 		else DAY = 0;
 		YEAR_TIME = u_to_f(DAY) / 365.0f;
+		calculateDate();
 	}
 }
 
@@ -293,6 +329,7 @@ void Kernel::traceInitProperties(CPU_Particle* particle) const {
 	particle->data.outgoing_longwave_radiation   = lut(Texture_Field::OUTGOING_LONGWAVE_RADIATION, outgoiing_longwave_radiation_sample);
 	particle->data.reflected_shortwave_radiation = lut(Texture_Field::REFLECTED_SHORTWAVE_RADIATION, reflected_shortwave_radiation_sample);
 	calculateSunlight(particle);
+	particle->data.sun_intensity = particle->new_data.sun_intensity;
 	particle->data.temperature = glm::mix(particle->data.night_temperature, particle->data.day_temperature, particle->data.sun_intensity);
 }
 
@@ -337,13 +374,12 @@ vec3 Kernel::sunDir() const {
 
 void Kernel::calculateDate() {
 	const array<int, 12> daysInMonth = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-	YEAR_TIME = 1.0f - YEAR_TIME;
-	if (YEAR_TIME < 0.0f) {
-		YEAR_TIME += 1.0f;
+	int dayOfYear = f_to_i(round(YEAR_TIME * 365.0f + 355.0f));
+	if (dayOfYear > 365) {
+		dayOfYear -= 365;
 	}
-
-	const int dayOfYear = f_to_i(round(YEAR_TIME * 365.0f));
 	int daysPassed = 0;
+
 	for (CALENDAR_MONTH = 0; CALENDAR_MONTH < 12; ++CALENDAR_MONTH) {
 		if (dayOfYear <= daysPassed + daysInMonth[CALENDAR_MONTH]) {
 			CALENDAR_DAY = dayOfYear - daysPassed;
@@ -368,7 +404,7 @@ void Kernel::calculateYearTime() {
 	dayOfYear += CALENDAR_DAY;
 
 	const int totalDaysInYear = 365;
-	vec1 adjustedValue = (355 - dayOfYear + 1) / static_cast<vec1>(totalDaysInYear); // Start in solstice december 21
+	vec1 adjustedValue = (355 - dayOfYear + 1) / i_to_f(totalDaysInYear); // Start in solstice december 21
 
 	if (adjustedValue < 0) {
 		adjustedValue = 1.0f + adjustedValue;

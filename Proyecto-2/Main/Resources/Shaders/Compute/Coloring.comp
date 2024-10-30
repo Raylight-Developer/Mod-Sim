@@ -88,7 +88,7 @@ vec3 f_particleColor(in Particle particle, in float dist) {
 		case 19: return vec3(f_mapfloat(0.0, 425.0, 0.0, 1.0, particle.reflected_shortwave_radiation));
 // SPH
 		case 20: return f_windToColor(particle.sph_wind_vector);
-		case 21: return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0,particle.sph_pressure));
+		case 21: return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0, particle.sph_pressure));
 		case 22: return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.sph_temperature));
 	}
 	return vec3(1,0,1);

@@ -2,6 +2,8 @@
 
 #include "Window.hpp"
 
+#define SPH 20
+
 PathTracer::PathTracer(Renderer* renderer) :
 	renderer(renderer)
 {
@@ -90,17 +92,9 @@ void PathTracer::f_initialize() {
 	// Compute Output
 	gl_data["raw_render_layer"] = renderLayer(renderer->render_resolution);
 
-	vector<uint> texture_data;
-	vector<string> texture_names = { "Blue Marble", "Topography", "Bathymetry", "Sea Surface Temperature LR", "Sea Surface Temperature Night LR", "Land Surface Temperature LR", "Land Surface Temperature Night LR", "MODIS/Humidity After Moist CAF", "Water Vapor LR", "Cloud Fraction", "Cloud Water Content LR", "Cloud Particle Radius LR", "Cloud Optical Thickness LR", "Ozone LR", "Albedo LR", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation" };
-	for (const string& tex : texture_names) {
-		Texture texture = Texture::fromFile("./Resources/Nasa Earth Data/" + tex + ".png", Texture_Format::RGBA_8);
-		textures.push_back(GPU_Texture(ul_to_u(texture_data.size()), texture.resolution.x, texture.resolution.y, 0));
-		auto data = texture.toRgba8Texture();
-		texture_data.insert(texture_data.end(), data.begin(), data.end());
-	}
-	texture_size = ul_to_u(texture_data.size());
-	gl_data["ssbo 3"] = ssboBinding(ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
-	gl_data["ssbo 4"] = ssboBinding(ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
+	#ifdef NDEBUG
+		f_updateTextures(true);
+	#endif // DEBUG
 }
 
 void PathTracer::f_updateBvh() {
@@ -113,22 +107,58 @@ void PathTracer::f_updateParticles() {
 	gl_data["ssbo 1"] = ssboBinding(ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
 }
 
+void PathTracer::f_updateTextures(const bool& high_res) {
+	const string LR = high_res? "" : " LR";
+	vector<uint> texture_data;
+	vector<string> texture_names = { 
+		"Blue Marble",
+		"Topography",
+		"Bathymetry",
+		"Pressure",
+		"Sea Surface Temperature" + LR,
+		"Sea Surface Temperature Night" + LR,
+		"Land Surface Temperature" + LR,
+		"Land Surface Temperature Night" + LR,
+		"Humidity",
+		"Water Vapor" + LR,
+		"Cloud Fraction",
+		"Cloud Water Content" + LR,
+		"Cloud Particle Radius" + LR,
+		"Cloud Optical Thickness" + LR,
+		"Ozone" + LR,
+		"Albedo" + LR,
+		"UV Index",
+		"Net Radiation",
+		"Solar Insolation",
+		"Outgoing Longwave Radiation",
+		"Reflected Shortwave Radiation"
+	};
+	for (const string& tex : texture_names) {
+		Texture texture = Texture::fromFile("./Resources/Data/" + tex + ".png", Texture_Format::RGBA_8);
+		textures.push_back(GPU_Texture(ul_to_u(texture_data.size()), texture.resolution.x, texture.resolution.y, 0));
+		auto data = texture.toRgba8Texture();
+		texture_data.insert(texture_data.end(), data.begin(), data.end());
+	}
+	texture_size = ul_to_u(texture_data.size());
+	gl_data["ssbo 3"] = ssboBinding(ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
+	gl_data["ssbo 4"] = ssboBinding(ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
+}
+
 void PathTracer::f_guiUpdate() {
 	ImGui::SeparatorText("Pathtraced Rendering");
 	ImGui::Checkbox("Render Planet", &render_planet);
 	if (render_planet) {
-		const char* items_b[] = { "Blue Marble", "Topography", "Bathymetry", "Sea Temperature Day", "Sea Temperature Night", "Land Temperature Day", "Land Temperature Night", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "Albedo", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation" };
+		const char* items_b[] = { "Blue Marble", "Topography", "Bathymetry", "Surface Pressure", "Sea Temperature Day", "Sea Temperature Night", "Land Temperature Day", "Land Temperature Night", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "Albedo", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation"};
 		ImGui::Combo("Planet Texture", &render_planet_texture, items_b, IM_ARRAYSIZE(items_b));
 	}
 
 	ImGui::Checkbox("Render Lighting", &render_lighting);
-	if (render_lighting) {
+	if (render_lighting and render_particle_color_mode < SPH) {
 		ImGui::Checkbox("Render Atmosphere", &render_atmosphere);
 	}
-	ImGui::Checkbox("Render Particle Lighting", &render_particle_lighting);
 
 	if (!renderer->run_sim) {
-		if (use_octree) {
+		if (use_octree and render_particle_color_mode < SPH) {
 			ImGui::Checkbox("Render Octree", &render_octree);
 			if (render_octree) {
 				ImGui::Checkbox("Hue", &render_octree_hue);
@@ -142,16 +172,19 @@ void PathTracer::f_guiUpdate() {
 
 	ImGui::Checkbox("Render Particles", &render_particles);
 	if (render_particles) {
-		ImGui::Checkbox("Use Octree", &use_octree);
-		if (use_octree) {
-			int MAX_OCTREE_DEPTH = u_to_i(renderer->kernel.MAX_OCTREE_DEPTH);
-			if (ImGui::SliderInt("Max Octree Depth", &MAX_OCTREE_DEPTH, 0, 6)) {
-				renderer->kernel.MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
-				renderer->f_updateBvh();
-				f_updateParticles();
+		ImGui::Checkbox("Render Particle Lighting", &render_particle_lighting);
+		if (render_particle_color_mode < SPH) {
+			ImGui::Checkbox("Use Octree", &use_octree);
+			if (use_octree) {
+				int MAX_OCTREE_DEPTH = u_to_i(renderer->kernel.MAX_OCTREE_DEPTH);
+				if (ImGui::SliderInt("Max Octree Depth", &MAX_OCTREE_DEPTH, 0, 6)) {
+					renderer->kernel.MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
+					renderer->f_updateBvh();
+					f_updateParticles();
+				}
 			}
+			ImGui::SliderFloat("Particle Radius", &render_particle_radius, 0.005f, 0.025f, "%.4f");
 		}
-		ImGui::SliderFloat("Particle Radius", &render_particle_radius, 0.005f, 0.025f, "%.4f");
 
 		const char* items_b[] = { "Sun Intensity", "Wind", "Height", "Pressure", "Current Temperature", "Day Temperature", "Night Temperature", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "Albedo", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation", "SPH.Wind", "SPH.Pressure", "SPH.Temperature" };
 		ImGui::Combo("Particle Color Mode", &render_particle_color_mode, items_b, IM_ARRAYSIZE(items_b));

@@ -61,7 +61,7 @@ bool f_raySphereIntersection(in Ray ray, in vec3 position, in float radius, out 
 	float a = dot(ray.direction, ray.direction);
 	float b = 2.0*dot(ray.direction, CO);
 	float c = dot(CO, CO);
-	if (render_particle_color_mode > 18) {
+	if (render_particle_color_mode >= SPH) {
 		c -= radius * radius;
 	}
 	else {
@@ -119,7 +119,7 @@ bool f_EarthIntersection(in Ray ray, out float t, out vec2 uv) {
 
 int f_visitBvh(in Ray ray, inout float result_raylength) {
 	int closest_particle = -1;
-	if (use_octree == 1) {
+	if (use_octree == 1 && render_particle_color_mode < SPH) {
 		Ray bvh_ray = Ray(ray.origin, normalize(1.0 / ray.direction));
 
 		float t_length = MAX_DIST;
