@@ -1,5 +1,6 @@
 float f_mapfloat(float from_min, float from_max, float to_min, float to_max, float value) {
-	return (to_min + ((to_max - to_min) / (from_max - from_min)) * (value - from_min));
+	value = clamp(value, from_min, from_max);
+	return clamp((to_min + ((to_max - to_min) / (from_max - from_min)) * (value - from_min)), to_min, to_max);
 }
 
 vec3 hsv2rgb(vec3 c) {
@@ -26,7 +27,7 @@ vec4 blendColors(vec4 bottomLayer, vec4 topLayer) {
 vec3 f_windToColor(vec3 wind) {
 	vec3 color;
 	float speed = length(wind);
-	float normalizedSpeed = clamp(f_mapfloat(0.0, 1.0, 0.0, 1.0, speed), 0.0, 1.0);
+	float normalizedSpeed = f_mapfloat(0.0, 40.0, 0.0, 1.0, speed);
 
 	if (normalizedSpeed <= 0.5) {
 		float t = normalizedSpeed * 2.0;
@@ -41,7 +42,7 @@ vec3 f_windToColor(vec3 wind) {
 
 vec3 f_temperatureToColor(float temp) {
 	vec3 color;
-	float t = clamp(f_mapfloat(0.0, 1.0, 1.0, 0.0, temp), 0.0, 1.0);
+	float t = f_mapfloat(0.0, 1.0, 1.0, 0.0, temp);
 
 	if (t < 0.25) {
 		// Interpolate from Red to Yellow

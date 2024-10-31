@@ -111,7 +111,6 @@ Builder::Builder(const vector<CPU_Particle>& particles, const vec1& particle_rad
 		convertBvh(&root_node);
 	}
 	else {
-		cout << "Build SPH BVH" << endl;
 		for (uint i = 0; i < particles.size(); i++) {
 			const vec3 center = (particles[i].transformed_position);
 			const vec3 max = d_to_f(particles[i].transformed_position + particles[i].smoothing_radius);
@@ -235,7 +234,6 @@ void Builder::growBvhSPH(CPU_Bvh* node) {
 		for (CPU_Particle& particle : node->particles) {
 			radius = max(radius, particle.smoothing_radius);
 		}
-		//radius *= 2.0f;
 		node->p_min -= d_to_f(radius);
 		node->p_max += d_to_f(radius);
 

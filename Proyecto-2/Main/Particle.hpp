@@ -8,7 +8,6 @@ struct CPU_Neighbor;
 struct CPU_Particle_Data {
 	dvec3 position; // mm (mega) meters
 	dvec3 wind_vector; // m/s
-	dvec3 pressure_gradient;
 	dvec1 surface_area; // mm (mega) meters
 
 	dvec1 height; // m

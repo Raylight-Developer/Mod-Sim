@@ -19,6 +19,8 @@ struct Renderer {
 	PathTracer pathtracer;
 
 	Transform camera_transform;
+	dquat camera;
+	dvec1 zoom;
 
 	dvec1 display_aspect_ratio;
 	dvec1 render_aspect_ratio;
@@ -54,6 +56,7 @@ struct Renderer {
 	bool  run_sim;
 	bool  next_frame;
 	bool  lock_settings;
+	bool  lock_view;
 
 	Renderer();
 	~Renderer();

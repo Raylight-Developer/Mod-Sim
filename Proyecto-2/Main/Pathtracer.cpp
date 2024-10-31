@@ -21,7 +21,7 @@ PathTracer::PathTracer(Renderer* renderer) :
 	}
 	render_particles = true;
 	{
-		render_particle_color_mode = 20;
+		render_particle_color_mode = 1;
 	}
 	render_planet_texture = 0;
 }
@@ -195,7 +195,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 			ImGui::Checkbox("Render Particle Lighting", &render_particle_lighting);
 			if (render_particle_color_mode < SPH) {
 				ImGui::Text("Particle Radius");
-				if (ImGui::SliderFloat("##slider14", &renderer->kernel.PARTICLE_RADIUS, 0.005f, 0.1f, "%.4f")) {
+				if (ImGui::SliderFloat("##slider14", &renderer->kernel.PARTICLE_RADIUS, 0.005f, 0.25f, "%.4f")) {
 					renderer->f_updateBvh();
 				}
 			}
@@ -271,17 +271,25 @@ void PathTracer::f_render() {
 	const GLuint compute_program = gl_data["compute_program"];
 	const GLuint display_program = gl_data["display_program"];
 
-	const mat4 matrix = d_to_f(glm::yawPitchRoll(renderer->camera_transform.euler_rotation.y * DEG_RAD, renderer->camera_transform.euler_rotation.x * DEG_RAD, renderer->camera_transform.euler_rotation.z * DEG_RAD));
-	const vec3 y_vector = matrix[1];
-	const vec3 z_vector = -matrix[2];
-
 	const vec1 focal_length = 0.05f;
 	const vec1 sensor_size  = 0.036f;
 
-	const vec3 camera_pos = d_to_f(renderer->camera_transform.position);
+	const vec3 worldUp =vec3(0, 1, 0);
+	const vec3 rotatedDirection = d_to_f(renderer->camera) * vec3(0, 0, 1);
+	const vec3 camera_pos = rotatedDirection * d_to_f(renderer->zoom);
+	const vec3 z_vector = -glm::normalize(camera_pos);
+	const vec3 y_vector = d_to_f(renderer->camera) * vec3(0, 1, 0);
 	const vec3 projection_center = camera_pos + focal_length * z_vector;
 	const vec3 projection_u = normalize(cross(z_vector, y_vector)) * sensor_size;
 	const vec3 projection_v = normalize(cross(projection_u, z_vector)) * sensor_size;
+
+	//const mat4 matrix = d_to_f(glm::yawPitchRoll(renderer->camera_transform.euler_rotation.y * DEG_RAD, renderer->camera_transform.euler_rotation.x * DEG_RAD, renderer->camera_transform.euler_rotation.z * DEG_RAD));
+	//const vec3 y_vector = matrix[1];
+	//const vec3 z_vector = -matrix[2];
+	//const vec3 camera_pos = d_to_f(renderer->camera_transform.position);
+	//const vec3 projection_center = camera_pos + focal_length * z_vector;
+	//const vec3 projection_u = normalize(cross(z_vector, y_vector)) * sensor_size;
+	//const vec3 projection_v = normalize(cross(projection_u, z_vector)) * sensor_size;
 
 	glUseProgram(compute_program);
 

@@ -29,7 +29,7 @@ struct Kernel {
 
 	dvec1 DT;
 	uint  RUNFRAME;
-	uint  SAMPLES;
+	uint  SUB_SAMPLES;
 	dvec1 SDT;
 
 	dvec3 sun_dir;
@@ -42,7 +42,6 @@ struct Kernel {
 	vector<GPU_Bvh> bvh_nodes;
 
 	dvec1 time;
-	uint  frame_count;
 
 	Kernel();
 
@@ -60,8 +59,8 @@ struct Kernel {
 	void calculateSunlight(CPU_Particle* particle) const;
 
 	void scatterSPH(CPU_Particle* particle) const;
-	void scatterPressure(CPU_Particle* particle) const;
-	void gatherPressure(CPU_Particle* particle) const;
+	void scatterWind(CPU_Particle* particle) const;
+	void gatherWind(CPU_Particle* particle) const;
 	void gatherThermodynamics(CPU_Particle* particle) const;
 
 	dvec3 sunDir() const;

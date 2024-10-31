@@ -18,6 +18,8 @@ Renderer::Renderer() {
 	}
 
 	camera_transform = Transform(dvec3(0, 0, 37.5), dvec3(0));
+	camera = dquat(1,0,0,0);
+	zoom = 37.5;
 
 	runframe = 0;
 
@@ -37,7 +39,7 @@ Renderer::Renderer() {
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
 
 	camera_zoom_sensitivity = 7.5;
-	camera_orbit_sensitivity = 20.0;
+	camera_orbit_sensitivity = 2.0;
 	input_lerp = 10.0;
 	inputs = vector(6, false);
 	input_lerps = vector(6, dvec3(0.0));
@@ -53,6 +55,7 @@ Renderer::Renderer() {
 	run_sim = false;
 	next_frame = false;
 	lock_settings = false;
+	lock_view = false;
 }
 
 Renderer::~Renderer() {
@@ -225,7 +228,7 @@ void Renderer::f_guiLoop() {
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(400, FLT_MAX));
 	ImGui::Begin("Info");
-	ImGui::SetWindowPos(ImVec2(0, 0));
+	//ImGui::SetWindowPos(ImVec2(0, 0));
 	const vec1 availableWidth = ImGui::GetContentRegionAvail().x;
 	const vec1 spacing = ImGui::GetStyle().ItemSpacing.x;
 	const vec1 itemWidth = availableWidth;
@@ -242,10 +245,10 @@ void Renderer::f_guiLoop() {
 		kernel.TIME_SCALE = f_to_d(TIME_SCALE);
 	}
 
-	int SAMPLES = kernel.SAMPLES;
-	ImGui::Text("Samples");
-	if (ImGui::SliderInt("##samples", &SAMPLES, 1, 10)) {
-		kernel.SAMPLES = SAMPLES;
+	int SAMPLES = kernel.SUB_SAMPLES;
+	ImGui::Text("Sub Samples");
+	if (ImGui::SliderInt("##samples", &SAMPLES, 1, 50)) {
+		kernel.SUB_SAMPLES = SAMPLES;
 	}
 	ImGui::PopItemWidth();
 
@@ -377,10 +380,10 @@ void Renderer::f_guiLoop() {
 			const dvec1 percent = round((gpu_time / frame_time) * 100.0);
 			ImGui::Text(("~GPU[" + to_str(percent, 0) + "]%%").c_str());
 			ImGui::SameLine();
-			//ImGui::SetCursorPosX(thirdPos);
+			ImGui::SetCursorPosX(thirdPos);
 			ImGui::Text(("~CPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
 			ImGui::SameLine();
-			//ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::SetCursorPosX(thirdPos * 2.0f);
 			ImGui::Text(("Fps: " + to_str(frame_count, 0)).c_str());
 			ImGui::PopItemWidth();
 		}
@@ -389,15 +392,15 @@ void Renderer::f_guiLoop() {
 		ImGui::PushItemWidth(halfWidth);
 		ImGui::Text(("Month:  " + to_str(kernel.CALENDAR_MONTH, 0)).c_str());
 		ImGui::SameLine();
-		//ImGui::SetCursorPosX(halfPos);
+		ImGui::SetCursorPosX(halfPos);
 		ImGui::Text(("Day:    " + to_str(kernel.CALENDAR_DAY, 0)).c_str());
 		ImGui::Text(("Hour:   " + to_str(kernel.CALENDAR_HOUR, 0)).c_str());
 		ImGui::SameLine();
-		//ImGui::SetCursorPosX(halfPos);
+		ImGui::SetCursorPosX(halfPos);
 		ImGui::Text(("Minute: " + to_str(kernel.CALENDAR_MINUTE, 0)).c_str());
 		ImGui::Text(("Zoom:   " + to_str(camera_zoom_sensitivity, 1)).c_str());
 		ImGui::SameLine();
-		//ImGui::SetCursorPosX(halfPos);
+		ImGui::SetCursorPosX(halfPos);
 		ImGui::Text(("Orbit:  " + to_str(camera_orbit_sensitivity, 1)).c_str());
 		ImGui::PopItemWidth();
 	}
@@ -429,6 +432,11 @@ void Renderer::f_frameUpdate() {
 }
 
 void Renderer::f_inputLoop() {
+	if (lock_view) {
+		const dmat4 rotmat = glm::rotate(dmat4(1.0), -glm::radians(kernel.EARTH_TILT), dvec3(0, 0, 1));
+		const dvec3 tilt = glm::normalize(dvec3(rotmat * dvec4(0,1,0,1)));
+		camera = glm::rotate(camera, glm::radians(delta_time * kernel.TIME_SCALE * 0.01 * 360.0), tilt);
+	}
 	for (uint i = 0; i < 6; i++) {
 		dvec3* input = &input_lerps[i];
 		if (input->y < 1.0) {
@@ -439,22 +447,36 @@ void Renderer::f_inputLoop() {
 		}
 		if (i == 0) {
 			camera_transform.orbit(dvec3(0), dvec2(-1, 0) * input->x * camera_orbit_sensitivity * delta_time);
+			camera = glm::rotate(camera, -1.0 * input->x * camera_orbit_sensitivity * delta_time, dvec3(1, 0, 0));
 		}
 		if (i == 1) {
 			camera_transform.orbit(dvec3(0), dvec2(0, -1) * input->x * camera_orbit_sensitivity * delta_time);
+			camera = glm::rotate(camera, -1.0 * input->x * camera_orbit_sensitivity * delta_time, dvec3(0, 1, 0));
 		}
 		if (i == 2) {
 			camera_transform.orbit(dvec3(0), dvec2(1, 0) * input->x * camera_orbit_sensitivity * delta_time);
+			camera = glm::rotate(camera, 1.0 * input->x * camera_orbit_sensitivity * delta_time, dvec3(1, 0, 0));
 		}
 		if (i == 3) {
 			camera_transform.orbit(dvec3(0), dvec2(0, 1) * input->x * camera_orbit_sensitivity * delta_time);
+			camera = glm::rotate(camera, 1.0 * input->x * camera_orbit_sensitivity * delta_time, dvec3(0, 1, 0));
 		}
 		if (i == 4) {
 			camera_transform.moveLocal(dvec3(0, 0, -1) * input->x * camera_zoom_sensitivity * delta_time);
+			zoom -= 1.0 * input->x * camera_zoom_sensitivity * delta_time;
 		}
 		if (i == 5) {
 			camera_transform.moveLocal(dvec3(0, 0, 1) * input->x * camera_zoom_sensitivity * delta_time);
+			zoom += 1.0 * input->x * camera_zoom_sensitivity * delta_time;
 		}
+	}
+	if (!lock_view) {
+		//const dvec3 eulerAngles = glm::eulerAngles(camera);
+		//dvec1 pitch = eulerAngles.x;
+		//const dvec1 yaw = eulerAngles.y;
+		//const dvec1 pitchLimit = glm::radians(89.0f);
+		//pitch = glm::clamp(pitch, -pitchLimit, pitchLimit);
+		//camera = glm::angleAxis(pitch, dvec3(1, 0, 0)) *  glm::angleAxis(yaw, dvec3(0, 1, 0));
 	}
 }
 
@@ -520,6 +542,9 @@ void Renderer::key(GLFWwindow* window, int key, int scancode, int action, int mo
 	//if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
 	//	glfwSetWindowShouldClose(window, GLFW_TRUE);
 	//}
+	if (key == GLFW_KEY_L && action == GLFW_PRESS) {
+		instance->lock_view = !instance->lock_view;
+	}
 	if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) {
 		instance->camera_orbit_sensitivity /= 0.9;
 		instance->camera_zoom_sensitivity /= 0.9;
