@@ -60,13 +60,7 @@ bool f_raySphereIntersection(in Ray ray, in vec3 position, in float radius, out 
 	vec3 CO = ray.origin - position;
 	float a = dot(ray.direction, ray.direction);
 	float b = 2.0*dot(ray.direction, CO);
-	float c = dot(CO, CO);
-	if (render_probe_color_mode >= SPH) {
-		c -= radius * radius;
-	}
-	else {
-		c -= render_probe_radius * render_probe_radius;
-	}
+	float c = dot(CO, CO) - radius * radius;
 
 	float delta = b*b - 4.0*a*c;
 	if(delta < 0.0) {
@@ -142,7 +136,11 @@ int f_visitProbeBvh(in Ray ray, inout float result_raylength) {
 			}
 			if (node.id_end > 0) { // Leaf
 				for (uint i = node.id_start; i < node.id_end; ++i) {
-					if (f_raySphereIntersection(ray, probes[i].position, probes[i].smoothing_radius, t_dist)) {
+					float radius = render_probe_radius;
+					if (render_probe_color_mode >= SPH) {
+						radius = probes[i].smoothing_radius;
+					}
+					if (f_raySphereIntersection(ray, probes[i].position, radius, t_dist)) {
 						if (t_dist < t_length) {
 							t_length = t_dist;
 							result_raylength = t_dist;
@@ -174,7 +172,11 @@ int f_visitProbeBvh(in Ray ray, inout float result_raylength) {
 		float t_dist = MAX_DIST;
 		for (uint i = 0; i < probes.length(); i ++) {
 			//if (i % 16 == 0) {
-				if (f_raySphereIntersection(ray, probes[i].position, probes[i].smoothing_radius, t_dist)) {
+				float radius = render_probe_radius;
+				if (render_probe_color_mode >= SPH) {
+					radius = probes[i].smoothing_radius;
+				}
+				if (f_raySphereIntersection(ray, probes[i].position, radius, t_dist)) {
 					if (t_dist < t_length) {
 						t_length = t_dist;
 						result_raylength = t_dist;

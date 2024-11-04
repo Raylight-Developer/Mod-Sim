@@ -10,7 +10,7 @@
 
 #pragma optimize("O3", on)
 Kernel::Kernel() {
-	PARTICLE_RADIUS           = 0.05f;
+	PARTICLE_RADIUS           = 0.025f;
 	PARTICLE_COUNT            = 1024;// 8192 * 2;
 	PARTICLE_MAX_OCTREE_DEPTH = 2;
 	PARTICLE_POLE_BIAS        = 0.0;//0.975;
@@ -110,7 +110,7 @@ void Kernel::buildProbes() {
 		const dvec1 z = radius * sin(theta) * sin(phi);
 
 		probe.data.position = rotateGeoloc(dvec3(x, y, z), PROBE_POLE_GEOLOCATION);
-		rotateEarth(&probe);
+		updateProbePosition(&probe);
 
 		traceInitProperties(&probe);
 		probe.gen_index = i;
@@ -148,7 +148,7 @@ void Kernel::buildParticles() {
 		const dvec1 z = radius * sin(theta) * sin(phi);
 
 		particle.position = rotateGeoloc(dvec3(x, y, z), PARTICLE_POLE_GEOLOCATION);
-		rotateEarth(&particle);
+		updateParticlePosition(&particle);
 		particles.push_back(particle);
 	}
 }
@@ -224,7 +224,7 @@ void Kernel::lockParticles() {
 			return a.distance < b.distance;
 		});
 
-		particle.probe = neighbors[0];
+		particle.probe = neighbors[0].probe;
 
 		if ((i % (PROBE_COUNT / 5)) == 0) {
 			#pragma omp critical
@@ -261,7 +261,7 @@ void Kernel::simulate(const dvec1& delta_time) {
 
 		// SCATTER
 		for (CPU_Probe& probe : probes) {
-			rotateEarth(&probe);
+			updateProbePosition(&probe);
 			calculateSunlight(&probe);
 			scatterSPH(&probe);
 		}
@@ -271,10 +271,15 @@ void Kernel::simulate(const dvec1& delta_time) {
 			gatherWind(&probe);
 			gatherThermodynamics(&probe);
 
-
-
 			probe.data = probe.new_data;
 		}
+
+	}
+	// WIND FIELD
+	for (CPU_Particle& particle : particles) {
+		updateParticlePosition(&particle);
+		calculateParticle(&particle);
+		updateParticlePosition(&particle);
 	}
 
 	for (const CPU_Probe& probe : probes) {
@@ -295,7 +300,7 @@ void Kernel::updateTime() {
 	}
 }
 
-void Kernel::rotateEarth(CPU_Probe* probe) const {
+void Kernel::updateProbePosition(CPU_Probe* probe) const {
 	const dvec1 axialTilt = -glm::radians(EARTH_TILT);
 	const dvec1 theta = glm::radians(DAY_TIME * 360.0);
 
@@ -485,6 +490,27 @@ void Kernel::gatherThermodynamics(CPU_Probe* probe) const {
 	probe->new_data.pressure += net_heat * SDT;
 }
 
+void Kernel::calculateParticle(CPU_Particle* particle) const {
+	dvec1 distance = glm::distance(particle->transformed_position, particle->probe->transformed_position);
+
+	// Recalculate Closest Probe TODO: Make Recursive
+	for (const CPU_Neighbor& neighbor : particle->probe->neighbors) {
+		dvec1 dist = glm::distance(particle->transformed_position, neighbor.probe->transformed_position);
+		if (dist < distance) {
+			particle->probe = neighbor.probe;
+		}
+	}
+
+	dvec3 wind_vector = particle->probe->data.wind_vector * pow(glm::max(0.0, particle->probe->smoothing_radius - distance), 3.0);
+	for (const CPU_Neighbor& neighbor : particle->probe->neighbors) {
+		dvec1 dist = glm::distance(particle->transformed_position, neighbor.probe->transformed_position);
+		const dvec1 smoothing_kernel = pow(glm::max(0.0, neighbor.probe->smoothing_radius - dist), 3.0);
+		dvec3 wind_vector = neighbor.probe->data.wind_vector * smoothing_kernel;
+	}
+
+	particle->rotation *= glm::quat(glm::radians(particle->probe->data.wind_vector * 0.1 * DT));
+}
+
 dvec3 Kernel::rotateGeoloc(const dvec3& point, const dvec2& geoloc) const {
 	const dvec1 phi = glm::radians(geoloc.x - 90.0);
 	const dvec1 theta = glm::radians(geoloc.y + 90.0);
@@ -507,7 +533,7 @@ dquat Kernel::rotateGeoloc(const dvec2& geoloc) const {
 	return combinedRotation;
 }
 
-void Kernel::rotateEarth(CPU_Particle* particle) const {
+void Kernel::updateParticlePosition(CPU_Particle* particle) const {
 	const dvec1 axialTilt = -glm::radians(EARTH_TILT);
 	const dvec1 theta = glm::radians(DAY_TIME * 360.0);
 

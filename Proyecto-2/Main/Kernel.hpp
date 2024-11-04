@@ -68,13 +68,16 @@ struct Kernel {
 
 	void simulate(const dvec1& delta_time);
 	void updateTime();
-	void rotateEarth(CPU_Probe* probe) const;
+	void updateProbePosition(CPU_Probe* probe) const;
 	void calculateSunlight(CPU_Probe* probe) const;
 
 	void scatterSPH(CPU_Probe* probe) const;
 	void scatterWind(CPU_Probe* probe) const;
 	void gatherWind(CPU_Probe* probe) const;
 	void gatherThermodynamics(CPU_Probe* probe) const;
+
+	void calculateParticle(CPU_Particle* particle) const;
+	void updateParticlePosition(CPU_Particle* particle) const;
 
 	dvec3 sunDir() const;
 	void calculateDate();
@@ -83,5 +86,4 @@ struct Kernel {
 	void calculateDayTime();
 	dvec3 rotateGeoloc(const dvec3& point, const dvec2& geoloc) const;
 	dquat rotateGeoloc(const dvec2& geoloc) const;
-	void rotateEarth(CPU_Particle* particle) const;
 };

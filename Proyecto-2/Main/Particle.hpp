@@ -63,7 +63,7 @@ struct CPU_Particle {
 	dquat rotation;
 	dvec3 position;
 	dvec3 transformed_position;
-	CPU_Neighbor probe;
+	CPU_Probe* probe;
 
 	CPU_Particle();
 };

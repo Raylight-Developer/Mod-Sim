@@ -114,7 +114,7 @@ CPU_Particle::CPU_Particle() :
 	transformed_position(dvec3(0)),
 	position(dvec3(0)),
 	rotation(dquat(1,0,0,0)),
-	probe(CPU_Neighbor(-1.0, nullptr))
+	probe(nullptr)
 {}
 
 GPU_Particle::GPU_Particle(const CPU_Particle& particle) :

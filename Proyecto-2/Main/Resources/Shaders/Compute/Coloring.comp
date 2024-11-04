@@ -114,6 +114,9 @@ vec4 f_earthColor(in vec2 uv, in vec3 normal, in vec3 sun_dir) {
 			black_marble.y = pow(black_marble.y, 1.8) * 0.9;
 			black_marble.z = pow(black_marble.z, 1.8) * 0.9;
 			color = mix(black_marble, blue_marble, diffuse);
+			if (render_lighting == 0) {
+				color = blue_marble;
+			}
 			break;
 		}
 		case 6:
