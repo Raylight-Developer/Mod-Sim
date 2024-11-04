@@ -1,6 +1,6 @@
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-struct Particle {
+struct Probe {
 	vec3  position;
 	float height;
 
@@ -37,6 +37,11 @@ struct Particle {
 	float sph_temperature;
 };
 
+struct Particle {
+	vec3  position;
+	float padding;
+};
+
 struct Texture {
 	uint start;
 	uint width;
@@ -45,10 +50,10 @@ struct Texture {
 };
 
 struct Bvh {
-	vec3 p_min;
-	uint particle_start;
-	vec3 p_max;
-	uint particle_end;
+	vec3  p_min;
+	uint  id_start;
+	vec3  p_max;
+	uint  id_end;
 	ivec4 pointers_a;
 	ivec4 pointers_b;
 };

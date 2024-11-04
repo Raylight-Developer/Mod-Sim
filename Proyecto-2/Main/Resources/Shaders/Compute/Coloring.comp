@@ -64,35 +64,39 @@ vec3 f_temperatureToColor(float temp) {
 	return color;
 }
 
-vec3 f_particleColor(in Particle particle, in float dist) {
+vec3 f_probeColor(in Probe probe, in float dist) {
 	float distance_factor = clamp(f_mapfloat(39.0, 32.0, 0.0, 1.0, dist), 0, 1);
-	switch (render_particle_color_mode) {
-		case 0:  return vec3(particle.sun_intensity);
-		case 1:  return f_windToColor(particle.wind_vector);
-		case 2:  return vec3(f_mapfloat(-8000.0, 6400.0, 0.0, 1.0, particle.height));
-		case 3:  return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0,particle.pressure));
-		case 4:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.temperature - 273.15));
-		case 5:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.day_temperature - 273.15));
-		case 6:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.night_temperature - 273.15));
-		case 7:  return vec3(f_mapfloat(0.1, 0.9, 0.0, 1.0, particle.humidity));
-		case 8:  return vec3(f_mapfloat(0.0, 6.0, 0.0, 1.0, particle.water_vapor));
-		case 9:  return vec3(particle.cloud_coverage);
-		case 10: return vec3(f_mapfloat(0.0, 1000.0, 0.0, 1.0, particle.cloud_water_content));
-		case 11: return vec3(f_mapfloat(4.0, 40.0, 0.0, 1.0, particle.cloud_particle_radius));
-		case 12: return vec3(f_mapfloat(0.0, 0.5, 0.0, 1.0, particle.cloud_optical_thickness));
-		case 13: return vec3(f_mapfloat(100.0, 500.0, 0.0, 1.0, particle.ozone));
-		case 14: return vec3(f_mapfloat(0.0, 0.9, 0.0, 1.0, particle.albedo));
-		case 15: return vec3(f_mapfloat(0.0, 16.0, 0.0, 1.0, particle.uv_index));
-		case 16: return vec3(f_mapfloat(-280.0, 280.0, 0.0, 1.0, particle.net_radiation));
-		case 17: return vec3(f_mapfloat(0.0, 550.0, 0.0, 1.0, particle.solar_insolation));
-		case 18: return vec3(f_mapfloat(85.0, 350.0, 0.0, 1.0, particle.outgoing_longwave_radiation));
-		case 19: return vec3(f_mapfloat(0.0, 425.0, 0.0, 1.0, particle.reflected_shortwave_radiation));
+	switch (render_probe_color_mode) {
+		case 0:  return vec3(probe.sun_intensity);
+		case 1:  return f_windToColor(probe.wind_vector);
+		case 2:  return vec3(f_mapfloat(-8000.0, 6400.0, 0.0, 1.0, probe.height));
+		case 3:  return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0,probe.pressure));
+		case 4:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, probe.temperature - 273.15));
+		case 5:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, probe.day_temperature - 273.15));
+		case 6:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, probe.night_temperature - 273.15));
+		case 7:  return vec3(f_mapfloat(0.1, 0.9, 0.0, 1.0, probe.humidity));
+		case 8:  return vec3(f_mapfloat(0.0, 6.0, 0.0, 1.0, probe.water_vapor));
+		case 9:  return vec3(probe.cloud_coverage);
+		case 10: return vec3(f_mapfloat(0.0, 1000.0, 0.0, 1.0, probe.cloud_water_content));
+		case 11: return vec3(f_mapfloat(4.0, 40.0, 0.0, 1.0, probe.cloud_particle_radius));
+		case 12: return vec3(f_mapfloat(0.0, 0.5, 0.0, 1.0, probe.cloud_optical_thickness));
+		case 13: return vec3(f_mapfloat(100.0, 500.0, 0.0, 1.0, probe.ozone));
+		case 14: return vec3(f_mapfloat(0.0, 0.9, 0.0, 1.0, probe.albedo));
+		case 15: return vec3(f_mapfloat(0.0, 16.0, 0.0, 1.0, probe.uv_index));
+		case 16: return vec3(f_mapfloat(-280.0, 280.0, 0.0, 1.0, probe.net_radiation));
+		case 17: return vec3(f_mapfloat(0.0, 550.0, 0.0, 1.0, probe.solar_insolation));
+		case 18: return vec3(f_mapfloat(85.0, 350.0, 0.0, 1.0, probe.outgoing_longwave_radiation));
+		case 19: return vec3(f_mapfloat(0.0, 425.0, 0.0, 1.0, probe.reflected_shortwave_radiation));
 // SPH
-		case 20: return f_windToColor(particle.sph_wind_vector);
-		case 21: return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0, particle.sph_pressure));
-		case 22: return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, particle.sph_temperature - 273.15));
+		case 20: return f_windToColor(probe.sph_wind_vector);
+		case 21: return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0, probe.sph_pressure));
+		case 22: return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, probe.sph_temperature - 273.15));
 	}
 	return vec3(1,0,1);
+}
+
+vec3 f_particleColor(in Particle particle, in float dist) {
+	return vec3(1);
 }
 
 vec4 f_earthColor(in vec2 uv, in vec3 normal, in vec3 sun_dir) {

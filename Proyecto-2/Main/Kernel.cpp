@@ -10,28 +10,35 @@
 
 #pragma optimize("O3", on)
 Kernel::Kernel() {
-	PARTICLE_RADIUS    = 0.05f;
-	PARTICLE_COUNT     = 8192;// 8192 * 2;
-	BVH_SPH            = false;
-	MAX_OCTREE_DEPTH   = 2;
-	POLE_BIAS          = 0.0;//0.975;
-	POLE_BIAS_POWER    = 1.0;// 5.0;
-	POLE_GEOLOCATION   = dvec2(25.0, 90.0);
-	EARTH_TILT         = 23.5;
-	CALENDAR_DAY       = 21;
-	CALENDAR_MONTH     = 12;
-	CALENDAR_HOUR      = 21;
-	CALENDAR_MINUTE    = 0;
-	YEAR_TIME          = 0;
-	DAY_TIME           = 0;
-	DAY                = 0;
-	TIME_SCALE         = 1.0;
-	DT                 = 0;
-	RUNFRAME           = 0;
-	SUB_SAMPLES        = 8;
-	SDT                = 0;
-	time               = 0;
-	sun_dir            = dvec3(0, 0, 1);
+	PARTICLE_RADIUS           = 0.05f;
+	PARTICLE_COUNT            = 1024;// 8192 * 2;
+	PARTICLE_MAX_OCTREE_DEPTH = 2;
+	PARTICLE_POLE_BIAS        = 0.0;//0.975;
+	PARTICLE_POLE_BIAS_POWER  = 1.0;// 5.0;
+	PARTICLE_POLE_GEOLOCATION = dvec2(25.0, 90.0);
+
+	PROBE_RADIUS           = 0.05f;
+	PROBE_COUNT            = 8192;// 8192 * 2;
+	PROBE_MAX_OCTREE_DEPTH = 2;
+	PROBE_POLE_BIAS        = 0.0;//0.975;
+	PROBE_POLE_BIAS_POWER  = 1.0;// 5.0;
+	PROBE_POLE_GEOLOCATION = dvec2(25.0, 90.0);
+	BVH_SPH                = false;
+
+	EARTH_TILT      = 23.5;
+	CALENDAR_DAY    = 21;
+	CALENDAR_MONTH  = 12;
+	CALENDAR_HOUR   = 21;
+	CALENDAR_MINUTE = 0;
+	YEAR_TIME       = 0;
+	DAY_TIME        = 0;
+	DAY             = 0;
+	TIME_SCALE      = 1.0;
+	DT              = 0;
+	RUNFRAME        = 0;
+	SUB_SAMPLES     = 2;
+	SDT             = 0;
+	sun_dir         = dvec3(0, 0, 1);
 	calculateDateTime();
 
 #ifdef NDEBUG
@@ -84,16 +91,16 @@ Kernel::Kernel() {
 }
 #pragma optimize("", on)
 
-void Kernel::buildParticles() {
-	cout << "Rebuild Particles" << endl;
-	const dvec1 radius = 6.371 + PARTICLE_RADIUS;
+void Kernel::buildProbes() {
+	cout << "Rebuild Probes" << endl;
+	const dvec1 radius = 6.371 + PROBE_RADIUS;
 	sun_dir = sunDir();
 
-	particles.clear();
-	for (uint i = 0; i < PARTICLE_COUNT; i++) {
-		CPU_Particle particle = CPU_Particle();
-		const dvec1 normalized_i = i / (dvec1)(PARTICLE_COUNT - 1);
-		const dvec1 biased_i = (1.0 - POLE_BIAS) * normalized_i + POLE_BIAS * pow(normalized_i, POLE_BIAS_POWER);
+	probes.clear();
+	for (uint i = 0; i < PROBE_COUNT; i++) {
+		CPU_Probe probe = CPU_Probe();
+		const dvec1 normalized_i = i / (dvec1)(PROBE_COUNT - 1);
+		const dvec1 biased_i = (1.0 - PROBE_POLE_BIAS) * normalized_i + PROBE_POLE_BIAS * pow(normalized_i, PROBE_POLE_BIAS_POWER);
 
 		const dvec1 theta = acos(1.0 - 2.0 * biased_i);
 		const dvec1 phi = dvec1(i) * (glm::pi<dvec1>() * (3.0 - sqrt(5.0)));
@@ -102,24 +109,102 @@ void Kernel::buildParticles() {
 		const dvec1 y = radius * cos(theta);
 		const dvec1 z = radius * sin(theta) * sin(phi);
 
-		particle.data.position = rotateGeoloc(dvec3(x, y, z), POLE_GEOLOCATION);
-		rotateEarth(&particle);
+		probe.data.position = rotateGeoloc(dvec3(x, y, z), PROBE_POLE_GEOLOCATION);
+		rotateEarth(&probe);
 
-		traceInitProperties(&particle);
-		particle.gen_index = i;
+		traceInitProperties(&probe);
+		probe.gen_index = i;
+		probes.push_back(probe);
+	}
+}
+
+void Kernel::buildBvhParticles() {
+	const Particle_Builder bvh_build = BVH_SPH ? Particle_Builder(particles, -1.0f, 1): Particle_Builder(particles, d_to_f(PARTICLE_RADIUS), PROBE_MAX_OCTREE_DEPTH);
+	particles = bvh_build.particles;
+	particle_nodes = bvh_build.nodes;
+
+	gpu_particles.clear();
+	for (const CPU_Particle& particle : particles) {
+		gpu_particles.push_back(GPU_Particle(particle));
+	}
+}
+
+void Kernel::buildParticles() {
+	cout << "Rebuild Particles" << endl;
+	const dvec1 radius = 6.371 + PROBE_RADIUS * 2.0 + PARTICLE_RADIUS;
+	sun_dir = sunDir();
+
+	particles.clear();
+	for (uint i = 0; i < PARTICLE_COUNT; i++) {
+		CPU_Particle particle = CPU_Particle();
+		const dvec1 normalized_i = i / (dvec1)(PARTICLE_COUNT - 1);
+		const dvec1 biased_i = (1.0 - PARTICLE_POLE_BIAS) * normalized_i + PARTICLE_POLE_BIAS * pow(normalized_i, PARTICLE_POLE_BIAS_POWER);
+
+		const dvec1 theta = acos(1.0 - 2.0 * biased_i);
+		const dvec1 phi = dvec1(i) * (glm::pi<dvec1>() * (3.0 - sqrt(5.0)));
+
+		const dvec1 x = radius * sin(theta) * cos(phi);
+		const dvec1 y = radius * cos(theta);
+		const dvec1 z = radius * sin(theta) * sin(phi);
+
+		particle.position = rotateGeoloc(dvec3(x, y, z), PARTICLE_POLE_GEOLOCATION);
+		rotateEarth(&particle);
 		particles.push_back(particle);
 	}
 }
 
 void Kernel::lock() {
 	textures.clear();
+	lockProbes();
 	lockParticles();
-	time = 0.0;
+}
+
+void Kernel::lockProbes() {
+	const int NUM_NEIGHBORS = 6;
+
+	int i = 0;
+	int i_size = u_to_i(PROBE_COUNT);
+	#pragma omp parallel for private(i) num_threads(12)
+	for (i = 0; i < i_size; i++) {
+		CPU_Probe& probe = probes[i];
+
+		vector<CPU_Neighbor> neighbors;
+
+		for (uint j = 0; j < PROBE_COUNT; j++) {
+			if (i != j) {
+				const dvec1 dist = glm::distance(probe.data.position, probes[j].data.position);
+				neighbors.push_back(CPU_Neighbor(dist, &probes[j]));
+			}
+		}
+
+		sort(neighbors.begin(), neighbors.end(), [](const CPU_Neighbor& a, const CPU_Neighbor& b) {
+			return a.distance < b.distance;
+		});
+
+		probe.smoothing_radius = neighbors[NUM_NEIGHBORS].distance;
+		for (uint k = 0; k < NUM_NEIGHBORS; k++) {
+			probe.neighbors.push_back(neighbors[k]);
+		}
+
+		for (CPU_Neighbor& neighbor : probe.neighbors) {
+			const dvec1 smoothing_kernel = pow(glm::max(0.0, probe.smoothing_radius - neighbor.distance), 3.0);
+
+			const dvec3 direction = neighbor.probe->data.position - probe.data.position;
+
+			const dvec3 unitDirection = direction / neighbor.distance;
+			const dvec1 pressureDifference = (probe.data.pressure - neighbor.probe->data.pressure) * 10.0;
+			probe.data.wind_vector += unitDirection * (pressureDifference) * smoothing_kernel * 10.0;
+		}
+
+		if ((i % (PROBE_COUNT / 5)) == 0) {
+			#pragma omp critical
+			cout << "Lock Probes: " << f_to_u(round(u_to_f(i) / u_to_f(PROBE_COUNT) * 100.0f)) << "%" << endl;
+		}
+
+	}
 }
 
 void Kernel::lockParticles() {
-	const int NUM_NEIGHBORS = 6;
-
 	int i = 0;
 	int i_size = u_to_i(PARTICLE_COUNT);
 	#pragma omp parallel for private(i) num_threads(12)
@@ -128,10 +213,10 @@ void Kernel::lockParticles() {
 
 		vector<CPU_Neighbor> neighbors;
 
-		for (uint j = 0; j < PARTICLE_COUNT; j++) {
+		for (uint j = 0; j < PROBE_COUNT; j++) {
 			if (i != j) {
-				const dvec1 dist = glm::distance(particle.data.position, particles[j].data.position);
-				neighbors.push_back(CPU_Neighbor(dist, &particles[j]));
+				const dvec1 dist = glm::distance(particle.transformed_position, probes[j].transformed_position);
+				neighbors.push_back(CPU_Neighbor(dist, &probes[j]));
 			}
 		}
 
@@ -139,127 +224,61 @@ void Kernel::lockParticles() {
 			return a.distance < b.distance;
 		});
 
-		particle.smoothing_radius = neighbors[NUM_NEIGHBORS].distance;
-		for (uint k = 0; k < NUM_NEIGHBORS; k++) {
-			particle.neighbors.push_back(neighbors[k]);
-		}
+		particle.probe = neighbors[0];
 
-		for (CPU_Neighbor& neighbor : particle.neighbors) {
-			const dvec1 smoothing_kernel = pow(glm::max(0.0, particle.smoothing_radius - neighbor.distance), 3.0);
-
-			const dvec3 direction = neighbor.neighbor->data.position - particle.data.position;
-
-			const dvec3 unitDirection = direction / neighbor.distance;
-			const dvec1 pressureDifference = (particle.data.pressure - neighbor.neighbor->data.pressure) * 10.0;
-			particle.data.wind_vector += unitDirection * (pressureDifference) * smoothing_kernel * 10.0;
-		}
-
-		if ((i % (PARTICLE_COUNT / 5)) == 0) {
+		if ((i % (PROBE_COUNT / 5)) == 0) {
 			#pragma omp critical
-			cout << "Lock Particles: " << f_to_u(round(u_to_f(i) / u_to_f(PARTICLE_COUNT) * 100.0f)) << "%" << endl;
-		}
-
-	}
-}
-
-void Kernel::generateSPHTexture() {
-	sph_texture = Texture();
-	sph_texture.resolution = uvec2(360, 180);
-	sph_texture.uint_data = vector(360 * 180, MAX_UINT32);
-
-	int x = 0;
-	int y = 0;
-	int x_size = u_to_i(sph_texture.resolution.x);
-	int y_size = u_to_i(sph_texture.resolution.y);
-	#pragma omp parallel for private(x,y) collapse(2) num_threads(12)
-	for (x = 0; x < x_size; x++) {
-		for (y = 0; y < y_size; y++) {
-			const dvec1 u = i_to_d(x) / i_to_d(x_size);
-			const dvec1 v = i_to_d(y) / i_to_d(y_size);
-
-			const dvec1 radius = 6.371;
-			const dvec1 theta = u * glm::two_pi<dvec1>();
-			const dvec1 phi = v * glm::pi<dvec1>();
-
-			const dvec1 xPos = radius * sin(phi) * cos(theta);
-			const dvec1 yPos = radius * cos(phi);
-			const dvec1 zPos = radius * sin(phi) * sin(theta);
-
-			const dvec3 position(xPos, yPos, zPos);
-
-			vector<CPU_Neighbor> neighbors;
-
-			for (uint i = 0; i < PARTICLE_COUNT; i++) {
-				const dvec1 dist = glm::distance(position, particles[i].data.position);
-				neighbors.push_back(CPU_Neighbor(dist, &particles[i]));
-			}
-			sort(neighbors.begin(), neighbors.end(), [](const CPU_Neighbor& a, const CPU_Neighbor& b) {
-				return a.distance < b.distance;
-			});
-			uint count = 3;
-			uint k = 0;
-			while (count > 0) {
-				if (neighbors[k].distance > 0.0) {
-					sph_texture.uint_data[x + x_size * y] = neighbors[k].neighbor->gen_index;
-					count--;
-				}
-				k++;
-			}
+			cout << "Lock Particles: " << f_to_u(round(u_to_f(i) / u_to_f(PROBE_COUNT) * 100.0f)) << "%" << endl;
 		}
 	}
 }
 
-void Kernel::buildBvh() {
-	const Builder bvh_build = BVH_SPH ? Builder(particles, -1.0f, 1): Builder(particles, d_to_f(PARTICLE_RADIUS), MAX_OCTREE_DEPTH);
-	particles = bvh_build.particles;
-	bvh_nodes = bvh_build.nodes;
+void Kernel::buildBvhProbes() {
+	const Builder bvh_build = BVH_SPH ? Builder(probes, -1.0f, 1): Builder(probes, d_to_f(PROBE_RADIUS), PROBE_MAX_OCTREE_DEPTH);
+	probes = bvh_build.probes;
+	probe_nodes = bvh_build.nodes;
 
-	gpu_particles.clear();
-	for (const CPU_Particle& particle : particles) {
-		gpu_particles.push_back(GPU_Particle(particle));
+	gpu_probes.clear();
+	for (const CPU_Probe& probe : probes) {
+		gpu_probes.push_back(GPU_Probe(probe));
 	}
 }
 
 void Kernel::simulate(const dvec1& delta_time) {
 	DT = clamp(delta_time, 0.0, 0.25) * TIME_SCALE;
 	SDT = DT / u_to_d(SUB_SAMPLES);
-	gpu_particles.clear();
+	gpu_probes.clear();
 
 	const dvec1 day_time = DAY_TIME * 24.0;
 	CALENDAR_HOUR = int(round(day_time - glm::fract(day_time)));
 	CALENDAR_MINUTE = int(round(glm::fract(day_time) * 60.0));
 	for (uint i = 0; i < SUB_SAMPLES; i++) {
-		time += SDT;
 		updateTime();
 		sun_dir = sunDir();
-		for (CPU_Particle& particle : particles) {
-			particle.new_data = particle.data;
+		for (CPU_Probe& probe : probes) {
+			probe.new_data = probe.data;
 		}
 
 		// SCATTER
-		for (CPU_Particle& particle : particles) {
-			rotateEarth(&particle);
-			calculateSunlight(&particle);
-			scatterSPH(&particle);
+		for (CPU_Probe& probe : probes) {
+			rotateEarth(&probe);
+			calculateSunlight(&probe);
+			scatterSPH(&probe);
 		}
 
 		// GATHER
-		for (CPU_Particle& particle : particles) {
-			gatherWind(&particle);
-			gatherThermodynamics(&particle);
+		for (CPU_Probe& probe : probes) {
+			gatherWind(&probe);
+			gatherThermodynamics(&probe);
 
 
 
-			particle.data = particle.new_data;
+			probe.data = probe.new_data;
 		}
-
-//		if (i == SAMPLES - 1) {
-//			generateSPHTexture();
-//		}
 	}
 
-	for (const CPU_Particle& particle : particles) {
-		gpu_particles.push_back(GPU_Particle(particle));
+	for (const CPU_Probe& probe : probes) {
+		gpu_probes.push_back(GPU_Probe(probe));
 	}
 }
 
@@ -276,7 +295,7 @@ void Kernel::updateTime() {
 	}
 }
 
-void Kernel::rotateEarth(CPU_Particle* particle) const {
+void Kernel::rotateEarth(CPU_Probe* probe) const {
 	const dvec1 axialTilt = -glm::radians(EARTH_TILT);
 	const dvec1 theta = glm::radians(DAY_TIME * 360.0);
 
@@ -284,58 +303,58 @@ void Kernel::rotateEarth(CPU_Particle* particle) const {
 	const dquat timeRotation = glm::angleAxis(theta, dvec3(0, 1, 0));
 	const dquat combinedRotation = tiltRotation * timeRotation;
 
-	particle->transformed_position = combinedRotation * particle->data.position;
+	probe->transformed_position = combinedRotation * probe->data.position;
 }
 
-void Kernel::scatterSPH(CPU_Particle* particle) const {
-	particle->sph = CPU_Particle_Data();
-	if (particle->neighbors.size() > 0) {
-		for (CPU_Neighbor& neighbor : particle->neighbors) {
-			const dvec1 smoothing_kernel = pow(glm::max(0.0, particle->smoothing_radius - neighbor.distance), 3.0);
-			particle->sph.temperature += neighbor.neighbor->data.temperature;
+void Kernel::scatterSPH(CPU_Probe* probe) const {
+	probe->sph = CPU_Probe_Data();
+	if (probe->neighbors.size() > 0) {
+		for (CPU_Neighbor& neighbor : probe->neighbors) {
+			const dvec1 smoothing_kernel = pow(glm::max(0.0, probe->smoothing_radius - neighbor.distance), 3.0);
+			probe->sph.temperature += neighbor.probe->data.temperature;
 
 		}
-		particle->sph.temperature += particle->data.temperature;
-		particle->sph.temperature /= ul_to_d(particle->neighbors.size() + 1);
-		scatterWind(particle);
+		probe->sph.temperature += probe->data.temperature;
+		probe->sph.temperature /= ul_to_d(probe->neighbors.size() + 1);
+		scatterWind(probe);
 	}
 	else {
-		particle->sph = particle->data;
+		probe->sph = probe->data;
 	}
 }
 
-void Kernel::scatterWind(CPU_Particle* particle) const {
+void Kernel::scatterWind(CPU_Probe* probe) const {
 	dvec3 wind = dvec3(0);
 	dvec3 pressure_gradient = dvec3(0);
 
-	for (CPU_Neighbor& neighbor : particle->neighbors) {
-		const dvec1 smoothing_kernel = pow(glm::max(0.0, particle->smoothing_radius - neighbor.distance), 3.0);
+	for (CPU_Neighbor& neighbor : probe->neighbors) {
+		const dvec1 smoothing_kernel = pow(glm::max(0.0, probe->smoothing_radius - neighbor.distance), 3.0);
 
-		const dvec3 direction = neighbor.neighbor->data.position - particle->data.position;
+		const dvec3 direction = neighbor.probe->data.position - probe->data.position;
 
 		const dvec3 unitDirection = direction / neighbor.distance;
-		const dvec1 pressureDifference = (particle->data.pressure - neighbor.neighbor->data.pressure) * 10.0;
+		const dvec1 pressureDifference = (probe->data.pressure - neighbor.probe->data.pressure) * 10.0;
 		pressure_gradient += unitDirection * (pressureDifference) * smoothing_kernel;
-		wind += neighbor.neighbor->data.wind_vector * smoothing_kernel;
+		wind += neighbor.probe->data.wind_vector * smoothing_kernel;
 	}
 
-	wind /= ul_to_d(particle->neighbors.size());
-	pressure_gradient /= ul_to_d(particle->neighbors.size());
-	particle->sph.wind_vector = wind + pressure_gradient;
+	wind /= ul_to_d(probe->neighbors.size());
+	pressure_gradient /= ul_to_d(probe->neighbors.size());
+	probe->sph.wind_vector = wind + pressure_gradient;
 }
 
-void Kernel::traceInitProperties(CPU_Particle* particle) const {
-	const dvec3 ray_direction = glm::normalize(dvec3(0) - particle->transformed_position);
+void Kernel::traceInitProperties(CPU_Probe* probe) const {
+	const dvec3 ray_direction = glm::normalize(dvec3(0) - probe->transformed_position);
 
 	const dvec1 a = glm::dot(ray_direction, ray_direction);
-	const dvec1 b = 2.0 * dot(ray_direction, particle->transformed_position);
-	const dvec1 c = dot(particle->transformed_position, particle->transformed_position) - 40.589641; // Earth Radius ^2
+	const dvec1 b = 2.0 * dot(ray_direction, probe->transformed_position);
+	const dvec1 c = dot(probe->transformed_position, probe->transformed_position) - 40.589641; // Earth Radius ^2
 	const dvec1 delta = b * b - 4.0 * a * c;
 	if (delta < 0.0) {
 		return;
 	}
 
-	const dvec3 intersectionPoint = particle->transformed_position + ((-b - sqrt(delta)) / (2.0 * a)) * ray_direction;
+	const dvec3 intersectionPoint = probe->transformed_position + ((-b - sqrt(delta)) / (2.0 * a)) * ray_direction;
 	const dvec1 axialTilt = -glm::radians(EARTH_TILT);
 	const dmat3 tiltRotation = dmat3(
 		dvec3(cos(axialTilt), -sin(axialTilt), 0),
@@ -379,91 +398,91 @@ void Kernel::traceInitProperties(CPU_Particle* particle) const {
 	const vec1 sst_night    = lut(Texture_Field::SEA_SURFACE_TEMPERATURE_NIGHT, sst_night_sample);
 	const vec1 lst          = lut(Texture_Field::LAND_SURFACE_TEMPERATURE_DAY, lst_sample);
 	const vec1 lst_night    = lut(Texture_Field::LAND_SURFACE_TEMPERATURE_NIGHT, lst_night_sample);
-	particle->data.pressure = lut(Texture_Field::SURFACE_PRESSURE, pressure_sample);
+	probe->data.pressure = lut(Texture_Field::SURFACE_PRESSURE, pressure_sample);
 	if (topography == -1.0) { // Is at sea
-		particle->data.day_temperature = sst;
-		particle->data.night_temperature = sst_night;
-		particle->data.on_water = true;
-		particle->data.height = bathymetry;
-		particle->data.albedo = 0.135;
+		probe->data.day_temperature = sst;
+		probe->data.night_temperature = sst_night;
+		probe->data.on_water = true;
+		probe->data.height = bathymetry;
+		probe->data.albedo = 0.135;
 	}
 	else { // Is on Land
-		particle->data.day_temperature = lst;
-		particle->data.night_temperature = lst_night;
-		particle->data.on_water = false;
-		particle->data.height = topography;
-		particle->data.albedo = lut(Texture_Field::ALBEDO, albedo_sample);
+		probe->data.day_temperature = lst;
+		probe->data.night_temperature = lst_night;
+		probe->data.on_water = false;
+		probe->data.height = topography;
+		probe->data.albedo = lut(Texture_Field::ALBEDO, albedo_sample);
 	}
 
-	particle->data.humidity                = lut(Texture_Field::HUMIDITY, humidity_sample);
-	particle->data.water_vapor             = lut(Texture_Field::WATER_VAPOR, water_vapor_sample);
-	particle->data.cloud_coverage          = lut(Texture_Field::CLOUD_COVERAGE, cloud_coverage_sample);
-	particle->data.cloud_water_content     = lut(Texture_Field::CLOUD_WATER_CONTENT, cloud_water_content_sample);
-	particle->data.cloud_particle_radius   = lut(Texture_Field::CLOUD_PARTICLE_RADIUS, cloud_particle_radius_sample);
-	particle->data.cloud_optical_thickness = lut(Texture_Field::CLOUD_OPTICAL_THICKNESS, cloud_optical_thickness_sample);
+	probe->data.humidity                = lut(Texture_Field::HUMIDITY, humidity_sample);
+	probe->data.water_vapor             = lut(Texture_Field::WATER_VAPOR, water_vapor_sample);
+	probe->data.cloud_coverage          = lut(Texture_Field::CLOUD_COVERAGE, cloud_coverage_sample);
+	probe->data.cloud_water_content     = lut(Texture_Field::CLOUD_WATER_CONTENT, cloud_water_content_sample);
+	probe->data.cloud_particle_radius   = lut(Texture_Field::CLOUD_PARTICLE_RADIUS, cloud_particle_radius_sample);
+	probe->data.cloud_optical_thickness = lut(Texture_Field::CLOUD_OPTICAL_THICKNESS, cloud_optical_thickness_sample);
 
-	particle->data.ozone                         = lut(Texture_Field::OZONE, ozone_sample);
-	particle->data.uv_index                      = lut(Texture_Field::UV_INDEX, uv_index_sample);
-	particle->data.net_radiation                 = lut(Texture_Field::NET_RADIATION, net_radiation_sample);
-	particle->data.solar_insolation              = lut(Texture_Field::SOLAR_INSOLATION, solar_insolation_sample);
-	particle->data.outgoing_longwave_radiation   = lut(Texture_Field::OUTGOING_LONGWAVE_RADIATION, outgoiing_longwave_radiation_sample);
-	particle->data.reflected_shortwave_radiation = lut(Texture_Field::REFLECTED_SHORTWAVE_RADIATION, reflected_shortwave_radiation_sample);
-	calculateSunlight(particle);
-	particle->data.sun_intensity = particle->new_data.sun_intensity;
-	particle->data.solar_irradiance = particle->new_data.solar_irradiance;
-	particle->data.temperature = glm::mix(particle->data.night_temperature, particle->data.day_temperature, particle->data.sun_intensity);
-	particle->data.emissivity = clamp(particle->data.reflected_shortwave_radiation / (1360.0 - particle->data.solar_insolation), 0.0, 1.0);
+	probe->data.ozone                         = lut(Texture_Field::OZONE, ozone_sample);
+	probe->data.uv_index                      = lut(Texture_Field::UV_INDEX, uv_index_sample);
+	probe->data.net_radiation                 = lut(Texture_Field::NET_RADIATION, net_radiation_sample);
+	probe->data.solar_insolation              = lut(Texture_Field::SOLAR_INSOLATION, solar_insolation_sample);
+	probe->data.outgoing_longwave_radiation   = lut(Texture_Field::OUTGOING_LONGWAVE_RADIATION, outgoiing_longwave_radiation_sample);
+	probe->data.reflected_shortwave_radiation = lut(Texture_Field::REFLECTED_SHORTWAVE_RADIATION, reflected_shortwave_radiation_sample);
+	calculateSunlight(probe);
+	probe->data.sun_intensity = probe->new_data.sun_intensity;
+	probe->data.solar_irradiance = probe->new_data.solar_irradiance;
+	probe->data.temperature = glm::mix(probe->data.night_temperature, probe->data.day_temperature, probe->data.sun_intensity);
+	probe->data.emissivity = clamp(probe->data.reflected_shortwave_radiation / (1360.0 - probe->data.solar_insolation), 0.0, 1.0);
 }
 
-void Kernel::calculateSunlight(CPU_Particle* particle) const {
-	const dvec3 normal = glm::normalize(particle->transformed_position);
-	particle->new_data.sun_intensity = clamp(dot(normal, sun_dir), 0.0, 1.0); // %
-	particle->new_data.solar_irradiance = max((particle->data.sun_intensity * 1360.0) - particle->data.solar_insolation, 0.0); // W/m^2
+void Kernel::calculateSunlight(CPU_Probe* probe) const {
+	const dvec3 normal = glm::normalize(probe->transformed_position);
+	probe->new_data.sun_intensity = clamp(dot(normal, sun_dir), 0.0, 1.0); // %
+	probe->new_data.solar_irradiance = max((probe->data.sun_intensity * 1360.0) - probe->data.solar_insolation, 0.0); // W/m^2
 }
 
-void Kernel::gatherWind(CPU_Particle* particle) const {
+void Kernel::gatherWind(CPU_Probe* probe) const {
 	dvec3 wind = dvec3(0);
-	for (CPU_Neighbor& neighbor : particle->neighbors) {
-		const dvec1 inv_smoothing_kernel = pow(glm::max(0.0, neighbor.neighbor->smoothing_radius - neighbor.distance), 3.0);
+	for (CPU_Neighbor& neighbor : probe->neighbors) {
+		const dvec1 inv_smoothing_kernel = pow(glm::max(0.0, neighbor.probe->smoothing_radius - neighbor.distance), 3.0);
 
-		wind += neighbor.neighbor->sph.wind_vector * inv_smoothing_kernel * 1.5;
+		wind += neighbor.probe->sph.wind_vector * inv_smoothing_kernel * 1.5;
 	}
-	wind /= ul_to_d(particle->neighbors.size());
-	particle->new_data.wind_vector *= (1.0 - SDT * 0.001);
-	particle->new_data.wind_vector += (wind * SDT) * 2.5;
-	particle->new_data.wind_vector = glm::rotate(glm::angleAxis(glm::linearRand(-0.5, 0.5), glm::sphericalRand(1.0)), particle->new_data.wind_vector); // rand rotation
-	const dvec1 wind_speed = glm::length(particle->new_data.wind_vector);
+	wind /= ul_to_d(probe->neighbors.size());
+	probe->new_data.wind_vector *= (1.0 - SDT * 0.001);
+	probe->new_data.wind_vector += (wind * SDT) * 2.5;
+	probe->new_data.wind_vector = glm::rotate(glm::angleAxis(glm::linearRand(-0.5, 0.5), glm::sphericalRand(1.0)), probe->new_data.wind_vector); // rand rotation
+	const dvec1 wind_speed = glm::length(probe->new_data.wind_vector);
 	if (wind_speed == 0.0) {
-		particle->new_data.wind_vector = glm::normalize(dvec3(randD(1.0, 2.0), randD(1.0, 2.0), randD(1.0, 2.0)));
+		probe->new_data.wind_vector = glm::normalize(dvec3(randD(1.0, 2.0), randD(1.0, 2.0), randD(1.0, 2.0)));
 	}
 	if (wind_speed < 0.005) {
-		particle->new_data.wind_vector	= glm::normalize(particle->new_data.wind_vector) * 0.1;
+		probe->new_data.wind_vector	= glm::normalize(probe->new_data.wind_vector) * 0.1;
 		//cout << "Wind Too Slow: " << wind_speed << endl;
 	}
 	if (wind_speed > 40.0) {
-		particle->new_data.wind_vector = glm::normalize(particle->new_data.wind_vector) * 35.0;
+		probe->new_data.wind_vector = glm::normalize(probe->new_data.wind_vector) * 35.0;
 		//cout << "Wind Too Fast: " << wind_speed << endl;
 	}
 }
 
-void Kernel::gatherThermodynamics(CPU_Particle* particle) const {
+void Kernel::gatherThermodynamics(CPU_Probe* probe) const {
 	// = solar_heat_transfer_coefficient * (absorptivity) * (solar irradiance) * area
-	const dvec1 solar_heat_absorption = (1.0 - particle->data.albedo) * particle->data.solar_irradiance * particle->data.surface_area;
+	const dvec1 solar_heat_absorption = (1.0 - probe->data.albedo) * probe->data.solar_irradiance * probe->data.surface_area;
 
 	// = emissivity * Stefan-Boltzmann * temperature * area
-	const dvec1 radiative_loss = particle->data.emissivity * STEFAN_BOLZMANN * pow(particle->data.temperature, 4.0) * particle->data.surface_area;
+	const dvec1 radiative_loss = probe->data.emissivity * STEFAN_BOLZMANN * pow(probe->data.temperature, 4.0) * probe->data.surface_area;
 
 	// = (convective_heat_transfer_coefficient) * (temperature - surrounding_temperature) * area
-	const dvec1 wind_speed = glm::length(particle->data.wind_vector);
+	const dvec1 wind_speed = glm::length(probe->data.wind_vector);
 	const dvec1 coeff = pow((1.0 + wind_speed), 0.4);
-	const dvec1 convective_transfer = coeff * (particle->data.temperature - particle->sph.temperature) * particle->data.surface_area;
+	const dvec1 convective_transfer = coeff * (probe->data.temperature - probe->sph.temperature) * probe->data.surface_area;
 
 	const dvec1 net_heat = solar_heat_absorption * 0.001 - radiative_loss * 0.005 - convective_transfer * 0.001;
 	if (abs(net_heat) > 1.0) {
 		cout << "Temp Changing Too Quickly: Net  " << net_heat << "  | Solar  " << solar_heat_absorption << "  | Rad  -" << radiative_loss << "  | Convection  " << convective_transfer << endl;
 	}
-	particle->new_data.temperature += net_heat * SDT;
-	particle->new_data.pressure += net_heat * SDT;
+	probe->new_data.temperature += net_heat * SDT;
+	probe->new_data.pressure += net_heat * SDT;
 }
 
 dvec3 Kernel::rotateGeoloc(const dvec3& point, const dvec2& geoloc) const {
@@ -475,6 +494,28 @@ dvec3 Kernel::rotateGeoloc(const dvec3& point, const dvec2& geoloc) const {
 	const dquat combinedRotation =  lonRotation * latRotation;
 
 	return combinedRotation * point;
+}
+
+dquat Kernel::rotateGeoloc(const dvec2& geoloc) const {
+	const dvec1 phi = glm::radians(geoloc.x - 90.0);
+	const dvec1 theta = glm::radians(geoloc.y + 90.0);
+
+	const dquat latRotation  = glm::angleAxis(phi, dvec3(1, 0, 0));
+	const dquat lonRotation  = glm::angleAxis(theta,dvec3(0, 1, 0));
+	const dquat combinedRotation = lonRotation * latRotation;
+
+	return combinedRotation;
+}
+
+void Kernel::rotateEarth(CPU_Particle* particle) const {
+	const dvec1 axialTilt = -glm::radians(EARTH_TILT);
+	const dvec1 theta = glm::radians(DAY_TIME * 360.0);
+
+	const dquat tiltRotation = glm::angleAxis(axialTilt, dvec3(0, 0, 1));
+	const dquat timeRotation = glm::angleAxis(theta, dvec3(0, 1, 0));
+	const dquat combinedRotation = tiltRotation * timeRotation * particle->rotation;
+
+	particle->transformed_position = combinedRotation * particle->position;
 }
 
 dvec3 Kernel::sunDir() const {

@@ -73,7 +73,9 @@ struct Renderer {
 	void f_inputLoop();
 	void f_timings();
 
-	void f_updateBvh();
+	void f_updateBvhProbes();
+	void f_updateProbes();
+	void f_updateBvhParticles();
 	void f_updateParticles();
 
 	void f_guiLoop();

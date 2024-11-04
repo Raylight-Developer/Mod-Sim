@@ -2,10 +2,10 @@
 
 #include "Shared.hpp"
 
-struct CPU_Particle;
+struct CPU_Probe;
 struct CPU_Neighbor;
 
-struct CPU_Particle_Data {
+struct CPU_Probe_Data {
 	dvec3 position; // mm (mega) meters
 	dvec3 wind_vector; // m/s
 	dvec1 surface_area; // mm (mega) meters
@@ -36,30 +36,46 @@ struct CPU_Particle_Data {
 
 	bool on_water;
 
-	CPU_Particle_Data();
+	CPU_Probe_Data();
 };
 
-struct CPU_Particle {
+struct CPU_Probe {
 	uint gen_index;
-	CPU_Particle_Data new_data;
-	CPU_Particle_Data data;
-	CPU_Particle_Data sph;
+	CPU_Probe_Data new_data;
+	CPU_Probe_Data data;
+	CPU_Probe_Data sph;
 	dvec3 transformed_position;
 
 	dvec1 smoothing_radius;
 	vector<CPU_Neighbor> neighbors;
 
-	CPU_Particle();
+	CPU_Probe();
 };
 
 struct CPU_Neighbor {
 	dvec1 distance;
-	CPU_Particle* neighbor;
+	CPU_Probe* probe;
 
-	CPU_Neighbor(const dvec1& distance, CPU_Particle* neighbor);
+	CPU_Neighbor(const dvec1& distance, CPU_Probe* neighbor);
 };
 
-struct alignas(16) GPU_Particle {
+struct CPU_Particle {
+	dquat rotation;
+	dvec3 position;
+	dvec3 transformed_position;
+	CPU_Neighbor probe;
+
+	CPU_Particle();
+};
+
+struct GPU_Particle {
+	vec3 position;
+	vec1 padding = 0.0;
+
+	GPU_Particle(const CPU_Particle& particle);
+};
+
+struct alignas(16) GPU_Probe {
 	vec3 position;
 	vec1 height;
 
@@ -95,6 +111,6 @@ struct alignas(16) GPU_Particle {
 	vec3 sph_wind_vector;
 	vec1 sph_temperature;
 
-	GPU_Particle();
-	GPU_Particle(const CPU_Particle& particle);
+	GPU_Probe();
+	GPU_Probe(const CPU_Probe& particle);
 };

@@ -31,7 +31,7 @@ void main() {
 	float bvh_t_length = MAX_DIST;
 	Ray bvh_ray = Ray(ray.origin, 1.0 / ray.direction);
 
-	if (render_particles == 1) {
+	if (render_probes == 1) {
 		float t_length = MAX_DIST;
 		float t_dist = MAX_DIST;
 		vec2 earth_uv = vec2(0.5);
@@ -47,12 +47,51 @@ void main() {
 				}
 			}
 		}
-		int closest_particle_index = f_visitBvh(ray, t_dist);
+		int closest_probe_index = f_visitProbeBvh(ray, t_dist);
+		if (closest_probe_index != -1) {
+			if (t_dist < t_length && t_dist > EPSILON) {
+				color = vec4(f_probeColor(probes[closest_probe_index], t_dist), 1.0);
+				if (render_probe_lighting == 1) {
+					color = mix(bg_color, color, probes[closest_probe_index].sun_intensity * 0.7 + 0.3);
+				}
+			}
+		}
+		if (render_particles == 1) {
+			int closest_particle_index = f_visitParticleBvh(ray, t_dist);
+			if (closest_particle_index != -1) {
+				if (t_dist < t_length && t_dist > EPSILON) {
+					color = vec4(f_particleColor(particles[closest_particle_index], t_dist), 1.0);
+					if (render_particle_lighting == 1) {
+						vec3 normal = normalize(particles[closest_particle_index].position);
+						float diffuse = clamp(f_mapfloat(-1.0, 1.0, -0.2, 1.0, dot(normal, sun_dir)), 0, 1);
+						//color.xyz *= (diffuse * 0.8 + 0.2);
+					}
+				}
+			}
+		}
+	}
+	else if (render_particles == 1) {
+		float t_length = MAX_DIST;
+		float t_dist = MAX_DIST;
+		vec2 earth_uv = vec2(0.5);
+		if (render_planet == 1) {
+			if (f_EarthIntersection(ray, t_dist, earth_uv)) {
+				if (t_dist < t_length && t_dist > EPSILON) {
+					t_length = t_dist;
+					vec3 intersection = ray.origin + ray.direction * t_dist;
+					vec3 normal = normalize(intersection);
+					color = f_earthColor(earth_uv, normal, sun_dir);
+				}
+			}
+		}
+		int closest_particle_index = f_visitParticleBvh(ray, t_dist);
 		if (closest_particle_index != -1) {
 			if (t_dist < t_length && t_dist > EPSILON) {
 				color = vec4(f_particleColor(particles[closest_particle_index], t_dist), 1.0);
 				if (render_particle_lighting == 1) {
-					color = mix(bg_color, color, particles[closest_particle_index].sun_intensity * 0.7 + 0.3);
+					vec3 normal = normalize(particles[closest_particle_index].position);
+					float diffuse = clamp(f_mapfloat(-1.0, 1.0, -0.2, 1.0, dot(normal, sun_dir)), 0, 1);
+					//color.xyz *= (diffuse * 0.8 + 0.2);
 				}
 			}
 		}
@@ -68,24 +107,47 @@ void main() {
 	}
 
 	float octree_alpha = 1.0;
-	if (render_octree == 1) {
+	if (render_probe_octree == 1) {
 		if (render_octree_debug == 1) {
-			if (f_rayBvhIntersection(bvh_ray, bvh_nodes[render_octree_debug_index])) {
+			if (f_rayBvhIntersection(bvh_ray, probe_nodes[render_octree_debug_index])) {
 				octree_alpha = 0.5f;
 				if (render_octree_hue == 1) {
-					octree_color = floatToColor(float(render_octree_debug_index) / float(bvh_nodes.length()));
+					octree_color = floatToColor(float(render_octree_debug_index) / float(probe_nodes.length()));
 				}
 			}
 		}
 		else {
-			for (int i = 0; i < bvh_nodes.length(); i++) {
-				Bvh node = bvh_nodes[i];
+			for (int i = 0; i < probe_nodes.length(); i++) {
+				Bvh node = probe_nodes[i];
 				node.p_min += 0.05;
 				node.p_max -= 0.05;
 				if (f_rayBvhIntersection(bvh_ray, node)) {
 					octree_view_depth++;
 					if (render_octree_hue == 1) {
-						octree_color = floatToColor(float(i) / float(bvh_nodes.length()));
+						octree_color = floatToColor(float(i) / float(probe_nodes.length()));
+					}
+				}
+			}
+		}
+	}
+	else if (render_particle_octree == 1) {
+		if (render_octree_debug == 1) {
+			if (f_rayBvhIntersection(bvh_ray, particle_nodes[render_octree_debug_index])) {
+				octree_alpha = 0.5f;
+				if (render_octree_hue == 1) {
+					octree_color = floatToColor(float(render_octree_debug_index) / float(particle_nodes.length()));
+				}
+			}
+		}
+		else {
+			for (int i = 0; i < particle_nodes.length(); i++) {
+				Bvh node = particle_nodes[i];
+				node.p_min += 0.05;
+				node.p_max -= 0.05;
+				if (f_rayBvhIntersection(bvh_ray, node)) {
+					octree_view_depth++;
+					if (render_octree_hue == 1) {
+						octree_color = floatToColor(float(i) / float(particle_nodes.length()));
 					}
 				}
 			}
@@ -95,7 +157,7 @@ void main() {
 		octree_alpha *= 0.95;
 	}
 
-	if (render_lighting == 1 && render_atmosphere == 1 && render_particle_color_mode < SPH) {
+	if (render_lighting == 1 && render_atmosphere == 1 && render_probe_color_mode < SPH) {
 		vec2 e = ray_vs_sphere( ray.origin, ray.direction, ATMOSPHERE_RADIUS );
 		if ( e.x <= e.y ) {
 			vec2 f = ray_vs_sphere( ray.origin, ray.direction, EARTH_RADIUS );

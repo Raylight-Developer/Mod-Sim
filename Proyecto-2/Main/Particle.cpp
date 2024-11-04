@@ -1,6 +1,6 @@
 #include "Particle.hpp"
 
-CPU_Particle_Data::CPU_Particle_Data() {
+CPU_Probe_Data::CPU_Probe_Data() {
 	position = dvec3(0);
 	wind_vector  = dvec3(0);
 	surface_area = 1;
@@ -29,10 +29,10 @@ CPU_Particle_Data::CPU_Particle_Data() {
 	on_water = false;
 }
 
-CPU_Particle::CPU_Particle() :
-	new_data(CPU_Particle_Data()),
-	data(CPU_Particle_Data()),
-	sph(CPU_Particle_Data())
+CPU_Probe::CPU_Probe() :
+	new_data(CPU_Probe_Data()),
+	data(CPU_Probe_Data()),
+	sph(CPU_Probe_Data())
 {
 	gen_index = 0;
 
@@ -40,7 +40,7 @@ CPU_Particle::CPU_Particle() :
 	smoothing_radius = 0.0f;
 }
 
-GPU_Particle::GPU_Particle() {
+GPU_Probe::GPU_Probe() {
 	position = vec3(0);
 	wind_vector  = vec3(0);
 	sun_intensity = 0;
@@ -71,7 +71,7 @@ GPU_Particle::GPU_Particle() {
 	sph_temperature = 0;
 }
 
-GPU_Particle::GPU_Particle(const CPU_Particle& particle) {
+GPU_Probe::GPU_Probe(const CPU_Probe& particle) {
 	gen_index = particle.gen_index;
 	smoothing_radius = d_to_f(particle.smoothing_radius);
 
@@ -105,7 +105,18 @@ GPU_Particle::GPU_Particle(const CPU_Particle& particle) {
 	sph_temperature = d_to_f(particle.sph.temperature);
 }
 
-CPU_Neighbor::CPU_Neighbor(const dvec1& distance, CPU_Particle* neighbor) :
+CPU_Neighbor::CPU_Neighbor(const dvec1& distance, CPU_Probe* neighbor) :
 	distance(distance),
-	neighbor(neighbor)
+	probe(neighbor)
+{}
+
+CPU_Particle::CPU_Particle() :
+	transformed_position(dvec3(0)),
+	position(dvec3(0)),
+	rotation(dquat(1,0,0,0)),
+	probe(CPU_Neighbor(-1.0, nullptr))
+{}
+
+GPU_Particle::GPU_Particle(const CPU_Particle& particle) :
+	position(d_to_f(particle.transformed_position))
 {}

@@ -61,11 +61,11 @@ bool f_raySphereIntersection(in Ray ray, in vec3 position, in float radius, out 
 	float a = dot(ray.direction, ray.direction);
 	float b = 2.0*dot(ray.direction, CO);
 	float c = dot(CO, CO);
-	if (render_particle_color_mode >= SPH) {
+	if (render_probe_color_mode >= SPH) {
 		c -= radius * radius;
 	}
 	else {
-		c -= render_particle_radius * render_particle_radius;
+		c -= render_probe_radius * render_probe_radius;
 	}
 
 	float delta = b*b - 4.0*a*c;
@@ -118,9 +118,9 @@ bool f_EarthIntersection(in Ray ray, out float t, out vec2 uv) {
 	return true;
 }
 
-int f_visitBvh(in Ray ray, inout float result_raylength) {
-	int closest_particle = -1;
-	if (use_octree == 1) {
+int f_visitProbeBvh(in Ray ray, inout float result_raylength) {
+	int closest_probe = -1;
+	if (use_probe_octree == 1) {
 		Ray bvh_ray = Ray(ray.origin, normalize(1.0 / ray.direction));
 
 		float t_length = MAX_DIST;
@@ -135,14 +135,83 @@ int f_visitBvh(in Ray ray, inout float result_raylength) {
 			--stack_index;
 
 			int currentNode = stack[stack_index];
-			Bvh node = bvh_nodes[currentNode];
+			Bvh node = probe_nodes[currentNode];
 
 			if (!f_rayBvhIntersection(bvh_ray, node)) {
 				continue;
 			}
-			if (node.particle_end > 0) { // Leaf
-				for (uint i = node.particle_start; i < node.particle_end; ++i) {
-					if (f_raySphereIntersection(ray, particles[i].position, particles[i].smoothing_radius, t_dist)) {
+			if (node.id_end > 0) { // Leaf
+				for (uint i = node.id_start; i < node.id_end; ++i) {
+					if (f_raySphereIntersection(ray, probes[i].position, probes[i].smoothing_radius, t_dist)) {
+						if (t_dist < t_length) {
+							t_length = t_dist;
+							result_raylength = t_dist;
+							closest_probe = int(i);
+						}
+					}
+				}
+			}
+			else {
+				for (int i = 0; i < 8; ++i) {
+					if (i < 4) {
+						int childIndex = node.pointers_a[i];
+						if (childIndex >= 0) {
+							stack[stack_index++] = childIndex;
+						}
+					}
+					else {
+						int childIndex = node.pointers_b[i - 4];
+						if (childIndex >= 0) {
+							stack[stack_index++] = childIndex;
+						}
+					}
+				}
+			}
+		}
+	}
+	else {
+		float t_length = MAX_DIST;
+		float t_dist = MAX_DIST;
+		for (uint i = 0; i < probes.length(); i ++) {
+			//if (i % 16 == 0) {
+				if (f_raySphereIntersection(ray, probes[i].position, probes[i].smoothing_radius, t_dist)) {
+					if (t_dist < t_length) {
+						t_length = t_dist;
+						result_raylength = t_dist;
+						closest_probe = int(i);
+					}
+				}
+			//}
+		}
+	}
+	return closest_probe;
+}
+
+int f_visitParticleBvh(in Ray ray, inout float result_raylength) {
+	int closest_particle = -1;
+	if (use_particle_octree == 1) {
+		Ray bvh_ray = Ray(ray.origin, normalize(1.0 / ray.direction));
+
+		float t_length = MAX_DIST;
+		float t_dist = MAX_DIST;
+
+		int stack[100];
+		int stack_index = 0;
+		stack[stack_index++] = 0;
+
+		// TODO implement closest BVH First
+		while (stack_index > 0) {
+			--stack_index;
+
+			int currentNode = stack[stack_index];
+			Bvh node = particle_nodes[currentNode];
+
+			if (!f_rayBvhIntersection(bvh_ray, node)) {
+				continue;
+			}
+			if (node.id_end > 0) { // Leaf
+				for (uint i = node.id_start; i < node.id_end; ++i) {
+					if (f_raySphereIntersection(ray, particles[i].position, render_particle_radius, t_dist)) {
 						if (t_dist < t_length) {
 							t_length = t_dist;
 							result_raylength = t_dist;
@@ -174,7 +243,7 @@ int f_visitBvh(in Ray ray, inout float result_raylength) {
 		float t_dist = MAX_DIST;
 		for (uint i = 0; i < particles.length(); i ++) {
 			//if (i % 16 == 0) {
-				if (f_raySphereIntersection(ray, particles[i].position, particles[i].smoothing_radius, t_dist)) {
+				if (f_raySphereIntersection(ray, particles[i].position, render_particle_radius, t_dist)) {
 					if (t_dist < t_length) {
 						t_length = t_dist;
 						result_raylength = t_dist;

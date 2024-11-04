@@ -10,7 +10,7 @@ Renderer::Renderer() {
 	window = nullptr;
 	kernel = Kernel();
 	pathtracer = PathTracer(this);
-	if (pathtracer.render_particle_color_mode < SPH) {
+	if (pathtracer.render_probe_color_mode < SPH) {
 		kernel.BVH_SPH = false;
 	}
 	else {
@@ -182,8 +182,10 @@ void Renderer::systemInfo() {
 
 void Renderer::f_pipeline() {
 	pathtracer.f_initialize();
+	f_updateProbes();
+	f_updateBvhProbes();
 	f_updateParticles();
-	f_updateBvh();
+	f_updateBvhParticles();
 }
 
 void Renderer::f_tickUpdate() {
@@ -195,27 +197,45 @@ void Renderer::f_tickUpdate() {
 			kernel.simulate(delta_time);
 		}
 
-		if (pathtracer.render_particles && pathtracer.use_octree) {
-			kernel.buildBvh();
+		if (pathtracer.render_probes && pathtracer.use_probe_octree) {
+			kernel.buildBvhProbes();
 			const dvec1 start = glfwGetTime();
-			pathtracer.f_updateBvh();
+			pathtracer.f_updateBvhProbes();
+			gpu_delta += glfwGetTime() - start;
+		}
+		if (pathtracer.render_particles && pathtracer.use_particle_octree) {
+			kernel.buildBvhParticles();
+			const dvec1 start = glfwGetTime();
+			pathtracer.f_updateBvhParticles();
 			gpu_delta += glfwGetTime() - start;
 		}
 		const dvec1 start = glfwGetTime();
+		pathtracer.f_updateProbes();
 		pathtracer.f_updateParticles();
 		gpu_delta += glfwGetTime() - start;
 		next_frame = false;
 	}
 }
 
-void Renderer::f_updateBvh() {
-	kernel.buildBvh();
-	pathtracer.f_updateBvh();
+void Renderer::f_updateBvhProbes() {
+	kernel.buildBvhProbes();
+	pathtracer.f_updateBvhProbes();
+}
+
+void Renderer::f_updateProbes() {
+	kernel.buildProbes();
+	f_updateBvhProbes();
+	pathtracer.f_updateProbes();
+}
+
+void Renderer::f_updateBvhParticles() {
+	kernel.buildBvhParticles();
+	pathtracer.f_updateBvhParticles();
 }
 
 void Renderer::f_updateParticles() {
 	kernel.buildParticles();
-	f_updateBvh();
+	f_updateBvhParticles();
 	pathtracer.f_updateParticles();
 }
 
@@ -226,8 +246,11 @@ void Renderer::f_guiLoop() {
 	ImGui::NewFrame();
 
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(400, FLT_MAX));
+	ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(1000, FLT_MAX));
 	ImGui::Begin("Info");
+	if (lock_view) {
+		ImGui::Text("Locked View");
+	}
 	//ImGui::SetWindowPos(ImVec2(0, 0));
 	const vec1 availableWidth = ImGui::GetContentRegionAvail().x;
 	const vec1 spacing = ImGui::GetStyle().ItemSpacing.x;
@@ -276,47 +299,93 @@ void Renderer::f_guiLoop() {
 				next_frame = true;
 			}
 
-			ImGui::PushItemWidth(itemWidth);
-			int PARTICLE_COUNT = u_to_i(kernel.PARTICLE_COUNT);
-			ImGui::Text("Particle Count");
-			if (ImGui::SliderInt("##slider1", &PARTICLE_COUNT, 128, 8192*4)) {
-				kernel.PARTICLE_COUNT = i_to_u(PARTICLE_COUNT);
-				f_updateParticles();
-			}
-			ImGui::PopItemWidth();
-			ImGui::SeparatorText("Earth Settings");
-			ImGui::PushItemWidth(halfWidth);
+			if (ImGui::CollapsingHeader("Probe Settings")) {
+				ImGui::PushItemWidth(itemWidth);
+				int PROBE_COUNT = u_to_i(kernel.PROBE_COUNT);
+				ImGui::Text("Probe Count");
+				if (ImGui::SliderInt("##PROBE_COUNT", &PROBE_COUNT, 128, 8192 * 4)) {
+					kernel.PROBE_COUNT = i_to_u(PROBE_COUNT);
+					f_updateProbes();
+				}
+				ImGui::PopItemWidth();
+				ImGui::SeparatorText("Earth Settings");
+				ImGui::PushItemWidth(halfWidth);
 
-			ImGui::Text("Latitude");
-			ImGui::SameLine();
-			ImGui::SetCursorPosX(halfPos);
-			ImGui::Text("Longitude");
-			float lon = d_to_f(kernel.POLE_GEOLOCATION.x);
-			if (ImGui::SliderFloat("##slider2", &lon, -90.0f, 90.0f, "%.4f")) {
-				kernel.POLE_GEOLOCATION.x = f_to_d(lon);
-				f_updateParticles();
-			}
-			ImGui::SameLine();
-			float lat = d_to_f(kernel.POLE_GEOLOCATION.y);
-			if (ImGui::SliderFloat("##slider3", &lat, -180.0f, 180.0f, "%.4f")) {
-				kernel.POLE_GEOLOCATION.y = f_to_d(lat);
-				f_updateParticles();
-			}
+				ImGui::Text("Latitude");
+				ImGui::SameLine();
+				ImGui::SetCursorPosX(halfPos);
+				ImGui::Text("Longitude");
+				float lon = d_to_f(kernel.PROBE_POLE_GEOLOCATION.x);
+				if (ImGui::SliderFloat("##PROBE_POLE_GEOLOCATION_x", &lon, -90.0f, 90.0f, "%.4f")) {
+					kernel.PROBE_POLE_GEOLOCATION.x = f_to_d(lon);
+					f_updateProbes();
+				}
+				ImGui::SameLine();
+				float lat = d_to_f(kernel.PROBE_POLE_GEOLOCATION.y);
+				if (ImGui::SliderFloat("##PROBE_POLE_GEOLOCATION_y", &lat, -180.0f, 180.0f, "%.4f")) {
+					kernel.PROBE_POLE_GEOLOCATION.y = f_to_d(lat);
+					f_updateProbes();
+				}
 
-			ImGui::Text("Pole Bias");
-			ImGui::SameLine();
-			ImGui::SetCursorPosX(halfPos);
-			ImGui::Text("Pole Power");
-			float pole_bias = d_to_f(kernel.POLE_BIAS);
-			if (ImGui::SliderFloat("##slider4", &pole_bias, 0.0f, 1.0f, "%.5f")) {
-				kernel.POLE_BIAS = f_to_d(pole_bias);
-				f_updateParticles();
+				ImGui::Text("Pole Bias");
+				ImGui::SameLine();
+				ImGui::SetCursorPosX(halfPos);
+				ImGui::Text("Pole Power");
+				float pole_bias = d_to_f(kernel.PROBE_POLE_BIAS);
+				if (ImGui::SliderFloat("##PROBE_POLE_BIAS", &pole_bias, 0.0f, 1.0f, "%.5f")) {
+					kernel.PROBE_POLE_BIAS = f_to_d(pole_bias);
+					f_updateProbes();
+				}
+				ImGui::SameLine();
+				float pole_power = d_to_f(kernel.PROBE_POLE_BIAS_POWER);
+				if (ImGui::SliderFloat("##PROBE_POLE_BIAS_POWER", &pole_power, 1.0f, 10.0f)) {
+					kernel.PROBE_POLE_BIAS_POWER = f_to_d(pole_power);
+					f_updateProbes();
+				}
 			}
-			ImGui::SameLine();
-			float pole_power = d_to_f(kernel.POLE_BIAS_POWER);
-			if (ImGui::SliderFloat("##slider5", &pole_power, 1.0f, 10.0f)) {
-				kernel.POLE_BIAS_POWER = f_to_d(pole_power);
-				f_updateParticles();
+			if (ImGui::CollapsingHeader("Particle Settings")) {
+				ImGui::PushItemWidth(itemWidth);
+				int PARTICLE_COUNT = u_to_i(kernel.PARTICLE_COUNT);
+				ImGui::Text("Particle Count");
+				if (ImGui::SliderInt("##PARTICLE_COUNT", &PARTICLE_COUNT, 128, 8192 * 4)) {
+					kernel.PARTICLE_COUNT = i_to_u(PARTICLE_COUNT);
+					f_updateParticles();
+				}
+				ImGui::PopItemWidth();
+				ImGui::SeparatorText("Earth Settings");
+				ImGui::PushItemWidth(halfWidth);
+
+				ImGui::Text("Latitude");
+				ImGui::SameLine();
+				ImGui::SetCursorPosX(halfPos);
+				ImGui::Text("Longitude");
+				float lon = d_to_f(kernel.PARTICLE_POLE_GEOLOCATION.x);
+				if (ImGui::SliderFloat("##PARTICLE_POLE_GEOLOCATION_x", &lon, -90.0f, 90.0f, "%.4f")) {
+					kernel.PARTICLE_POLE_GEOLOCATION.x = f_to_d(lon);
+					f_updateParticles();
+				}
+				ImGui::SameLine();
+				float lat = d_to_f(kernel.PARTICLE_POLE_GEOLOCATION.y);
+				if (ImGui::SliderFloat("##PARTICLE_POLE_GEOLOCATION_y", &lat, -180.0f, 180.0f, "%.4f")) {
+					kernel.PARTICLE_POLE_GEOLOCATION.y = f_to_d(lat);
+					f_updateParticles();
+				}
+
+				ImGui::Text("Pole Bias");
+				ImGui::SameLine();
+				ImGui::SetCursorPosX(halfPos);
+				ImGui::Text("Pole Power");
+				float pole_bias = d_to_f(kernel.PARTICLE_POLE_BIAS);
+				if (ImGui::SliderFloat("##PARTICLE_POLE_BIAS", &pole_bias, 0.0f, 1.0f, "%.5f")) {
+					kernel.PARTICLE_POLE_BIAS = f_to_d(pole_bias);
+					f_updateParticles();
+				}
+				ImGui::SameLine();
+				float pole_power = d_to_f(kernel.PARTICLE_POLE_BIAS_POWER);
+				if (ImGui::SliderFloat("##PARTICLE_POLE_BIAS_POWER", &pole_power, 1.0f, 10.0f)) {
+					kernel.PARTICLE_POLE_BIAS_POWER = f_to_d(pole_power);
+					f_updateParticles();
+				}
 			}
 
 			ImGui::PopItemWidth();
@@ -325,7 +394,7 @@ void Renderer::f_guiLoop() {
 			float tilt = d_to_f(kernel.EARTH_TILT);
 			if (ImGui::SliderFloat("##slider6", &tilt, -180.0f, 180.0f, "%.2f")) {
 				kernel.EARTH_TILT = f_to_d(tilt);
-				f_updateParticles();
+				f_updateProbes();
 			}
 			ImGui::PopItemWidth();
 			ImGui::PushItemWidth(halfWidth);
@@ -335,12 +404,12 @@ void Renderer::f_guiLoop() {
 			ImGui::Text("Day");
 			if (ImGui::SliderInt("##slider7", &kernel.CALENDAR_MONTH, 0, 12)) {
 				kernel.calculateDateTime();
-				f_updateParticles();
+				f_updateProbes();
 			}
 			ImGui::SameLine();
 			if (ImGui::SliderInt("##slider8", &kernel.CALENDAR_DAY, 0, 31)) {
 				kernel.calculateDateTime();
-				f_updateParticles();
+				f_updateProbes();
 			}
 
 			ImGui::Text("Hour");
@@ -349,12 +418,12 @@ void Renderer::f_guiLoop() {
 			ImGui::Text("Minute");
 			if (ImGui::SliderInt("##slider9", &kernel.CALENDAR_HOUR, 0, 24)) {
 				kernel.calculateDateTime();
-				f_updateParticles();
+				f_updateProbes();
 			}
 			ImGui::SameLine();
 			if (ImGui::SliderInt("##slider10", &kernel.CALENDAR_MINUTE, 0, 60)) {
 				kernel.calculateDateTime();
-				f_updateParticles();
+				f_updateProbes();
 			}
 
 			ImGui::PopItemWidth();
@@ -432,10 +501,17 @@ void Renderer::f_frameUpdate() {
 }
 
 void Renderer::f_inputLoop() {
+	dvec3 tilt = dvec3(0, 1, 0);
+	dvec3 fwd = dvec3(1, 0, 0);
 	if (lock_view) {
 		const dmat4 rotmat = glm::rotate(dmat4(1.0), -glm::radians(kernel.EARTH_TILT), dvec3(0, 0, 1));
-		const dvec3 tilt = glm::normalize(dvec3(rotmat * dvec4(0,1,0,1)));
+		tilt = glm::normalize(dvec3(rotmat * dvec4(0,1,0,1)));
+		fwd = glm::normalize(dvec3(rotmat * dvec4(0,0,1,1)));
 		camera = glm::rotate(camera, glm::radians(delta_time * kernel.TIME_SCALE * 0.01 * 360.0), tilt);
+
+		//
+		//const dvec2 rotation = dvec2(sin(-glm::radians(kernel.DAY_TIME) * TWO_PI), 0);// glm::radians(delta_time * kernel.TIME_SCALE * 180.0));
+		//camera_transform.orbit(dvec3(0), rotation);
 	}
 	for (uint i = 0; i < 6; i++) {
 		dvec3* input = &input_lerps[i];
@@ -446,20 +522,20 @@ void Renderer::f_inputLoop() {
 			input->x = lerp(input->x, input->z, input->y);
 		}
 		if (i == 0) {
-			camera_transform.orbit(dvec3(0), dvec2(-1, 0) * input->x * camera_orbit_sensitivity * delta_time);
-			camera = glm::rotate(camera, -1.0 * input->x * camera_orbit_sensitivity * delta_time, dvec3(1, 0, 0));
+			camera_transform.orbit(dvec3(0), dvec2(-1, 0) * input->x * camera_orbit_sensitivity * 10.0 * delta_time);
+			camera = glm::rotate(camera, -1.0 * input->x * camera_orbit_sensitivity * delta_time, fwd);
 		}
 		if (i == 1) {
-			camera_transform.orbit(dvec3(0), dvec2(0, -1) * input->x * camera_orbit_sensitivity * delta_time);
-			camera = glm::rotate(camera, -1.0 * input->x * camera_orbit_sensitivity * delta_time, dvec3(0, 1, 0));
+			camera_transform.orbit(dvec3(0), dvec2(0, -1) * input->x * camera_orbit_sensitivity * 10.0 * delta_time);
+			camera = glm::rotate(camera, -1.0 * input->x * camera_orbit_sensitivity * delta_time, tilt);
 		}
 		if (i == 2) {
-			camera_transform.orbit(dvec3(0), dvec2(1, 0) * input->x * camera_orbit_sensitivity * delta_time);
-			camera = glm::rotate(camera, 1.0 * input->x * camera_orbit_sensitivity * delta_time, dvec3(1, 0, 0));
+			camera_transform.orbit(dvec3(0), dvec2(1, 0) * input->x * camera_orbit_sensitivity * 10.0 * delta_time);
+			camera = glm::rotate(camera, 1.0 * input->x * camera_orbit_sensitivity * delta_time, fwd);
 		}
 		if (i == 3) {
-			camera_transform.orbit(dvec3(0), dvec2(0, 1) * input->x * camera_orbit_sensitivity * delta_time);
-			camera = glm::rotate(camera, 1.0 * input->x * camera_orbit_sensitivity * delta_time, dvec3(0, 1, 0));
+			camera_transform.orbit(dvec3(0), dvec2(0, 1) * input->x * camera_orbit_sensitivity * 10.0 * delta_time);
+			camera = glm::rotate(camera, 1.0 * input->x * camera_orbit_sensitivity * delta_time, tilt);
 		}
 		if (i == 4) {
 			camera_transform.moveLocal(dvec3(0, 0, -1) * input->x * camera_zoom_sensitivity * delta_time);

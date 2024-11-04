@@ -8,20 +8,25 @@ PathTracer::PathTracer(Renderer* renderer) :
 	texture_size = 0;
 	compute_layout = uvec2(0);
 
-	use_octree = true;
 	render_planet            = true;
 	render_lighting          = true;
-	render_particle_lighting = false;
 	render_atmosphere        = true;
-	render_octree            = false;
+
+	use_probe_octree         = false;
+	use_particle_octree      = false;
+	render_probe_lighting    = false;
+	render_particle_lighting = false;
+	render_probe_octree      = false;
+	render_particle_octree   = false;
 	{
-		render_octree_hue        = false;
-		render_octree_debug      = false;
+		render_octree_hue         = false;
+		render_octree_debug       = false;
 		render_octree_debug_index = 0;
 	}
 	render_particles = true;
+	render_probes    = false;
 	{
-		render_particle_color_mode = 1;
+		render_probe_color_mode = 1;
 	}
 	render_planet_texture = 0;
 }
@@ -43,6 +48,8 @@ void PathTracer::f_initialize() {
 	gl_data["ssbo 2"] = 0;
 	gl_data["ssbo 3"] = 0;
 	gl_data["ssbo 4"] = 0;
+	gl_data["ssbo 5"] = 0;
+	gl_data["ssbo 6"] = 0;
 
 	glClearColor(0, 0, 0, 0);
 
@@ -94,14 +101,24 @@ void PathTracer::f_initialize() {
 	#endif // DEBUG
 }
 
-void PathTracer::f_updateBvh() {
+void PathTracer::f_updateBvhProbes() {
 	glDeleteBuffers(1, &gl_data["ssbo 2"]);
-	gl_data["ssbo 2"] = ssboBinding(ul_to_u(renderer->kernel.bvh_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.bvh_nodes.data());
+	gl_data["ssbo 2"] = ssboBinding(ul_to_u(renderer->kernel.probe_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.probe_nodes.data());
+}
+
+void PathTracer::f_updateBvhParticles() {
+	glDeleteBuffers(1, &gl_data["ssbo 4"]);
+	gl_data["ssbo 4"] = ssboBinding(ul_to_u(renderer->kernel.particle_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.particle_nodes.data());
+}
+
+void PathTracer::f_updateProbes() {
+	glDeleteBuffers(1, &gl_data["ssbo 1"]);
+	gl_data["ssbo 1"] = ssboBinding(ul_to_u(renderer->kernel.gpu_probes.size() * sizeof(GPU_Probe)), renderer->kernel.gpu_probes.data());
 }
 
 void PathTracer::f_updateParticles() {
-	glDeleteBuffers(1, &gl_data["ssbo 1"]);
-	gl_data["ssbo 1"] = ssboBinding(ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
+	glDeleteBuffers(1, &gl_data["ssbo 3"]);
+	gl_data["ssbo 3"] = ssboBinding(ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
 }
 
 #pragma optimize("O3", on)
@@ -139,8 +156,8 @@ void PathTracer::f_updateTextures(const bool& high_res) {
 		texture_data.insert(texture_data.end(), data.begin(), data.end());
 	}
 	texture_size = ul_to_u(texture_data.size());
-	gl_data["ssbo 3"] = ssboBinding(ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
-	gl_data["ssbo 4"] = ssboBinding(ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
+	gl_data["ssbo 5"] = ssboBinding(ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
+	gl_data["ssbo 6"] = ssboBinding(ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
 }
 #pragma optimize("", on)
 
@@ -152,13 +169,23 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 		if (ImGui::SliderFloat("##slider11", &renderer->render_scale, 0.1f, 1.0f, "%.3f")) {
 			renderer->f_resize();
 		}
-		ImGui::Checkbox("Use Octree", &use_octree);
-		if (!renderer->run_sim and use_octree and render_particle_color_mode < SPH) {
-			int MAX_OCTREE_DEPTH = u_to_i(renderer->kernel.MAX_OCTREE_DEPTH);
-			ImGui::Text("Max Octree Depth");
+		ImGui::Checkbox("Use Probe Octree", &use_probe_octree);
+		ImGui::Checkbox("Use Particle Octree", &use_particle_octree);
+		if (!renderer->run_sim and use_probe_octree and render_probe_color_mode < SPH) {
+			int MAX_OCTREE_DEPTH = u_to_i(renderer->kernel.PROBE_MAX_OCTREE_DEPTH);
+			ImGui::Text("Max Probe Octree Depth");
 			if (ImGui::SliderInt("##slider12", &MAX_OCTREE_DEPTH, 0, 6)) {
-				renderer->kernel.MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
-				renderer->f_updateBvh();
+				renderer->kernel.PROBE_MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
+				renderer->f_updateBvhProbes();
+				f_updateProbes();
+			}
+		}
+		if (!renderer->run_sim and use_particle_octree) {
+			int MAX_OCTREE_DEPTH = u_to_i(renderer->kernel.PARTICLE_MAX_OCTREE_DEPTH);
+			ImGui::Text("Max Particle Octree Depth");
+			if (ImGui::SliderInt("##part_octree", &MAX_OCTREE_DEPTH, 0, 6)) {
+				renderer->kernel.PARTICLE_MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
+				renderer->f_updateBvhParticles();
 				f_updateParticles();
 			}
 		}
@@ -172,53 +199,78 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 		}
 
 		ImGui::Checkbox("Render Lighting", &render_lighting);
-		if (render_lighting and render_particle_color_mode < SPH) {
+		if (render_lighting and render_probe_color_mode < SPH) {
 			ImGui::Checkbox("Render Atmosphere", &render_atmosphere);
 		}
 
 		if (!renderer->run_sim) {
-			if (use_octree) {
-				ImGui::Checkbox("Render Octree", &render_octree);
-				if (render_octree) {
+			if (use_probe_octree) {
+				if (ImGui::Checkbox("Render Probe Octree", &render_probe_octree)) {
+					render_octree_debug_index = 0;
+					render_particle_octree = false;
+				}
+				if (render_probe_octree) {
 					ImGui::Checkbox("Hue", &render_octree_hue);
 					ImGui::Checkbox("Debug", &render_octree_debug);
 					if (render_octree_debug) {
 						ImGui::Text("Index");
-						ImGui::SliderInt("##slider13", &render_octree_debug_index, 0, ul_to_i(renderer->kernel.bvh_nodes.size()));
+						ImGui::SliderInt("##slider13", &render_octree_debug_index, 0, ul_to_i(renderer->kernel.probe_nodes.size()));
+					}
+				}
+			}
+			if (use_particle_octree) {
+				if (ImGui::Checkbox("Render Particle Octree", &render_particle_octree)) {
+					render_octree_debug_index = 0;
+					render_probe_octree = false;
+				}
+				if (render_particle_octree) {
+					ImGui::Checkbox("Hue", &render_octree_hue);
+					ImGui::Checkbox("Debug", &render_octree_debug);
+					if (render_octree_debug) {
+						ImGui::Text("Index");
+						ImGui::SliderInt("##slider13", &render_octree_debug_index, 0, ul_to_i(renderer->kernel.particle_nodes.size()));
 					}
 				}
 			}
 		}
 
-		ImGui::Checkbox("Render Particles", &render_particles);
-		if (render_particles) {
-			ImGui::Checkbox("Render Particle Lighting", &render_particle_lighting);
-			if (render_particle_color_mode < SPH) {
-				ImGui::Text("Particle Radius");
-				if (ImGui::SliderFloat("##slider14", &renderer->kernel.PARTICLE_RADIUS, 0.005f, 0.25f, "%.4f")) {
-					renderer->f_updateBvh();
+		ImGui::Checkbox("Render Probes", &render_probes);
+		if (render_probes) {
+			ImGui::Checkbox("Render Probe Lighting", &render_probe_lighting);
+			if (render_probe_color_mode < SPH) {
+				ImGui::Text("Probe Display Radius");
+				if (ImGui::SliderFloat("##slider14", &renderer->kernel.PROBE_RADIUS, 0.005f, 0.25f, "%.4f")) {
+					renderer->f_updateBvhProbes();
 				}
 			}
 
 			const char* items_b[] = { "Sun Intensity", "Wind", "Height", "Pressure", "Current Temperature", "Day Temperature", "Night Temperature", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "Albedo", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation", "SPH.Wind", "SPH.Pressure", "SPH.Temperature" };
-			ImGui::Text("Particle Color Mode");
-			if (ImGui::Combo("##combo2", &render_particle_color_mode, items_b, IM_ARRAYSIZE(items_b))) {
-				if (render_particle_color_mode < SPH) {
+			ImGui::Text("Probe Color Mode");
+			if (ImGui::Combo("##combo2", &render_probe_color_mode, items_b, IM_ARRAYSIZE(items_b))) {
+				if (render_probe_color_mode < SPH) {
 					renderer->kernel.BVH_SPH = false;
 				}
 				else {
 					renderer->kernel.BVH_SPH = true;
 				}
-				renderer->f_updateBvh();
+				renderer->f_updateBvhProbes();
+			}
+		}
+		ImGui::Checkbox("Render Particles", &render_particles);
+		if (render_particles) {
+			ImGui::Checkbox("Render Particle Lighting", &render_particle_lighting);
+			ImGui::Text("Particle Display Radius");
+			if (ImGui::SliderFloat("##slider14", &renderer->kernel.PARTICLE_RADIUS, 0.005f, 0.25f, "%.4f")) {
+				renderer->f_updateBvhProbes();
 			}
 		}
 	}
 	ImGui::PopItemWidth();
 
 	if (ImGui::CollapsingHeader("VRAM Stats")) {
-		ImGui::Text(string("Octree VRAM: " + to_string((renderer->kernel.bvh_nodes.size() * sizeof(GPU_Bvh)) / 1024) + "kb ").c_str());
+		ImGui::Text(string("Octree VRAM: " + to_string((renderer->kernel.probe_nodes.size() * sizeof(GPU_Bvh)) / 1024) + "kb ").c_str());
 		ImGui::Text(string("Texture VRAM: " + to_string((texture_size * sizeof(uint)) / 1024 / 1024) + "mb ").c_str());
-		ImGui::Text(string("Particle VRAM: " + to_string((renderer->kernel.PARTICLE_COUNT * sizeof(GPU_Particle)) / 1024) + "kb ").c_str());
+		ImGui::Text(string("Particle VRAM: " + to_string((renderer->kernel.PROBE_COUNT * sizeof(GPU_Probe)) / 1024) + "kb ").c_str());
 	}
 }
 
@@ -251,6 +303,8 @@ void PathTracer::f_cleanup() {
 	glDeleteBuffers(1, &gl_data["ssbo 2"]);
 	glDeleteBuffers(1, &gl_data["ssbo 3"]);
 	glDeleteBuffers(1, &gl_data["ssbo 4"]);
+	glDeleteBuffers(1, &gl_data["ssbo 5"]);
+	glDeleteBuffers(1, &gl_data["ssbo 6"]);
 
 	glDeleteTextures(1, &gl_data["raw_render_layer"]);
 
@@ -274,7 +328,7 @@ void PathTracer::f_render() {
 	const vec1 focal_length = 0.05f;
 	const vec1 sensor_size  = 0.036f;
 
-	const vec3 worldUp =vec3(0, 1, 0);
+	const vec3 worldUp = vec3(0, 1, 0);
 	const vec3 rotatedDirection = d_to_f(renderer->camera) * vec3(0, 0, 1);
 	const vec3 camera_pos = rotatedDirection * d_to_f(renderer->zoom);
 	const vec3 z_vector = -glm::normalize(camera_pos);
@@ -297,41 +351,39 @@ void PathTracer::f_render() {
 	glUniform1f  (glGetUniformLocation(compute_program, "aspect_ratio"), d_to_f(renderer->render_aspect_ratio));
 	glUniform1f  (glGetUniformLocation(compute_program, "current_time"), d_to_f(renderer->current_time));
 	glUniform2ui (glGetUniformLocation(compute_program, "resolution"), renderer->render_resolution.x, renderer->render_resolution.y);
-
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_pos"), 1, value_ptr(camera_pos));
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_p_uv"),1, value_ptr(projection_center));
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_p_u"), 1, value_ptr(projection_u));
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_p_v"), 1, value_ptr(projection_v));
-
 	glUniform1f  (glGetUniformLocation(compute_program, "earth_tilt"),d_to_f( renderer->kernel.EARTH_TILT));
 	glUniform1f  (glGetUniformLocation(compute_program, "year_time"), d_to_f(renderer->kernel.YEAR_TIME));
 	glUniform1f  (glGetUniformLocation(compute_program, "day_time"),  d_to_f(renderer->kernel.DAY_TIME));
-
-	glUniform1ui (glGetUniformLocation(compute_program, "use_octree"), use_octree);
+	glUniform1ui (glGetUniformLocation(compute_program, "use_probe_octree"), use_probe_octree);
+	glUniform1ui (glGetUniformLocation(compute_program, "use_particle_octree"), use_particle_octree);
 	glUniform1ui (glGetUniformLocation(compute_program, "render_planet"), render_planet);
-	{
-		glUniform1i(glGetUniformLocation(compute_program, "render_planet_texture"), render_planet_texture);
-	}
+	glUniform1i  (glGetUniformLocation(compute_program, "render_planet_texture"), render_planet_texture);
 	glUniform1ui (glGetUniformLocation(compute_program, "render_lighting"), render_lighting);
+	glUniform1ui (glGetUniformLocation(compute_program, "render_probe_lighting"), render_probe_lighting);
 	glUniform1ui (glGetUniformLocation(compute_program, "render_particle_lighting"), render_particle_lighting);
 	glUniform1ui (glGetUniformLocation(compute_program, "render_atmosphere"), render_atmosphere);
-	glUniform1ui (glGetUniformLocation(compute_program, "render_octree"), render_octree);
-	{
-		glUniform1ui (glGetUniformLocation(compute_program, "render_octree_hue"), render_octree_hue);
-		glUniform1ui (glGetUniformLocation(compute_program, "render_octree_debug"), render_octree_debug);
-		glUniform1i  (glGetUniformLocation(compute_program, "render_octree_debug_index"), render_octree_debug_index);
-	}
+	glUniform1ui (glGetUniformLocation(compute_program, "render_probe_octree"), render_probe_octree);
+	glUniform1ui (glGetUniformLocation(compute_program, "render_particle_octree"), render_particle_octree);
+	glUniform1ui (glGetUniformLocation(compute_program, "render_octree_hue"), render_octree_hue);
+	glUniform1ui (glGetUniformLocation(compute_program, "render_octree_debug"), render_octree_debug);
+	glUniform1i  (glGetUniformLocation(compute_program, "render_octree_debug_index"), render_octree_debug_index);
+	glUniform1ui (glGetUniformLocation(compute_program, "render_probes"), render_probes);
+	glUniform1f  (glGetUniformLocation(compute_program, "render_probe_radius"), renderer->kernel.PROBE_RADIUS);
+	glUniform1i  (glGetUniformLocation(compute_program, "render_probe_color_mode"), render_probe_color_mode);
 	glUniform1ui (glGetUniformLocation(compute_program, "render_particles"), render_particles);
-	{
-		glUniform1f  (glGetUniformLocation(compute_program, "render_particle_radius"), renderer->kernel.PARTICLE_RADIUS);
-		glUniform1i(glGetUniformLocation(compute_program, "render_particle_color_mode"), render_particle_color_mode);
-	}
+	glUniform1f  (glGetUniformLocation(compute_program, "render_particle_radius"), renderer->kernel.PARTICLE_RADIUS);
 
 	glBindImageTexture(0, gl_data["raw_render_layer"], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, gl_data["ssbo 1"]);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, gl_data["ssbo 2"]);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, gl_data["ssbo 3"]);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, gl_data["ssbo 4"]);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, gl_data["ssbo 5"]);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, gl_data["ssbo 6"]);
 
 	glDispatchCompute(compute_layout.x, compute_layout.y, 1);
 
