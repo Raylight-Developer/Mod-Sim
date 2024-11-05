@@ -8,6 +8,7 @@ struct CPU_Neighbor;
 struct CPU_Probe_Data {
 	dvec3 position; // mm (mega) meters
 	dvec3 wind_vector; // m/s
+	dquat wind_quaternion;
 	dvec1 surface_area; // mm (mega) meters
 
 	dvec1 height; // m
@@ -61,6 +62,7 @@ struct CPU_Neighbor {
 
 struct CPU_Particle {
 	dquat rotation;
+	dquat wind_speed;
 	dvec3 position;
 	dvec3 transformed_position;
 	CPU_Probe* probe;

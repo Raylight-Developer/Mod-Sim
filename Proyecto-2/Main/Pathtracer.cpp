@@ -24,7 +24,7 @@ PathTracer::PathTracer(Renderer* renderer) :
 		render_octree_debug_index = 0;
 	}
 	render_particles = true;
-	render_probes    = false;
+	render_probes    = true;
 	{
 		render_probe_color_mode = 1;
 	}
@@ -98,6 +98,8 @@ void PathTracer::f_initialize() {
 
 	#ifdef NDEBUG
 		f_updateTextures(true);
+	#else
+		f_updateTextures(false);
 	#endif // DEBUG
 }
 

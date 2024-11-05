@@ -18,7 +18,7 @@ Kernel::Kernel() {
 	PARTICLE_POLE_GEOLOCATION = dvec2(25.0, 90.0);
 
 	PROBE_RADIUS           = 0.05f;
-	PROBE_COUNT            = 4096;// 8192 * 2;
+	PROBE_COUNT            = 8192;// 8192 * 2;
 	PROBE_MAX_OCTREE_DEPTH = 2;
 	PROBE_POLE_BIAS        = 0.0;//0.975;
 	PROBE_POLE_BIAS_POWER  = 1.0;// 5.0;
