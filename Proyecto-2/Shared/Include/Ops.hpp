@@ -349,3 +349,8 @@ struct Confirm {
 		return confirmed;
 	}
 };
+
+template <typename T>
+T f_expLerp(const T& current, const T& target, const uint& decay = 16, const dvec1& delta_time = FPS_60) { // from 1 - 25
+	return target + (current - target) * exp(-static_cast<int>(decay) * delta_time);
+}

@@ -56,9 +56,12 @@ struct Kernel {
 	Kernel();
 
 	void traceInitProperties(CPU_Probe* probe) const;
+
+	void updateGPUProbes();
 	void buildBvhProbes();
 	void buildProbes();
 
+	void updateGPUParticles();
 	void buildBvhParticles();
 	void buildParticles();
 

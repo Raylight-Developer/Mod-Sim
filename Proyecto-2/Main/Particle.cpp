@@ -118,5 +118,5 @@ CPU_Particle::CPU_Particle() :
 {}
 
 GPU_Particle::GPU_Particle(const CPU_Particle& particle) :
-	position(d_to_f(particle.transformed_position))
+	position(d_to_f(particle.transformed_position), 1.0)
 {}

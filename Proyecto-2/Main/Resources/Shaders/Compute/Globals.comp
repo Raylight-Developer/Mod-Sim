@@ -38,8 +38,7 @@ struct Probe {
 };
 
 struct Particle {
-	vec3  position;
-	float padding;
+	vec4 position;
 };
 
 struct Texture {

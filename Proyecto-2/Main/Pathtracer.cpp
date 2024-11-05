@@ -24,7 +24,7 @@ PathTracer::PathTracer(Renderer* renderer) :
 		render_octree_debug_index = 0;
 	}
 	render_particles = true;
-	render_probes    = true;
+	render_probes    = false;
 	{
 		render_probe_color_mode = 1;
 	}
@@ -121,7 +121,6 @@ void PathTracer::f_updateParticles() {
 	gl_data["ssbo 3"] = ssboBinding(ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
 }
 
-#pragma optimize("O3", on)
 void PathTracer::f_updateTextures(const bool& high_res) {
 	const string LR = high_res ? "" : " LR";
 	vector<uint> texture_data;
@@ -159,14 +158,13 @@ void PathTracer::f_updateTextures(const bool& high_res) {
 	gl_data["ssbo 5"] = ssboBinding(ul_to_u(textures.size() * sizeof(GPU_Texture)), textures.data());
 	gl_data["ssbo 6"] = ssboBinding(ul_to_u(texture_data.size() * sizeof(uint)), texture_data.data());
 }
-#pragma optimize("", on)
 
 void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, const vec1& itemWidth, const vec1& halfWidth, const vec1& thirdWidth, const vec1& halfPos) {
 	ImGui::PushItemWidth(itemWidth);
 
 	if (ImGui::CollapsingHeader("Pathtracing Optimization Settings")) {
 		ImGui::Text("Render Scale");
-		if (ImGui::SliderFloat("##slider11", &renderer->render_scale, 0.1f, 1.0f, "%.3f")) {
+		if (ImGui::SliderFloat("##render_scale", &renderer->render_scale, 0.1f, 1.0f, "%.3f")) {
 			renderer->f_resize();
 		}
 		ImGui::Checkbox("Use Probe Octree", &use_probe_octree);
@@ -174,7 +172,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 		if (!renderer->run_sim and use_probe_octree and render_probe_color_mode < SPH) {
 			int MAX_OCTREE_DEPTH = u_to_i(renderer->kernel.PROBE_MAX_OCTREE_DEPTH);
 			ImGui::Text("Max Probe Octree Depth");
-			if (ImGui::SliderInt("##slider12", &MAX_OCTREE_DEPTH, 0, 6)) {
+			if (ImGui::SliderInt("##PROBE_MAX_OCTREE_DEPTH", &MAX_OCTREE_DEPTH, 0, 6)) {
 				renderer->kernel.PROBE_MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
 				renderer->f_updateBvhProbes();
 				f_updateProbes();
@@ -183,7 +181,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 		if (!renderer->run_sim and use_particle_octree) {
 			int MAX_OCTREE_DEPTH = u_to_i(renderer->kernel.PARTICLE_MAX_OCTREE_DEPTH);
 			ImGui::Text("Max Particle Octree Depth");
-			if (ImGui::SliderInt("##part_octree", &MAX_OCTREE_DEPTH, 0, 6)) {
+			if (ImGui::SliderInt("##PARTICLE_MAX_OCTREE_DEPTH", &MAX_OCTREE_DEPTH, 0, 6)) {
 				renderer->kernel.PARTICLE_MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
 				renderer->f_updateBvhParticles();
 				f_updateParticles();
@@ -195,7 +193,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 		if (render_planet) {
 			const char* items_b[] = { "Earth", "Blue Marble", "Black Marble", "Topography", "Bathymetry", "Surface Pressure", "Sea Temperature Day", "Sea Temperature Night", "Land Temperature Day", "Land Temperature Night", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "Albedo", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation" };
 			ImGui::Text("Planet Texture");
-			ImGui::Combo("##combo1", &render_planet_texture, items_b, IM_ARRAYSIZE(items_b));
+			ImGui::Combo("##render_planet_texture", &render_planet_texture, items_b, IM_ARRAYSIZE(items_b));
 		}
 
 		ImGui::Checkbox("Render Lighting", &render_lighting);
@@ -214,7 +212,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 					ImGui::Checkbox("Debug", &render_octree_debug);
 					if (render_octree_debug) {
 						ImGui::Text("Index");
-						ImGui::SliderInt("##slider13", &render_octree_debug_index, 0, ul_to_i(renderer->kernel.probe_nodes.size()));
+						ImGui::SliderInt("##render_octree_debug_index", &render_octree_debug_index, 0, ul_to_i(renderer->kernel.probe_nodes.size()));
 					}
 				}
 			}
@@ -228,7 +226,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 					ImGui::Checkbox("Debug", &render_octree_debug);
 					if (render_octree_debug) {
 						ImGui::Text("Index");
-						ImGui::SliderInt("##slider13", &render_octree_debug_index, 0, ul_to_i(renderer->kernel.particle_nodes.size()));
+						ImGui::SliderInt("##render_octree_debug_index", &render_octree_debug_index, 0, ul_to_i(renderer->kernel.particle_nodes.size()));
 					}
 				}
 			}
@@ -239,14 +237,14 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 			ImGui::Checkbox("Render Probe Lighting", &render_probe_lighting);
 			if (render_probe_color_mode < SPH) {
 				ImGui::Text("Probe Display Radius");
-				if (ImGui::SliderFloat("##slider14", &renderer->kernel.PROBE_RADIUS, 0.005f, 0.25f, "%.4f")) {
+				if (ImGui::SliderFloat("##PROBE_RADIUS", &renderer->kernel.PROBE_RADIUS, 0.005f, 0.25f, "%.4f")) {
 					renderer->f_updateBvhProbes();
 				}
 			}
 
 			const char* items_b[] = { "Sun Intensity", "Wind", "Height", "Pressure", "Current Temperature", "Day Temperature", "Night Temperature", "Humidity", "Water Vapor", "Cloud Coverage", "Cloud Water Content", "Cloud Particle Radius", "Cloud Optical Thickness", "Ozone", "Albedo", "UV Index", "Net Radiation", "Solar Insolation", "Outgoing Longwave Radiation", "Reflected Shortwave Radiation", "SPH.Wind", "SPH.Pressure", "SPH.Temperature" };
 			ImGui::Text("Probe Color Mode");
-			if (ImGui::Combo("##combo2", &render_probe_color_mode, items_b, IM_ARRAYSIZE(items_b))) {
+			if (ImGui::Combo("##render_probe_color_mode", &render_probe_color_mode, items_b, IM_ARRAYSIZE(items_b))) {
 				if (render_probe_color_mode < SPH) {
 					renderer->kernel.BVH_SPH = false;
 				}
@@ -260,7 +258,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 		if (render_particles) {
 			ImGui::Checkbox("Render Particle Lighting", &render_particle_lighting);
 			ImGui::Text("Particle Display Radius");
-			if (ImGui::SliderFloat("##slider14", &renderer->kernel.PARTICLE_RADIUS, 0.005f, 0.25f, "%.4f")) {
+			if (ImGui::SliderFloat("##PARTICLE_RADIUS", &renderer->kernel.PARTICLE_RADIUS, 0.005f, 0.25f, "%.4f")) {
 				renderer->f_updateBvhProbes();
 			}
 		}

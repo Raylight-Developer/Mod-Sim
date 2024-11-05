@@ -183,9 +183,7 @@ void Renderer::systemInfo() {
 void Renderer::f_pipeline() {
 	pathtracer.f_initialize();
 	f_updateProbes();
-	f_updateBvhProbes();
 	f_updateParticles();
-	f_updateBvhParticles();
 }
 
 void Renderer::f_tickUpdate() {
@@ -197,21 +195,14 @@ void Renderer::f_tickUpdate() {
 			kernel.simulate(delta_time);
 		}
 
-		if (pathtracer.render_probes && pathtracer.use_probe_octree) {
-			kernel.buildBvhProbes();
-			const dvec1 start = glfwGetTime();
-			pathtracer.f_updateBvhProbes();
-			gpu_delta += glfwGetTime() - start;
-		}
-		if (pathtracer.render_particles && pathtracer.use_particle_octree) {
-			kernel.buildBvhParticles();
-			const dvec1 start = glfwGetTime();
-			pathtracer.f_updateBvhParticles();
-			gpu_delta += glfwGetTime() - start;
-		}
+		kernel.buildBvhProbes();
+		kernel.buildBvhParticles();
+
 		const dvec1 start = glfwGetTime();
 		pathtracer.f_updateProbes();
+		pathtracer.f_updateBvhProbes();
 		pathtracer.f_updateParticles();
+		pathtracer.f_updateBvhParticles();
 		gpu_delta += glfwGetTime() - start;
 		next_frame = false;
 	}
@@ -392,9 +383,10 @@ void Renderer::f_guiLoop() {
 			ImGui::PushItemWidth(itemWidth);
 			ImGui::Text("Earth Tilt");
 			float tilt = d_to_f(kernel.EARTH_TILT);
-			if (ImGui::SliderFloat("##slider6", &tilt, -180.0f, 180.0f, "%.2f")) {
+			if (ImGui::SliderFloat("##EARTH_TILT", &tilt, -180.0f, 180.0f, "%.2f")) {
 				kernel.EARTH_TILT = f_to_d(tilt);
 				f_updateProbes();
+				f_updateParticles();
 			}
 			ImGui::PopItemWidth();
 			ImGui::PushItemWidth(halfWidth);
@@ -402,28 +394,32 @@ void Renderer::f_guiLoop() {
 			ImGui::Text("Month");
 			ImGui::SameLine();
 			ImGui::Text("Day");
-			if (ImGui::SliderInt("##slider7", &kernel.CALENDAR_MONTH, 0, 12)) {
+			if (ImGui::SliderInt("##CALENDAR_MONTH", &kernel.CALENDAR_MONTH, 0, 12)) {
 				kernel.calculateDateTime();
 				f_updateProbes();
+				f_updateParticles();
 			}
 			ImGui::SameLine();
-			if (ImGui::SliderInt("##slider8", &kernel.CALENDAR_DAY, 0, 31)) {
+			if (ImGui::SliderInt("##CALENDAR_DAY", &kernel.CALENDAR_DAY, 0, 31)) {
 				kernel.calculateDateTime();
 				f_updateProbes();
+				f_updateParticles();
 			}
 
 			ImGui::Text("Hour");
 			ImGui::SameLine();
 			ImGui::SetCursorPosX(halfPos);
 			ImGui::Text("Minute");
-			if (ImGui::SliderInt("##slider9", &kernel.CALENDAR_HOUR, 0, 24)) {
+			if (ImGui::SliderInt("##CALENDAR_HOUR", &kernel.CALENDAR_HOUR, 0, 24)) {
 				kernel.calculateDateTime();
 				f_updateProbes();
+				f_updateParticles();
 			}
 			ImGui::SameLine();
-			if (ImGui::SliderInt("##slider10", &kernel.CALENDAR_MINUTE, 0, 60)) {
+			if (ImGui::SliderInt("##CALENDAR_MINUTE", &kernel.CALENDAR_MINUTE, 0, 60)) {
 				kernel.calculateDateTime();
 				f_updateProbes();
+				f_updateParticles();
 			}
 
 			ImGui::PopItemWidth();

@@ -11,14 +11,14 @@
 #pragma optimize("O3", on)
 Kernel::Kernel() {
 	PARTICLE_RADIUS           = 0.025f;
-	PARTICLE_COUNT            = 1024;// 8192 * 2;
+	PARTICLE_COUNT            = 2048;
 	PARTICLE_MAX_OCTREE_DEPTH = 2;
-	PARTICLE_POLE_BIAS        = 0.0;//0.975;
-	PARTICLE_POLE_BIAS_POWER  = 1.0;// 5.0;
+	PARTICLE_POLE_BIAS        = 0.0;
+	PARTICLE_POLE_BIAS_POWER  = 1.0;
 	PARTICLE_POLE_GEOLOCATION = dvec2(25.0, 90.0);
 
 	PROBE_RADIUS           = 0.05f;
-	PROBE_COUNT            = 8192;// 8192 * 2;
+	PROBE_COUNT            = 4096;// 8192 * 2;
 	PROBE_MAX_OCTREE_DEPTH = 2;
 	PROBE_POLE_BIAS        = 0.0;//0.975;
 	PROBE_POLE_BIAS_POWER  = 1.0;// 5.0;
@@ -118,15 +118,18 @@ void Kernel::buildProbes() {
 	}
 }
 
-void Kernel::buildBvhParticles() {
-	const Particle_Builder bvh_build = BVH_SPH ? Particle_Builder(particles, -1.0f, 1): Particle_Builder(particles, d_to_f(PARTICLE_RADIUS), PROBE_MAX_OCTREE_DEPTH);
-	particles = bvh_build.particles;
-	particle_nodes = bvh_build.nodes;
-
+void Kernel::updateGPUParticles() {
 	gpu_particles.clear();
 	for (const CPU_Particle& particle : particles) {
 		gpu_particles.push_back(GPU_Particle(particle));
 	}
+}
+
+void Kernel::buildBvhParticles() {
+	const Particle_Builder bvh_build = BVH_SPH ? Particle_Builder(particles, -1.0f, 1): Particle_Builder(particles, d_to_f(PARTICLE_RADIUS), PROBE_MAX_OCTREE_DEPTH);
+	particles = bvh_build.particles;
+	particle_nodes = bvh_build.nodes;
+	updateGPUParticles();
 }
 
 void Kernel::buildParticles() {
@@ -160,7 +163,7 @@ void Kernel::lock() {
 }
 
 void Kernel::lockProbes() {
-	const int NUM_NEIGHBORS = 6;
+	const int NUM_NEIGHBORS = 3;
 
 	int i = 0;
 	int i_size = u_to_i(PROBE_COUNT);
@@ -181,7 +184,7 @@ void Kernel::lockProbes() {
 			return a.distance < b.distance;
 		});
 
-		probe.smoothing_radius = neighbors[NUM_NEIGHBORS].distance;
+		probe.smoothing_radius = neighbors[NUM_NEIGHBORS].distance * 1.25;
 		for (uint k = 0; k < NUM_NEIGHBORS; k++) {
 			probe.neighbors.push_back(neighbors[k]);
 		}
@@ -196,11 +199,10 @@ void Kernel::lockProbes() {
 			probe.data.wind_vector += unitDirection * (pressureDifference) * smoothing_kernel * 10.0;
 		}
 
-		if ((i % (PROBE_COUNT / 5)) == 0) {
-			#pragma omp critical
-			cout << "Lock Probes: " << f_to_u(round(u_to_f(i) / u_to_f(PROBE_COUNT) * 100.0f)) << "%" << endl;
-		}
-
+		//if ((i % (PROBE_COUNT / 5)) == 0) {
+		//	#pragma omp critical
+		//	cout << "Lock Probes: " << f_to_u(round(u_to_f(i) / u_to_f(PROBE_COUNT) * 100.0f)) << "%" << endl;
+		//}
 	}
 }
 
@@ -226,10 +228,17 @@ void Kernel::lockParticles() {
 
 		particle.probe = neighbors[0].probe;
 
-		if ((i % (PROBE_COUNT / 5)) == 0) {
-			#pragma omp critical
-			cout << "Lock Particles: " << f_to_u(round(u_to_f(i) / u_to_f(PROBE_COUNT) * 100.0f)) << "%" << endl;
-		}
+		//if ((i % (PROBE_COUNT / 5)) == 0) {
+		//	#pragma omp critical
+		//	cout << "Lock Particles: " << f_to_u(round(u_to_f(i) / u_to_f(PROBE_COUNT) * 100.0f)) << "%" << endl;
+		//}
+	}
+}
+
+void Kernel::updateGPUProbes() {
+	gpu_probes.clear();
+	for (const CPU_Probe& probe : probes) {
+		gpu_probes.push_back(GPU_Probe(probe));
 	}
 }
 
@@ -237,17 +246,12 @@ void Kernel::buildBvhProbes() {
 	const Builder bvh_build = BVH_SPH ? Builder(probes, -1.0f, 1): Builder(probes, d_to_f(PROBE_RADIUS), PROBE_MAX_OCTREE_DEPTH);
 	probes = bvh_build.probes;
 	probe_nodes = bvh_build.nodes;
-
-	gpu_probes.clear();
-	for (const CPU_Probe& probe : probes) {
-		gpu_probes.push_back(GPU_Probe(probe));
-	}
+	updateGPUProbes();
 }
 
 void Kernel::simulate(const dvec1& delta_time) {
 	DT = clamp(delta_time, 0.0, 0.25) * TIME_SCALE;
 	SDT = DT / u_to_d(SUB_SAMPLES);
-	gpu_probes.clear();
 
 	const dvec1 day_time = DAY_TIME * 24.0;
 	CALENDAR_HOUR = int(round(day_time - glm::fract(day_time)));
@@ -276,15 +280,40 @@ void Kernel::simulate(const dvec1& delta_time) {
 
 	}
 	// WIND FIELD
+	//int i = 0;
+	//int i_size = u_to_i(PARTICLE_COUNT);
+	//#pragma omp parallel for private(i) num_threads(12)
+	//for (i = 0; i < i_size; i++) {
+	//	CPU_Particle& particle = particles[i];
+	//
+	//	vector<CPU_Neighbor> neighbors;
+	//
+	//	for (uint j = 0; j < PROBE_COUNT; j++) {
+	//		if (i != j) {
+	//			const dvec1 dist = glm::distance(particle.transformed_position, probes[j].transformed_position);
+	//			neighbors.push_back(CPU_Neighbor(dist, &probes[j]));
+	//		}
+	//	}
+	//
+	//	sort(neighbors.begin(), neighbors.end(), [](const CPU_Neighbor& a, const CPU_Neighbor& b) {
+	//		return a.distance < b.distance;
+	//		});
+	//
+	//	particle.probe = neighbors[0].probe;
+	//
+	//	updateParticlePosition(&particle);
+	//	calculateParticle(&particle);
+	//	updateParticlePosition(&particle);
+	//}
+
 	for (CPU_Particle& particle : particles) {
 		updateParticlePosition(&particle);
 		calculateParticle(&particle);
 		updateParticlePosition(&particle);
 	}
 
-	for (const CPU_Probe& probe : probes) {
-		gpu_probes.push_back(GPU_Probe(probe));
-	}
+	updateGPUParticles();
+	updateGPUProbes();
 }
 
 void Kernel::updateTime() {
@@ -453,9 +482,10 @@ void Kernel::gatherWind(CPU_Probe* probe) const {
 		wind += neighbor.probe->sph.wind_vector * inv_smoothing_kernel * 1.5;
 	}
 	wind /= ul_to_d(probe->neighbors.size());
-	probe->new_data.wind_vector *= (1.0 - SDT * 0.001);
+	probe->new_data.wind_vector *= (1.0 - SDT * 0.01);
 	probe->new_data.wind_vector += (wind * SDT) * 2.5;
-	probe->new_data.wind_vector = glm::rotate(glm::angleAxis(glm::linearRand(-0.5, 0.5), glm::sphericalRand(1.0)), probe->new_data.wind_vector); // rand rotation
+	//probe->new_data.wind_vector = glm::rotate(glm::angleAxis(glm::linearRand(-0.01, 0.01), glm::normalize(probe->transformed_position)), probe->new_data.wind_vector);
+	// TODO implement coriolis
 	const dvec1 wind_speed = glm::length(probe->new_data.wind_vector);
 	if (wind_speed == 0.0) {
 		probe->new_data.wind_vector = glm::normalize(dvec3(randD(1.0, 2.0), randD(1.0, 2.0), randD(1.0, 2.0)));
@@ -494,21 +524,31 @@ void Kernel::calculateParticle(CPU_Particle* particle) const {
 	dvec1 distance = glm::distance(particle->transformed_position, particle->probe->transformed_position);
 
 	// Recalculate Closest Probe TODO: Make Recursive
-	for (const CPU_Neighbor& neighbor : particle->probe->neighbors) {
-		dvec1 dist = glm::distance(particle->transformed_position, neighbor.probe->transformed_position);
-		if (dist < distance) {
-			particle->probe = neighbor.probe;
+	bool foundClosest = false;
+	while (!foundClosest) {
+		foundClosest = true;
+		for (const CPU_Neighbor& neighbor : particle->probe->neighbors) {
+			const dvec1 dist = glm::distance(particle->transformed_position, neighbor.probe->transformed_position);
+			if (dist < distance) {
+				particle->probe = neighbor.probe;
+				distance = dist;
+				foundClosest = false;  // A closer probe was found, so keep searching
+			}
 		}
 	}
 
-	dvec3 wind_vector = particle->probe->data.wind_vector * pow(glm::max(0.0, particle->probe->smoothing_radius - distance), 3.0);
+	dvec3 wind_vector = particle->probe->data.wind_vector;
 	for (const CPU_Neighbor& neighbor : particle->probe->neighbors) {
-		dvec1 dist = glm::distance(particle->transformed_position, neighbor.probe->transformed_position);
-		const dvec1 smoothing_kernel = pow(glm::max(0.0, neighbor.probe->smoothing_radius - dist), 3.0);
-		dvec3 wind_vector = neighbor.probe->data.wind_vector * smoothing_kernel;
+		const dvec1 dist = glm::distance(particle->transformed_position, neighbor.probe->transformed_position);
+		const dvec1 smoothing_kernel = glm::max(0.0, neighbor.probe->smoothing_radius - dist);
+		wind_vector += neighbor.probe->data.wind_vector * smoothing_kernel;
 	}
 
-	particle->rotation *= glm::quat(glm::radians(particle->probe->data.wind_vector * 0.1 * DT));
+	const dvec3 rotation_axis = glm::axis(particle->rotation);
+	const dvec3 projected_component = glm::dot(wind_vector, rotation_axis) * rotation_axis;
+	const dvec3 perpendicular_component = wind_vector - projected_component;
+
+	particle->rotation *= dquat(glm::radians(perpendicular_component) * 0.001 * DT);
 }
 
 dvec3 Kernel::rotateGeoloc(const dvec3& point, const dvec2& geoloc) const {

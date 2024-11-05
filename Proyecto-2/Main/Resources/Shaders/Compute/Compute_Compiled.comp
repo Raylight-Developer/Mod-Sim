@@ -235,13 +235,7 @@ bool f_raySphereIntersection(in Ray ray, in vec3 position, in float radius, out 
 	vec3 CO = ray.origin - position;
 	float a = dot(ray.direction, ray.direction);
 	float b = 2.0*dot(ray.direction, CO);
-	float c = dot(CO, CO);
-	if (render_probe_color_mode >= SPH) {
-		c -= radius * radius;
-	}
-	else {
-		c -= render_probe_radius * render_probe_radius;
-	}
+	float c = dot(CO, CO) - radius * radius;
 
 	float delta = b*b - 4.0*a*c;
 	if(delta < 0.0) {
@@ -317,7 +311,11 @@ int f_visitProbeBvh(in Ray ray, inout float result_raylength) {
 			}
 			if (node.id_end > 0) { // Leaf
 				for (uint i = node.id_start; i < node.id_end; ++i) {
-					if (f_raySphereIntersection(ray, probes[i].position, probes[i].smoothing_radius, t_dist)) {
+					float radius = render_probe_radius;
+					if (render_probe_color_mode >= SPH) {
+						radius = probes[i].smoothing_radius;
+					}
+					if (f_raySphereIntersection(ray, probes[i].position, radius, t_dist)) {
 						if (t_dist < t_length) {
 							t_length = t_dist;
 							result_raylength = t_dist;
@@ -349,7 +347,11 @@ int f_visitProbeBvh(in Ray ray, inout float result_raylength) {
 		float t_dist = MAX_DIST;
 		for (uint i = 0; i < probes.length(); i ++) {
 			//if (i % 16 == 0) {
-				if (f_raySphereIntersection(ray, probes[i].position, probes[i].smoothing_radius, t_dist)) {
+				float radius = render_probe_radius;
+				if (render_probe_color_mode >= SPH) {
+					radius = probes[i].smoothing_radius;
+				}
+				if (f_raySphereIntersection(ray, probes[i].position, radius, t_dist)) {
 					if (t_dist < t_length) {
 						t_length = t_dist;
 						result_raylength = t_dist;
@@ -417,7 +419,7 @@ int f_visitParticleBvh(in Ray ray, inout float result_raylength) {
 		float t_length = MAX_DIST;
 		float t_dist = MAX_DIST;
 		for (uint i = 0; i < particles.length(); i ++) {
-			if (i % 16 == 0) {
+			//if (i % 16 == 0) {
 				if (f_raySphereIntersection(ray, particles[i].position, render_particle_radius, t_dist)) {
 					if (t_dist < t_length) {
 						t_length = t_dist;
@@ -425,7 +427,7 @@ int f_visitParticleBvh(in Ray ray, inout float result_raylength) {
 						closest_particle = int(i);
 					}
 				}
-			}
+			//}
 		}
 	}
 	return closest_particle;
@@ -628,7 +630,7 @@ vec3 f_probeColor(in Probe probe, in float dist) {
 	float distance_factor = clamp(f_mapfloat(39.0, 32.0, 0.0, 1.0, dist), 0, 1);
 	switch (render_probe_color_mode) {
 		case 0:  return vec3(probe.sun_intensity);
-		case 1:  return f_windToColor(probe.wind_vector);
+		case 1:  return abs(probe.wind_vector);
 		case 2:  return vec3(f_mapfloat(-8000.0, 6400.0, 0.0, 1.0, probe.height));
 		case 3:  return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0,probe.pressure));
 		case 4:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, probe.temperature - 273.15));
@@ -674,6 +676,9 @@ vec4 f_earthColor(in vec2 uv, in vec3 normal, in vec3 sun_dir) {
 			black_marble.y = pow(black_marble.y, 1.8) * 0.9;
 			black_marble.z = pow(black_marble.z, 1.8) * 0.9;
 			color = mix(black_marble, blue_marble, diffuse);
+			if (render_lighting == 0) {
+				color = blue_marble;
+			}
 			break;
 		}
 		case 6:

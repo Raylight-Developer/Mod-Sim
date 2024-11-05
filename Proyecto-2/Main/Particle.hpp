@@ -68,9 +68,8 @@ struct CPU_Particle {
 	CPU_Particle();
 };
 
-struct GPU_Particle {
-	vec3 position;
-	vec1 padding = 0.0;
+struct alignas(16) GPU_Particle {
+	vec4 position;
 
 	GPU_Particle(const CPU_Particle& particle);
 };

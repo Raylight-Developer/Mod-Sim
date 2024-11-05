@@ -62,7 +62,7 @@ void main() {
 				if (t_dist < t_length && t_dist > EPSILON) {
 					color = vec4(f_particleColor(particles[closest_particle_index], t_dist), 1.0);
 					if (render_particle_lighting == 1) {
-						vec3 normal = normalize(particles[closest_particle_index].position);
+						vec3 normal = normalize(particles[closest_particle_index].position.xyz);
 						float diffuse = clamp(f_mapfloat(-1.0, 1.0, -0.2, 1.0, dot(normal, sun_dir)), 0, 1);
 						//color.xyz *= (diffuse * 0.8 + 0.2);
 					}
@@ -89,7 +89,7 @@ void main() {
 			if (t_dist < t_length && t_dist > EPSILON) {
 				color = vec4(f_particleColor(particles[closest_particle_index], t_dist), 1.0);
 				if (render_particle_lighting == 1) {
-					vec3 normal = normalize(particles[closest_particle_index].position);
+					vec3 normal = normalize(particles[closest_particle_index].position.xyz);
 					float diffuse = clamp(f_mapfloat(-1.0, 1.0, -0.2, 1.0, dot(normal, sun_dir)), 0, 1);
 					//color.xyz *= (diffuse * 0.8 + 0.2);
 				}
