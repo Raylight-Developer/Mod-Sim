@@ -5,6 +5,7 @@
 #define STEFAN_BOLZMANN 5.67e-8
 #define AIR_SPECIFIC_HEAT_CAPACITY 1005.0 // J/kg°C
 #define AIR_DENSITY                1.225 // kg/m³
+#define DRAG_COEFFICIENT           0.1
 
 #define CORIOLIS           vec3(15.0, 0, 0)
 
@@ -18,7 +19,7 @@ Kernel::Kernel() {
 	PARTICLE_POLE_GEOLOCATION = dvec2(25.0, 90.0);
 
 	PROBE_RADIUS           = 0.05f;
-	PROBE_COUNT            = 8192;// 8192 * 2;
+	PROBE_COUNT            = 2048;// 8192 * 2;
 	PROBE_MAX_OCTREE_DEPTH = 2;
 	PROBE_POLE_BIAS        = 0.0;//0.975;
 	PROBE_POLE_BIAS_POWER  = 1.0;// 5.0;
@@ -280,37 +281,37 @@ void Kernel::simulate(const dvec1& delta_time) {
 
 	}
 	// WIND FIELD
-	//int i = 0;
-	//int i_size = u_to_i(PARTICLE_COUNT);
-	//#pragma omp parallel for private(i) num_threads(12)
-	//for (i = 0; i < i_size; i++) {
-	//	CPU_Particle& particle = particles[i];
-	//
-	//	vector<CPU_Neighbor> neighbors;
-	//
-	//	for (uint j = 0; j < PROBE_COUNT; j++) {
-	//		if (i != j) {
-	//			const dvec1 dist = glm::distance(particle.transformed_position, probes[j].transformed_position);
-	//			neighbors.push_back(CPU_Neighbor(dist, &probes[j]));
-	//		}
-	//	}
-	//
-	//	sort(neighbors.begin(), neighbors.end(), [](const CPU_Neighbor& a, const CPU_Neighbor& b) {
-	//		return a.distance < b.distance;
-	//		});
-	//
-	//	particle.probe = neighbors[0].probe;
-	//
-	//	updateParticlePosition(&particle);
-	//	calculateParticle(&particle);
-	//	updateParticlePosition(&particle);
-	//}
-
-	for (CPU_Particle& particle : particles) {
+	int i = 0;
+	int i_size = u_to_i(PARTICLE_COUNT);
+	#pragma omp parallel for private(i) num_threads(12)
+	for (i = 0; i < i_size; i++) {
+		CPU_Particle& particle = particles[i];
+	
+		vector<CPU_Neighbor> neighbors;
+	
+		for (uint j = 0; j < PROBE_COUNT; j++) {
+			if (i != j) {
+				const dvec1 dist = glm::distance(particle.transformed_position, probes[j].transformed_position);
+				neighbors.push_back(CPU_Neighbor(dist, &probes[j]));
+			}
+		}
+	
+		sort(neighbors.begin(), neighbors.end(), [](const CPU_Neighbor& a, const CPU_Neighbor& b) {
+			return a.distance < b.distance;
+			});
+	
+		particle.probe = neighbors[0].probe;
+	
 		updateParticlePosition(&particle);
 		calculateParticle(&particle);
 		updateParticlePosition(&particle);
 	}
+
+	//for (CPU_Particle& particle : particles) {
+	//	updateParticlePosition(&particle);
+	//	calculateParticle(&particle);
+	//	updateParticlePosition(&particle);
+	//}
 
 	updateGPUParticles();
 	updateGPUProbes();
@@ -346,7 +347,6 @@ void Kernel::scatterSPH(CPU_Probe* probe) const {
 		for (CPU_Neighbor& neighbor : probe->neighbors) {
 			const dvec1 smoothing_kernel = pow(glm::max(0.0, probe->smoothing_radius - neighbor.distance), 3.0);
 			probe->sph.temperature += neighbor.probe->data.temperature;
-
 		}
 		probe->sph.temperature += probe->data.temperature;
 		probe->sph.temperature /= ul_to_d(probe->neighbors.size() + 1);
@@ -524,31 +524,40 @@ void Kernel::calculateParticle(CPU_Particle* particle) const {
 	dvec1 distance = glm::distance(particle->transformed_position, particle->probe->transformed_position);
 
 	// Recalculate Closest Probe TODO: Make Recursive
-	bool foundClosest = false;
-	while (!foundClosest) {
-		foundClosest = true;
-		for (const CPU_Neighbor& neighbor : particle->probe->neighbors) {
-			const dvec1 dist = glm::distance(particle->transformed_position, neighbor.probe->transformed_position);
-			if (dist < distance) {
-				particle->probe = neighbor.probe;
-				distance = dist;
-				foundClosest = false;  // A closer probe was found, so keep searching
-			}
-		}
-	}
+	//bool foundClosest = false;
+	//while (!foundClosest) {
+	//	foundClosest = true;
+	//	for (const CPU_Neighbor& neighbor : particle->probe->neighbors) {
+	//		const dvec1 dist = glm::distance(particle->transformed_position, neighbor.probe->transformed_position);
+	//		if (dist < distance) {
+	//			particle->probe = neighbor.probe;
+	//			distance = dist;
+	//			foundClosest = false;  // A closer probe was found, so keep searching
+	//		}
+	//	}
+	//}
 
-	dvec3 wind_vector = particle->probe->data.wind_vector;
+	dquat wind_vector = dquat(1.0, 0.0, 0.0, 0.0);
 	for (const CPU_Neighbor& neighbor : particle->probe->neighbors) {
 		const dvec1 dist = glm::distance(particle->transformed_position, neighbor.probe->transformed_position);
-		const dvec1 smoothing_kernel = glm::max(0.0, neighbor.probe->smoothing_radius - dist);
-		wind_vector += neighbor.probe->data.wind_vector * smoothing_kernel;
+		const dvec1 smoothing_kernel = pow(glm::max(0.0, 0.25 - dist), 3.0);
+		wind_vector += neighbor.probe->data.wind_quaternion * smoothing_kernel;
 	}
 
-	const dvec3 rotation_axis = glm::axis(particle->rotation);
-	const dvec3 projected_component = glm::dot(wind_vector, rotation_axis) * rotation_axis;
-	const dvec3 perpendicular_component = wind_vector - projected_component;
+	// Add wind to velocity
+	// Quaternion multiplication combines rotations
+	particle->wind_speed = glm::normalize(glm::normalize((wind_vector * DT)) * particle->wind_speed);
 
-	particle->rotation *= dquat(glm::radians(perpendicular_component) * 0.001 * DT);
+	// Apply drag to velocity
+	//dvec3 velVec(particle->wind_speed.x, particle->wind_speed.y, particle->wind_speed.z);
+	//dvec3 dragForce = -DRAG_COEFFICIENT * velVec;
+	//dquat dragQuat(0.0, dragForce.x, dragForce.y, dragForce.z);
+	//particle->wind_speed += dragQuat * DT;
+	//particle->wind_speed = glm::normalize(particle->wind_speed);
+
+	dquat deltaQuat = glm::normalize(particle->wind_speed * particle->rotation);
+	particle->rotation += deltaQuat * (0.001 * DT);
+	particle->rotation = glm::normalize(particle->rotation);
 }
 
 dvec3 Kernel::rotateGeoloc(const dvec3& point, const dvec2& geoloc) const {

@@ -3,7 +3,7 @@
 CPU_Probe_Data::CPU_Probe_Data() {
 	position = dvec3(0);
 	wind_vector  = dvec3(0);
-	wind_quaternion = dquat(glm::sphericalRand(1.0));
+	wind_quaternion = glm::normalize(dquat(randD(), randD(), randD(), randD()));
 	surface_area = 1;
 
 	height = 0;
@@ -114,7 +114,7 @@ CPU_Neighbor::CPU_Neighbor(const dvec1& distance, CPU_Probe* neighbor) :
 CPU_Particle::CPU_Particle() :
 	transformed_position(dvec3(0)),
 	position(dvec3(0)),
-	wind_speed(dquat(1,0,0,0)),
+	wind_speed(glm::normalize(dquat(randD(), randD(), randD(), randD()))),
 	rotation(dquat(1,0,0,0)),
 	probe(nullptr)
 {}
