@@ -12,14 +12,14 @@
 #pragma optimize("O3", on)
 Kernel::Kernel() {
 	PARTICLE_RADIUS           = 0.025f;
-	PARTICLE_COUNT            = 2048;
+	PARTICLE_COUNT            = 8192;
 	PARTICLE_MAX_OCTREE_DEPTH = 2;
 	PARTICLE_POLE_BIAS        = 0.0;
 	PARTICLE_POLE_BIAS_POWER  = 1.0;
 	PARTICLE_POLE_GEOLOCATION = dvec2(25.0, 90.0);
 
 	PROBE_RADIUS           = 0.05f;
-	PROBE_COUNT            = 2048;// 8192 * 2;
+	PROBE_COUNT            = 4096;// 8192 * 2;
 	PROBE_MAX_OCTREE_DEPTH = 2;
 	PROBE_POLE_BIAS        = 0.0;//0.975;
 	PROBE_POLE_BIAS_POWER  = 1.0;// 5.0;
@@ -281,37 +281,37 @@ void Kernel::simulate(const dvec1& delta_time) {
 
 	}
 	// WIND FIELD
-	int i = 0;
-	int i_size = u_to_i(PARTICLE_COUNT);
-	#pragma omp parallel for private(i) num_threads(12)
-	for (i = 0; i < i_size; i++) {
-		CPU_Particle& particle = particles[i];
-	
-		vector<CPU_Neighbor> neighbors;
-	
-		for (uint j = 0; j < PROBE_COUNT; j++) {
-			if (i != j) {
-				const dvec1 dist = glm::distance(particle.transformed_position, probes[j].transformed_position);
-				neighbors.push_back(CPU_Neighbor(dist, &probes[j]));
-			}
-		}
-	
-		sort(neighbors.begin(), neighbors.end(), [](const CPU_Neighbor& a, const CPU_Neighbor& b) {
-			return a.distance < b.distance;
-			});
-	
-		particle.probe = neighbors[0].probe;
-	
-		updateParticlePosition(&particle);
-		calculateParticle(&particle);
-		updateParticlePosition(&particle);
-	}
-
-	//for (CPU_Particle& particle : particles) {
+	//int i = 0;
+	//int i_size = u_to_i(PARTICLE_COUNT);
+	//#pragma omp parallel for private(i) num_threads(12)
+	//for (i = 0; i < i_size; i++) {
+	//	CPU_Particle& particle = particles[i];
+	//
+	//	vector<CPU_Neighbor> neighbors;
+	//
+	//	for (uint j = 0; j < PROBE_COUNT; j++) {
+	//		if (i != j) {
+	//			const dvec1 dist = glm::distance(particle.transformed_position, probes[j].transformed_position);
+	//			neighbors.push_back(CPU_Neighbor(dist, &probes[j]));
+	//		}
+	//	}
+	//
+	//	sort(neighbors.begin(), neighbors.end(), [](const CPU_Neighbor& a, const CPU_Neighbor& b) {
+	//		return a.distance < b.distance;
+	//		});
+	//
+	//	particle.probe = neighbors[0].probe;
+	//
 	//	updateParticlePosition(&particle);
 	//	calculateParticle(&particle);
 	//	updateParticlePosition(&particle);
 	//}
+
+	for (CPU_Particle& particle : particles) {
+		updateParticlePosition(&particle);
+		calculateParticle(&particle);
+		updateParticlePosition(&particle);
+	}
 
 	updateGPUParticles();
 	updateGPUProbes();
@@ -524,18 +524,18 @@ void Kernel::calculateParticle(CPU_Particle* particle) const {
 	dvec1 distance = glm::distance(particle->transformed_position, particle->probe->transformed_position);
 
 	// Recalculate Closest Probe TODO: Make Recursive
-	//bool foundClosest = false;
-	//while (!foundClosest) {
-	//	foundClosest = true;
-	//	for (const CPU_Neighbor& neighbor : particle->probe->neighbors) {
-	//		const dvec1 dist = glm::distance(particle->transformed_position, neighbor.probe->transformed_position);
-	//		if (dist < distance) {
-	//			particle->probe = neighbor.probe;
-	//			distance = dist;
-	//			foundClosest = false;  // A closer probe was found, so keep searching
-	//		}
-	//	}
-	//}
+	bool foundClosest = false;
+	while (!foundClosest) {
+		foundClosest = true;
+		for (const CPU_Neighbor& neighbor : particle->probe->neighbors) {
+			const dvec1 dist = glm::distance(particle->transformed_position, neighbor.probe->transformed_position);
+			if (dist < distance) {
+				particle->probe = neighbor.probe;
+				distance = dist;
+				foundClosest = false;  // A closer probe was found, so keep searching
+			}
+		}
+	}
 
 	dquat wind_vector = dquat(1.0, 0.0, 0.0, 0.0);
 	for (const CPU_Neighbor& neighbor : particle->probe->neighbors) {
@@ -556,7 +556,7 @@ void Kernel::calculateParticle(CPU_Particle* particle) const {
 	//particle->wind_speed = glm::normalize(particle->wind_speed);
 
 	dquat deltaQuat = glm::normalize(particle->wind_speed * particle->rotation);
-	particle->rotation += deltaQuat * (0.001 * DT);
+	particle->rotation += deltaQuat * (0.01 * DT);
 	particle->rotation = glm::normalize(particle->rotation);
 }
 

@@ -64,7 +64,7 @@ void main() {
 					if (render_particle_lighting == 1) {
 						vec3 normal = normalize(particles[closest_particle_index].position.xyz);
 						float diffuse = clamp(f_mapfloat(-1.0, 1.0, -0.2, 1.0, dot(normal, sun_dir)), 0, 1);
-						//color.xyz *= (diffuse * 0.8 + 0.2);
+						color.xyz *= (diffuse * 0.8 + 0.2);
 					}
 				}
 			}
@@ -91,7 +91,7 @@ void main() {
 				if (render_particle_lighting == 1) {
 					vec3 normal = normalize(particles[closest_particle_index].position.xyz);
 					float diffuse = clamp(f_mapfloat(-1.0, 1.0, -0.2, 1.0, dot(normal, sun_dir)), 0, 1);
-					//color.xyz *= (diffuse * 0.8 + 0.2);
+					color.xyz *= (diffuse * 0.8 + 0.2);
 				}
 			}
 		}
