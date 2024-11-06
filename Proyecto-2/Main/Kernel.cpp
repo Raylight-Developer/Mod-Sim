@@ -19,8 +19,8 @@ Kernel::Kernel() {
 	PARTICLE_POLE_GEOLOCATION = dvec2(25.0, 90.0);
 
 	PROBE_RADIUS           = 0.05f;
-	PROBE_COUNT            = 4096;// 8192 * 2;
-	PROBE_MAX_OCTREE_DEPTH = 2;
+	PROBE_COUNT            = 8192;
+	PROBE_MAX_OCTREE_DEPTH = 3;
 	PROBE_POLE_BIAS        = 0.0;//0.975;
 	PROBE_POLE_BIAS_POWER  = 1.0;// 5.0;
 	PROBE_POLE_GEOLOCATION = dvec2(25.0, 90.0);
@@ -65,6 +65,8 @@ Kernel::Kernel() {
 	textures[Texture_Field::SOLAR_INSOLATION]              = Texture::fromFile("./Resources/Data/Solar Insolation.png", Texture_Format::MONO_FLOAT);
 	textures[Texture_Field::OUTGOING_LONGWAVE_RADIATION]   = Texture::fromFile("./Resources/Data/Outgoing Longwave Radiation.png", Texture_Format::MONO_FLOAT);
 	textures[Texture_Field::REFLECTED_SHORTWAVE_RADIATION] = Texture::fromFile("./Resources/Data/Reflected Shortwave Radiation.png", Texture_Format::MONO_FLOAT);
+
+	textures[Texture_Field::WIND_VECTOR] = Texture::fromFile("./Resources/Data/Wind.png", Texture_Format::RGBA_8);
 #else
 	textures[Texture_Field::TOPOGRAPHY]                     = Texture::fromFile("./Resources/Data/Topography LR.png", Texture_Format::MONO_FLOAT);
 	textures[Texture_Field::BATHYMETRY]                     = Texture::fromFile("./Resources/Data/Bathymetry LR.png", Texture_Format::MONO_FLOAT);
@@ -426,46 +428,63 @@ void Kernel::traceInitProperties(CPU_Probe* probe) const {
 	const vec1 outgoiing_longwave_radiation_sample  = textures.at(Texture_Field::OUTGOING_LONGWAVE_RADIATION  ).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
 	const vec1 reflected_shortwave_radiation_sample = textures.at(Texture_Field::REFLECTED_SHORTWAVE_RADIATION).sampleTextureMono(uv, Texture_Format::MONO_FLOAT);
 
-	const vec1 topography   = lut(Texture_Field::TOPOGRAPHY, topography_sample);
-	const vec1 bathymetry   = lut(Texture_Field::BATHYMETRY, bathymetry_sample);
-	const vec1 sst          = lut(Texture_Field::SEA_SURFACE_TEMPERATURE_DAY, sst_sample);
-	const vec1 sst_night    = lut(Texture_Field::SEA_SURFACE_TEMPERATURE_NIGHT, sst_night_sample);
-	const vec1 lst          = lut(Texture_Field::LAND_SURFACE_TEMPERATURE_DAY, lst_sample);
-	const vec1 lst_night    = lut(Texture_Field::LAND_SURFACE_TEMPERATURE_NIGHT, lst_night_sample);
-	probe->data.pressure = lut(Texture_Field::SURFACE_PRESSURE, pressure_sample);
-	if (topography == -1.0) { // Is at sea
-		probe->data.day_temperature = sst;
-		probe->data.night_temperature = sst_night;
-		probe->data.on_water = true;
-		probe->data.height = bathymetry;
-		probe->data.albedo = 0.135;
-	}
-	else { // Is on Land
-		probe->data.day_temperature = lst;
-		probe->data.night_temperature = lst_night;
-		probe->data.on_water = false;
-		probe->data.height = topography;
-		probe->data.albedo = lut(Texture_Field::ALBEDO, albedo_sample);
-	}
+	const vec4 wind_vector_sample = textures.at(Texture_Field::WIND_VECTOR).sampleTexture(uv, Texture_Format::RGBA_8);
 
-	probe->data.humidity                = lut(Texture_Field::HUMIDITY, humidity_sample);
-	probe->data.water_vapor             = lut(Texture_Field::WATER_VAPOR, water_vapor_sample);
-	probe->data.cloud_coverage          = lut(Texture_Field::CLOUD_COVERAGE, cloud_coverage_sample);
-	probe->data.cloud_water_content     = lut(Texture_Field::CLOUD_WATER_CONTENT, cloud_water_content_sample);
-	probe->data.cloud_particle_radius   = lut(Texture_Field::CLOUD_PARTICLE_RADIUS, cloud_particle_radius_sample);
-	probe->data.cloud_optical_thickness = lut(Texture_Field::CLOUD_OPTICAL_THICKNESS, cloud_optical_thickness_sample);
+	{
+		const vec1 topography = lut(Texture_Field::TOPOGRAPHY, topography_sample);
+		const vec1 bathymetry = lut(Texture_Field::BATHYMETRY, bathymetry_sample);
+		const vec1 sst = lut(Texture_Field::SEA_SURFACE_TEMPERATURE_DAY, sst_sample);
+		const vec1 sst_night = lut(Texture_Field::SEA_SURFACE_TEMPERATURE_NIGHT, sst_night_sample);
+		const vec1 lst = lut(Texture_Field::LAND_SURFACE_TEMPERATURE_DAY, lst_sample);
+		const vec1 lst_night = lut(Texture_Field::LAND_SURFACE_TEMPERATURE_NIGHT, lst_night_sample);
+		probe->data.pressure = lut(Texture_Field::SURFACE_PRESSURE, pressure_sample);
 
-	probe->data.ozone                         = lut(Texture_Field::OZONE, ozone_sample);
-	probe->data.uv_index                      = lut(Texture_Field::UV_INDEX, uv_index_sample);
-	probe->data.net_radiation                 = lut(Texture_Field::NET_RADIATION, net_radiation_sample);
-	probe->data.solar_insolation              = lut(Texture_Field::SOLAR_INSOLATION, solar_insolation_sample);
-	probe->data.outgoing_longwave_radiation   = lut(Texture_Field::OUTGOING_LONGWAVE_RADIATION, outgoiing_longwave_radiation_sample);
-	probe->data.reflected_shortwave_radiation = lut(Texture_Field::REFLECTED_SHORTWAVE_RADIATION, reflected_shortwave_radiation_sample);
-	calculateSunlight(probe);
-	probe->data.sun_intensity = probe->new_data.sun_intensity;
-	probe->data.solar_irradiance = probe->new_data.solar_irradiance;
-	probe->data.temperature = glm::mix(probe->data.night_temperature, probe->data.day_temperature, probe->data.sun_intensity);
-	probe->data.emissivity = clamp(probe->data.reflected_shortwave_radiation / (1360.0 - probe->data.solar_insolation), 0.0, 1.0);
+		if (topography == -1.0) { // Is at sea
+			probe->data.day_temperature = sst;
+			probe->data.night_temperature = sst_night;
+			probe->data.on_water = true;
+			probe->data.height = bathymetry;
+			probe->data.albedo = 0.135;
+		}
+		else { // Is on Land
+			probe->data.day_temperature = lst;
+			probe->data.night_temperature = lst_night;
+			probe->data.on_water = false;
+			probe->data.height = topography;
+			probe->data.albedo = lut(Texture_Field::ALBEDO, albedo_sample);
+		}
+		probe->data.temperature = glm::mix(probe->data.night_temperature, probe->data.day_temperature, probe->data.sun_intensity);
+
+		probe->data.humidity = lut(Texture_Field::HUMIDITY, humidity_sample);
+		probe->data.water_vapor = lut(Texture_Field::WATER_VAPOR, water_vapor_sample);
+		probe->data.cloud_coverage = lut(Texture_Field::CLOUD_COVERAGE, cloud_coverage_sample);
+		probe->data.cloud_water_content = lut(Texture_Field::CLOUD_WATER_CONTENT, cloud_water_content_sample);
+		probe->data.cloud_particle_radius = lut(Texture_Field::CLOUD_PARTICLE_RADIUS, cloud_particle_radius_sample);
+		probe->data.cloud_optical_thickness = lut(Texture_Field::CLOUD_OPTICAL_THICKNESS, cloud_optical_thickness_sample);
+
+		probe->data.ozone = lut(Texture_Field::OZONE, ozone_sample);
+		probe->data.uv_index = lut(Texture_Field::UV_INDEX, uv_index_sample);
+		probe->data.net_radiation = lut(Texture_Field::NET_RADIATION, net_radiation_sample);
+		probe->data.solar_insolation = lut(Texture_Field::SOLAR_INSOLATION, solar_insolation_sample);
+		probe->data.outgoing_longwave_radiation = lut(Texture_Field::OUTGOING_LONGWAVE_RADIATION, outgoiing_longwave_radiation_sample);
+		probe->data.reflected_shortwave_radiation = lut(Texture_Field::REFLECTED_SHORTWAVE_RADIATION, reflected_shortwave_radiation_sample);
+		calculateSunlight(probe);
+		probe->data.sun_intensity = probe->new_data.sun_intensity;
+		probe->data.solar_irradiance = probe->new_data.solar_irradiance;
+		probe->data.emissivity = clamp(probe->data.reflected_shortwave_radiation / (1360.0 - probe->data.solar_insolation), 0.0, 1.0);
+
+		const dvec1 axialTilt = -glm::radians(EARTH_TILT);
+		const dvec1 u = glm::radians(wind_vector_sample.x);
+		const dvec1 v = glm::radians(wind_vector_sample.y);
+
+		const dquat tiltRotation = glm::angleAxis(axialTilt, dvec3(0, 0, 1));
+		const dquat uRotation  = glm::angleAxis(u,dvec3(0, 1, 0));
+		const dquat vRotation  = glm::angleAxis(v, dvec3(1, 0, 0));
+
+		probe->data.wind_quaternion = tiltRotation * uRotation * vRotation;
+		probe->data.wind_u = wind_vector_sample.x;
+		probe->data.wind_v = wind_vector_sample.y;
+	}
 }
 
 void Kernel::calculateSunlight(CPU_Probe* probe) const {
@@ -508,11 +527,11 @@ void Kernel::gatherThermodynamics(CPU_Probe* probe) const {
 	const dvec1 radiative_loss = probe->data.emissivity * STEFAN_BOLZMANN * pow(probe->data.temperature, 4.0) * probe->data.surface_area;
 
 	// = (convective_heat_transfer_coefficient) * (temperature - surrounding_temperature) * area
-	const dvec1 wind_speed = glm::length(probe->data.wind_vector);
+	const dvec1 wind_speed = glm::length(vec2(probe->data.wind_u, probe->data.wind_v));
 	const dvec1 coeff = pow((1.0 + wind_speed), 0.4);
 	const dvec1 convective_transfer = coeff * (probe->data.temperature - probe->sph.temperature) * probe->data.surface_area;
 
-	const dvec1 net_heat = solar_heat_absorption * 0.001 - radiative_loss * 0.005 - convective_transfer * 0.001;
+	const dvec1 net_heat = solar_heat_absorption * 0.001 - radiative_loss * 0.004 - convective_transfer * 0.001;
 	if (abs(net_heat) > 1.0) {
 		cout << "Temp Changing Too Quickly: Net  " << net_heat << "  | Solar  " << solar_heat_absorption << "  | Rad  -" << radiative_loss << "  | Convection  " << convective_transfer << endl;
 	}

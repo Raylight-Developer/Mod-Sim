@@ -7,6 +7,10 @@ struct Probe {
 	vec3  wind_vector;
 	float sun_intensity;
 
+	float wind_u;
+	float wind_v;
+	vec2 padding;
+
 	float pressure;
 	float temperature;
 	float day_temperature;

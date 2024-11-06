@@ -8,6 +8,8 @@ struct CPU_Neighbor;
 struct CPU_Probe_Data {
 	dvec3 position; // mm (mega) meters
 	dvec3 wind_vector; // m/s
+	dvec1 wind_u;
+	dvec1 wind_v;
 	dquat wind_quaternion;
 	dvec1 surface_area; // mm (mega) meters
 
@@ -82,6 +84,10 @@ struct alignas(16) GPU_Probe {
 
 	vec3 wind_vector;
 	vec1 sun_intensity;
+
+	vec1 wind_u;
+	vec1 wind_v;
+	vec2 padding = vec2(0);
 
 	vec1 pressure;
 	vec1 temperature;

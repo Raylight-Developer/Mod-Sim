@@ -261,7 +261,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 			ImGui::Checkbox("Render Particle Lighting", &render_particle_lighting);
 			ImGui::Text("Particle Display Radius");
 			if (ImGui::SliderFloat("##PARTICLE_RADIUS", &renderer->kernel.PARTICLE_RADIUS, 0.005f, 0.25f, "%.4f")) {
-				renderer->f_updateBvhProbes();
+				renderer->f_updateBvhParticles();
 			}
 		}
 	}

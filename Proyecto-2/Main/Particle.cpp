@@ -3,6 +3,8 @@
 CPU_Probe_Data::CPU_Probe_Data() {
 	position = dvec3(0);
 	wind_vector  = dvec3(0);
+	wind_u = 0;
+	wind_v = 0;
 	wind_quaternion = glm::normalize(dquat(randD(), randD(), randD(), randD()));
 	surface_area = 1;
 
@@ -79,6 +81,9 @@ GPU_Probe::GPU_Probe(const CPU_Probe& particle) {
 	position      = d_to_f(particle.transformed_position);
 	wind_vector   = d_to_f(particle.data.wind_vector);
 	sun_intensity = d_to_f(particle.data.sun_intensity);
+
+	wind_u = d_to_f(particle.data.wind_u);
+	wind_v = d_to_f(particle.data.wind_v);
 
 	height            = d_to_f(particle.data.height);
 	pressure          = d_to_f(particle.data.pressure);

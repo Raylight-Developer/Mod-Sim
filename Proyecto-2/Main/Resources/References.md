@@ -1,5 +1,7 @@
 # Simulation
 * [Global Wind Circulation ](https://www.shadertoy.com/view/MdGBWG)
+https://earth.nullschool.net/#current/wind/surface/level/patterson
+https://blog.mapbox.com/how-i-built-a-wind-map-with-webgl-b63022b5537f
 
 # Rendering
 * [Atmospheric Scattering Sample](https://www.shadertoy.com/view/lslXDr)

@@ -25,7 +25,9 @@ enum struct Texture_Field {
 	NET_RADIATION,
 	SOLAR_INSOLATION,
 	OUTGOING_LONGWAVE_RADIATION,
-	REFLECTED_SHORTWAVE_RADIATION
+	REFLECTED_SHORTWAVE_RADIATION,
+
+	WIND_VECTOR
 };
 
 vec1 lut(const Texture_Field& field, const vec1& color) {

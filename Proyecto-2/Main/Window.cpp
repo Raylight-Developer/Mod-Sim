@@ -618,10 +618,16 @@ void Renderer::key(GLFWwindow* window, int key, int scancode, int action, int mo
 		instance->lock_view = !instance->lock_view;
 	}
 	if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) {
+		instance->kernel.TIME_SCALE /= 0.9;
+	}
+	if (key == GLFW_KEY_LEFT && action == GLFW_PRESS) {
+		instance->kernel.TIME_SCALE *= 0.9;
+	}
+	if (key == GLFW_KEY_PERIOD && action == GLFW_PRESS) {
 		instance->camera_orbit_sensitivity /= 0.9;
 		instance->camera_zoom_sensitivity /= 0.9;
 	}
-	if (key == GLFW_KEY_LEFT && action == GLFW_PRESS) {
+	if (key == GLFW_KEY_COMMA && action == GLFW_PRESS) {
 		instance->camera_orbit_sensitivity *= 0.9;
 		instance->camera_zoom_sensitivity *= 0.9;
 	}
