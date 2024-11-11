@@ -103,24 +103,18 @@ void PathTracer::f_initialize() {
 	#endif // DEBUG
 }
 
-void PathTracer::f_updateBvhProbes() {
-	glDeleteBuffers(1, &gl_data["ssbo 2"]);
-	gl_data["ssbo 2"] = ssboBinding(ul_to_u(renderer->kernel.probe_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.probe_nodes.data());
-}
-
-void PathTracer::f_updateBvhParticles() {
-	glDeleteBuffers(1, &gl_data["ssbo 4"]);
-	gl_data["ssbo 4"] = ssboBinding(ul_to_u(renderer->kernel.particle_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.particle_nodes.data());
-}
-
 void PathTracer::f_updateProbes() {
 	glDeleteBuffers(1, &gl_data["ssbo 1"]);
+	glDeleteBuffers(1, &gl_data["ssbo 2"]);
 	gl_data["ssbo 1"] = ssboBinding(ul_to_u(renderer->kernel.gpu_probes.size() * sizeof(GPU_Probe)), renderer->kernel.gpu_probes.data());
+	gl_data["ssbo 2"] = ssboBinding(ul_to_u(renderer->kernel.probe_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.probe_nodes.data());
 }
 
 void PathTracer::f_updateParticles() {
 	glDeleteBuffers(1, &gl_data["ssbo 3"]);
+	glDeleteBuffers(1, &gl_data["ssbo 4"]);
 	gl_data["ssbo 3"] = ssboBinding(ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
+	gl_data["ssbo 4"] = ssboBinding(ul_to_u(renderer->kernel.particle_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.particle_nodes.data());
 }
 
 void PathTracer::f_updateTextures(const bool& high_res) {
@@ -176,8 +170,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 			ImGui::Text("Max Probe Octree Depth");
 			if (ImGui::SliderInt("##PROBE_MAX_OCTREE_DEPTH", &MAX_OCTREE_DEPTH, 0, 6)) {
 				renderer->kernel.PROBE_MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
-				renderer->f_updateBvhProbes();
-				f_updateProbes();
+				renderer->f_updateProbes();
 			}
 		}
 		if (!renderer->run_sim and use_particle_octree) {
@@ -185,8 +178,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 			ImGui::Text("Max Particle Octree Depth");
 			if (ImGui::SliderInt("##PARTICLE_MAX_OCTREE_DEPTH", &MAX_OCTREE_DEPTH, 0, 6)) {
 				renderer->kernel.PARTICLE_MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
-				renderer->f_updateBvhParticles();
-				f_updateParticles();
+				renderer->f_updateParticles();
 			}
 		}
 	}
@@ -240,7 +232,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 			if (render_probe_color_mode < SPH) {
 				ImGui::Text("Probe Display Radius");
 				if (ImGui::SliderFloat("##PROBE_RADIUS", &renderer->kernel.PROBE_RADIUS, 0.005f, 0.25f, "%.4f")) {
-					renderer->f_updateBvhProbes();
+					renderer->f_updateProbes();
 				}
 			}
 
@@ -253,7 +245,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 				else {
 					renderer->kernel.BVH_SPH = true;
 				}
-				renderer->f_updateBvhProbes();
+				renderer->f_updateProbes();
 			}
 		}
 		ImGui::Checkbox("Render Particles", &render_particles);
@@ -261,7 +253,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 			ImGui::Checkbox("Render Particle Lighting", &render_particle_lighting);
 			ImGui::Text("Particle Display Radius");
 			if (ImGui::SliderFloat("##PARTICLE_RADIUS", &renderer->kernel.PARTICLE_RADIUS, 0.005f, 0.25f, "%.4f")) {
-				renderer->f_updateBvhParticles();
+				renderer->f_updateParticles();
 			}
 		}
 	}
@@ -276,14 +268,14 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 
 void PathTracer::f_recompile() {
 	{
-		auto confirmation = computeShaderProgram("Compute/Compute");
+		auto confirmation = computeShaderProgram("Rendering/Compute");
 		if (confirmation) {
 			glDeleteProgram(gl_data["compute_program"]);
 			gl_data["compute_program"] =  confirmation.data;
 		}
 	}
 	{
-		auto confirmation = fragmentShaderProgram("Compute/Display", "Compute/Display");
+		auto confirmation = fragmentShaderProgram("Rendering/Display", "Rendering/Display");
 		if (confirmation) {
 			glDeleteProgram(gl_data["display_program"]);
 			gl_data["display_program"] = confirmation.data;

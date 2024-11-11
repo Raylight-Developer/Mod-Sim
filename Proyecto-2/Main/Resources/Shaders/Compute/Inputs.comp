@@ -1,67 +1,13 @@
-//-------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
-layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+layout(local_size_x = 64) in;
 
-layout(rgba8, binding = 0) writeonly uniform image2D raw_render_layer;
-
-layout(std430, binding = 1) buffer ProbeBuffer {
+layout(std430, binding = 0) buffer ProbeBuffer {
 	Probe probes[];
 };
 
-layout(std430, binding = 2) buffer BvhProbeBuffer {
-	Bvh probe_nodes[];
-};
-
-layout(std430, binding = 3) buffer ParticleBuffer {
+layout(std430, binding = 1) buffer ParticleBuffer {
 	Particle particles[];
 };
 
-layout(std430, binding = 4) buffer BvhParticleBuffer {
-	Bvh particle_nodes[];
-};
-
-layout(std430, binding = 5) buffer TextureBuffer {
-	Texture textures[];
-};
-
-layout(std430, binding = 6) buffer TextureDataBuffer {
-	uint texture_data[];
-};
-
-uniform uint  frame_count;
-uniform float aspect_ratio;
-uniform float current_time;
-uniform uvec2 resolution;
-
-uniform vec3  camera_pos;
-uniform vec3  camera_p_uv;
-uniform vec3  camera_p_u;
-uniform vec3  camera_p_v;
-
-uniform float earth_tilt;
-uniform float year_time;
-uniform float day_time;
-
-uniform uint  use_probe_octree;
-uniform uint  use_particle_octree;
-
-uniform uint  render_atmosphere;
-uniform uint  render_lighting;
-uniform uint  render_probe_lighting;
-uniform uint  render_particle_lighting;
-
-uniform uint  render_probe_octree;
-uniform uint  render_particle_octree;
-uniform uint  render_octree_hue;
-uniform uint  render_octree_debug;
-uniform int   render_octree_debug_index;
-
-uniform uint  render_probes;
-uniform float render_probe_radius;
-uniform int   render_probe_color_mode;
-
-uniform uint  render_particles;
-uniform float render_particle_radius;
-
-uniform uint  render_planet;
-uniform int   render_planet_texture;
+void main() {
+	uint index = gl_GlobalInvocationID.x;
+}

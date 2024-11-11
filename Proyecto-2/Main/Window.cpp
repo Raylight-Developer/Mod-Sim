@@ -195,38 +195,26 @@ void Renderer::f_tickUpdate() {
 			kernel.simulate(delta_time);
 		}
 
-		kernel.buildBvhProbes();
-		kernel.buildBvhParticles();
+		kernel.buildProbes();
+		kernel.buildParticles();
 
 		const dvec1 start = glfwGetTime();
 		pathtracer.f_updateProbes();
-		pathtracer.f_updateBvhProbes();
 		pathtracer.f_updateParticles();
-		pathtracer.f_updateBvhParticles();
 		gpu_delta += glfwGetTime() - start;
 		next_frame = false;
 	}
 }
 
-void Renderer::f_updateBvhProbes() {
-	kernel.buildBvhProbes();
-	pathtracer.f_updateBvhProbes();
-}
-
 void Renderer::f_updateProbes() {
 	kernel.buildProbes();
-	f_updateBvhProbes();
+	kernel.updateGPUProbes();
 	pathtracer.f_updateProbes();
-}
-
-void Renderer::f_updateBvhParticles() {
-	kernel.buildBvhParticles();
-	pathtracer.f_updateBvhParticles();
 }
 
 void Renderer::f_updateParticles() {
 	kernel.buildParticles();
-	f_updateBvhParticles();
+	kernel.updateGPUParticles();
 	pathtracer.f_updateParticles();
 }
 

@@ -199,6 +199,7 @@ string processSubShader(const string& file_path) {
 		}
 		return output.str();
 	}
+	cerr << file_path << endl;
 	throw runtime_error(to_string(errno));
 }
 

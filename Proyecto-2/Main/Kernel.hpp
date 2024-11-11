@@ -44,13 +44,17 @@ struct Kernel {
 
 	unordered_map<Texture_Field, Texture> textures;
 
-	vector<CPU_Probe> probes;
-	vector<GPU_Probe> gpu_probes;
-	vector<GPU_Bvh> probe_nodes;
+	vector<CPU_Probe>        probes;
+	vector<CPU_Particle>     particles;
 
-	vector<CPU_Particle> particles;
-	vector<GPU_Particle> gpu_particles;
-	vector<GPU_Bvh> particle_nodes;
+	vector<GPU_Probe>        gpu_probes;
+	vector<GPU_Particle>     gpu_particles;
+
+	vector<Compute_Probe>    compute_probes;
+	vector<Compute_Particle> compute_particles;
+
+	vector<GPU_Bvh>          probe_nodes;
+	vector<GPU_Bvh>          particle_nodes;
 
 
 	Kernel();
@@ -58,11 +62,9 @@ struct Kernel {
 	void traceInitProperties(CPU_Probe* probe) const;
 
 	void updateGPUProbes();
-	void buildBvhProbes();
 	void buildProbes();
 
 	void updateGPUParticles();
-	void buildBvhParticles();
 	void buildParticles();
 
 	void lock();

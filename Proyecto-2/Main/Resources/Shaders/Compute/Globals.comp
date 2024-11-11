@@ -1,79 +1,23 @@
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 struct Probe {
-	vec3  position;
-	float height;
-
-	vec3  wind_vector;
-	float sun_intensity;
-
-	float wind_u;
-	float wind_v;
-	vec2 padding;
-
-	float pressure;
-	float temperature;
-	float day_temperature;
-	float night_temperature;
-
-	float humidity;
-	float water_vapor;
-	float cloud_coverage;
-	float cloud_water_content;
-
-	float cloud_particle_radius;
-	float cloud_optical_thickness;
-	float ozone;
-	float albedo;
-
-	float uv_index;
-	float net_radiation;
-	float solar_insolation;
-	float outgoing_longwave_radiation;
-
-	float reflected_shortwave_radiation;
-	uint  gen_index;
-	float smoothing_radius;
-
-	float sph_pressure;
-
-	vec3  sph_wind_vector;
-	float sph_temperature;
+	vec4  position;
+	vec4  wind_speed;
+	uvec3 neighbors;
+	uint  padding;
 };
 
 struct Particle {
-	vec4 position;
+	vec3 position;
+	uint closest;
+	vec4 rotation;
 };
 
-struct Texture {
-	uint start;
-	uint width;
-	uint height;
-	uint format;
-};
-
-struct Bvh {
-	vec3  p_min;
-	uint  id_start;
-	vec3  p_max;
-	uint  id_end;
-	ivec4 pointers_a;
-	ivec4 pointers_b;
-};
 // INTERNAL ---------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 
-struct Ray {
-	vec3  origin;
-	vec3  direction;
-};
 // DEFINITIONS ------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-
-const float EARTH_RADIUS = 6.371;
-const float ATMOSPHERE_RADIUS = EARTH_RADIUS + 0.5;
-const float EARTH_RADIUS_SQ = 40.589641;
-const float SUN_RADIUS_SQ = 484889.3956;
 
 const float TWO_PI   = 6.28318530718;
 const float PI       = 3.14159265359;
@@ -86,4 +30,3 @@ const float MAX_DIST = 1000.0;
 const float EPSILON  = 0.00001;
 
 const uint MAX_UINT = 4294967295;
-const int  SPH = 20;

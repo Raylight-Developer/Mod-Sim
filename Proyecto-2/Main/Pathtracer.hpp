@@ -40,8 +40,6 @@ struct PathTracer {
 
 	void f_initialize();
 
-	void f_updateBvhProbes();
-	void f_updateBvhParticles();
 	void f_updateProbes();
 	void f_updateParticles();
 	void f_updateTextures(const bool& high_res);

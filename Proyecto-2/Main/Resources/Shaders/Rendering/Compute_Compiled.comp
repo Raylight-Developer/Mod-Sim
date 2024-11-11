@@ -12,6 +12,10 @@ struct Probe {
 	vec3  wind_vector;
 	float sun_intensity;
 
+	float wind_u;
+	float wind_v;
+	vec2 padding;
+
 	float pressure;
 	float temperature;
 	float day_temperature;
@@ -43,8 +47,7 @@ struct Probe {
 };
 
 struct Particle {
-	vec3  position;
-	float padding;
+	vec4 position;
 };
 
 struct Texture {
@@ -388,7 +391,7 @@ int f_visitParticleBvh(in Ray ray, inout float result_raylength) {
 			}
 			if (node.id_end > 0) { // Leaf
 				for (uint i = node.id_start; i < node.id_end; ++i) {
-					if (f_raySphereIntersection(ray, particles[i].position, render_particle_radius, t_dist)) {
+					if (f_raySphereIntersection(ray, particles[i].position.xyz, render_particle_radius, t_dist)) {
 						if (t_dist < t_length) {
 							t_length = t_dist;
 							result_raylength = t_dist;
@@ -420,7 +423,7 @@ int f_visitParticleBvh(in Ray ray, inout float result_raylength) {
 		float t_dist = MAX_DIST;
 		for (uint i = 0; i < particles.length(); i ++) {
 			//if (i % 16 == 0) {
-				if (f_raySphereIntersection(ray, particles[i].position, render_particle_radius, t_dist)) {
+				if (f_raySphereIntersection(ray, particles[i].position.xyz, render_particle_radius, t_dist)) {
 					if (t_dist < t_length) {
 						t_length = t_dist;
 						result_raylength = t_dist;
@@ -561,8 +564,7 @@ mat3 rot3xy( vec2 angle ) {
 	);
 }
 float f_mapfloat(float from_min, float from_max, float to_min, float to_max, float value) {
-	value = clamp(value, from_min, from_max);
-	return clamp((to_min + ((to_max - to_min) / (from_max - from_min)) * (value - from_min)), to_min, to_max);
+	return (to_min + ((to_max - to_min) / (from_max - from_min)) * (value - from_min));
 }
 
 vec3 hsv2rgb(vec3 c) {
@@ -574,7 +576,7 @@ vec3 hsv2rgb(vec3 c) {
 vec4 floatToColor(float f) {
 	vec3 color = hsv2rgb(vec3(f, 1.0, 1.0));
 	return vec4(color, 1.0);
-}
+}	
 
 vec4 blendColors(vec4 bottomLayer, vec4 topLayer) {
 	vec3 topColor = topLayer.rgb;
@@ -604,7 +606,7 @@ vec3 f_windToColor(vec3 wind) {
 
 vec3 f_temperatureToColor(float temp) {
 	vec3 color;
-	float t = f_mapfloat(0.0, 1.0, 1.0, 0.0, temp);
+	float t = clamp(temp, 0.0, 1.0);
 
 	if (t < 0.25) {
 		// Interpolate from Red to Yellow
@@ -630,12 +632,13 @@ vec3 f_probeColor(in Probe probe, in float dist) {
 	float distance_factor = clamp(f_mapfloat(39.0, 32.0, 0.0, 1.0, dist), 0, 1);
 	switch (render_probe_color_mode) {
 		case 0:  return vec3(probe.sun_intensity);
-		case 1:  return abs(probe.wind_vector);
+		//case 1:  return f_windToColor(probe.wind_vector);
+		case 1:  return vec3(probe.wind_u, probe.wind_v, 0);
 		case 2:  return vec3(f_mapfloat(-8000.0, 6400.0, 0.0, 1.0, probe.height));
 		case 3:  return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0,probe.pressure));
-		case 4:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, probe.temperature - 273.15));
-		case 5:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, probe.day_temperature - 273.15));
-		case 6:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, probe.night_temperature - 273.15));
+		case 4:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 1.0, 0.0, probe.temperature - 273.15));
+		case 5:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 1.0, 0.0, probe.day_temperature - 273.15));
+		case 6:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 1.0, 0.0, probe.night_temperature - 273.15));
 		case 7:  return vec3(f_mapfloat(0.1, 0.9, 0.0, 1.0, probe.humidity));
 		case 8:  return vec3(f_mapfloat(0.0, 6.0, 0.0, 1.0, probe.water_vapor));
 		case 9:  return vec3(probe.cloud_coverage);
@@ -652,7 +655,7 @@ vec3 f_probeColor(in Probe probe, in float dist) {
 // SPH
 		case 20: return f_windToColor(probe.sph_wind_vector);
 		case 21: return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0, probe.sph_pressure));
-		case 22: return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 0.0, 1.0, probe.sph_temperature - 273.15));
+		case 22: return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 1.0, 0.0, probe.sph_temperature - 273.15));
 	}
 	return vec3(1,0,1);
 }
@@ -743,7 +746,9 @@ void main() {
 			if (t_dist < t_length && t_dist > EPSILON) {
 				color = vec4(f_probeColor(probes[closest_probe_index], t_dist), 1.0);
 				if (render_probe_lighting == 1) {
-					color = mix(bg_color, color, probes[closest_probe_index].sun_intensity * 0.7 + 0.3);
+					vec3 normal = normalize(probes[closest_probe_index].position.xyz);
+					float diffuse = clamp(f_mapfloat(-1.0, 1.0, -0.2, 1.0, dot(normal, sun_dir)), 0, 1);
+						color.xyz *= (diffuse * 0.9 + 0.1);
 				}
 			}
 		}
@@ -753,9 +758,9 @@ void main() {
 				if (t_dist < t_length && t_dist > EPSILON) {
 					color = vec4(f_particleColor(particles[closest_particle_index], t_dist), 1.0);
 					if (render_particle_lighting == 1) {
-						vec3 normal = normalize(particles[closest_particle_index].position);
+						vec3 normal = normalize(particles[closest_particle_index].position.xyz);
 						float diffuse = clamp(f_mapfloat(-1.0, 1.0, -0.2, 1.0, dot(normal, sun_dir)), 0, 1);
-						//color.xyz *= (diffuse * 0.8 + 0.2);
+						color.xyz *= (diffuse * 0.9 + 0.1);
 					}
 				}
 			}
@@ -780,9 +785,9 @@ void main() {
 			if (t_dist < t_length && t_dist > EPSILON) {
 				color = vec4(f_particleColor(particles[closest_particle_index], t_dist), 1.0);
 				if (render_particle_lighting == 1) {
-					vec3 normal = normalize(particles[closest_particle_index].position);
+					vec3 normal = normalize(particles[closest_particle_index].position.xyz);
 					float diffuse = clamp(f_mapfloat(-1.0, 1.0, -0.2, 1.0, dot(normal, sun_dir)), 0, 1);
-					//color.xyz *= (diffuse * 0.8 + 0.2);
+					color.xyz *= (diffuse * 0.9 + 0.1);
 				}
 			}
 		}

@@ -2,8 +2,13 @@
 
 #include "Shared.hpp"
 
-struct CPU_Probe;
 struct CPU_Neighbor;
+struct CPU_Probe;
+struct GPU_Probe;
+struct CPU_Particle;
+struct GPU_Particle;
+struct Compute_Probe;
+struct Compute_Particle;
 
 struct CPU_Probe_Data {
 	dvec3 position; // mm (mega) meters
@@ -76,6 +81,7 @@ struct alignas(16) GPU_Particle {
 	vec4 position;
 
 	GPU_Particle(const CPU_Particle& particle);
+	GPU_Particle(const Compute_Particle& particle);
 };
 
 struct alignas(16) GPU_Probe {
@@ -119,5 +125,22 @@ struct alignas(16) GPU_Probe {
 	vec1 sph_temperature;
 
 	GPU_Probe();
-	GPU_Probe(const CPU_Probe& particle);
+	GPU_Probe(const CPU_Probe& probe);
+};
+
+struct alignas(16) Compute_Probe {
+	vec4  position;
+	vec4  wind_speed;
+	uvec3 neighbors;
+	vec1  padding = 0.0f;
+
+	Compute_Probe(const CPU_Probe& probe, CPU_Probe* first);
+};
+
+struct alignas(16) Compute_Particle {
+	vec3 position;
+	uint closest;
+	vec4 rotation;
+
+	Compute_Particle(const CPU_Particle& particle, CPU_Probe* first);
 };

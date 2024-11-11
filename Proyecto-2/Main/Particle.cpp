@@ -125,5 +125,25 @@ CPU_Particle::CPU_Particle() :
 {}
 
 GPU_Particle::GPU_Particle(const CPU_Particle& particle) :
-	position(d_to_f(particle.transformed_position), 1.0)
+	position(d_to_f(particle.transformed_position), 0.0f)
 {}
+
+GPU_Particle::GPU_Particle(const Compute_Particle& particle) :
+	position(particle.position, 0.0f)
+{}
+
+Compute_Probe::Compute_Probe(const CPU_Probe& probe, CPU_Probe* first) {
+	position = vec4(d_to_f(probe.transformed_position), 0.0f);
+	wind_speed = vec4(d_to_f(probe.data.wind_quaternion.w), d_to_f(probe.data.wind_quaternion.x), d_to_f(probe.data.wind_quaternion.y), d_to_f(probe.data.wind_quaternion.z));
+	neighbors = uvec3(0);
+
+	neighbors[0] = (int)(probe.neighbors[0].probe - first);
+	neighbors[1] = (int)(probe.neighbors[1].probe - first);
+	neighbors[2] = (int)(probe.neighbors[2].probe - first);
+}
+
+Compute_Particle::Compute_Particle(const CPU_Particle& particle, CPU_Probe* first) {
+	position = particle.transformed_position;
+	closest = (int)(particle.probe - first);
+	rotation = vec4(d_to_f(particle.wind_speed.w), d_to_f(particle.wind_speed.x), d_to_f(particle.wind_speed.y), d_to_f(particle.wind_speed.z));
+}

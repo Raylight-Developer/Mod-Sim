@@ -94,6 +94,16 @@ Kernel::Kernel() {
 }
 #pragma optimize("", on)
 
+void Kernel::updateGPUProbes() {
+	const Builder bvh_build = BVH_SPH ? Builder(probes, -1.0f, 1): Builder(probes, d_to_f(PROBE_RADIUS), PROBE_MAX_OCTREE_DEPTH);
+	probe_nodes = bvh_build.nodes;
+
+	gpu_probes.clear();
+	for (const CPU_Probe& probe : bvh_build.probes) {
+		gpu_probes.push_back(GPU_Probe(probe));
+	}
+}
+
 void Kernel::buildProbes() {
 	cout << "Rebuild Probes" << endl;
 	const dvec1 radius = 6.371 + PROBE_RADIUS;
@@ -122,17 +132,13 @@ void Kernel::buildProbes() {
 }
 
 void Kernel::updateGPUParticles() {
+	const Particle_Builder bvh_build = Particle_Builder(particles, d_to_f(PARTICLE_RADIUS), PROBE_MAX_OCTREE_DEPTH);
+	particle_nodes = bvh_build.nodes;
+
 	gpu_particles.clear();
-	for (const CPU_Particle& particle : particles) {
+	for (const CPU_Particle& particle : bvh_build.particles) {
 		gpu_particles.push_back(GPU_Particle(particle));
 	}
-}
-
-void Kernel::buildBvhParticles() {
-	const Particle_Builder bvh_build = BVH_SPH ? Particle_Builder(particles, -1.0f, 1): Particle_Builder(particles, d_to_f(PARTICLE_RADIUS), PROBE_MAX_OCTREE_DEPTH);
-	particles = bvh_build.particles;
-	particle_nodes = bvh_build.nodes;
-	updateGPUParticles();
 }
 
 void Kernel::buildParticles() {
@@ -238,19 +244,6 @@ void Kernel::lockParticles() {
 	}
 }
 
-void Kernel::updateGPUProbes() {
-	gpu_probes.clear();
-	for (const CPU_Probe& probe : probes) {
-		gpu_probes.push_back(GPU_Probe(probe));
-	}
-}
-
-void Kernel::buildBvhProbes() {
-	const Builder bvh_build = BVH_SPH ? Builder(probes, -1.0f, 1): Builder(probes, d_to_f(PROBE_RADIUS), PROBE_MAX_OCTREE_DEPTH);
-	probes = bvh_build.probes;
-	probe_nodes = bvh_build.nodes;
-	updateGPUProbes();
-}
 
 void Kernel::simulate(const dvec1& delta_time) {
 	DT = clamp(delta_time, 0.0, 0.25) * TIME_SCALE;
@@ -282,37 +275,14 @@ void Kernel::simulate(const dvec1& delta_time) {
 		}
 
 	}
-	// WIND FIELD
-	//int i = 0;
-	//int i_size = u_to_i(PARTICLE_COUNT);
-	//#pragma omp parallel for private(i) num_threads(12)
-	//for (i = 0; i < i_size; i++) {
-	//	CPU_Particle& particle = particles[i];
-	//
-	//	vector<CPU_Neighbor> neighbors;
-	//
-	//	for (uint j = 0; j < PROBE_COUNT; j++) {
-	//		if (i != j) {
-	//			const dvec1 dist = glm::distance(particle.transformed_position, probes[j].transformed_position);
-	//			neighbors.push_back(CPU_Neighbor(dist, &probes[j]));
-	//		}
-	//	}
-	//
-	//	sort(neighbors.begin(), neighbors.end(), [](const CPU_Neighbor& a, const CPU_Neighbor& b) {
-	//		return a.distance < b.distance;
-	//		});
-	//
-	//	particle.probe = neighbors[0].probe;
-	//
-	//	updateParticlePosition(&particle);
-	//	calculateParticle(&particle);
-	//	updateParticlePosition(&particle);
-	//}
 
+	auto first = &probes[0];
+	compute_particles.clear();
 	for (CPU_Particle& particle : particles) {
 		updateParticlePosition(&particle);
 		calculateParticle(&particle);
 		updateParticlePosition(&particle);
+		compute_particles.push_back(Compute_Particle(particle, first));
 	}
 
 	updateGPUParticles();
