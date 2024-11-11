@@ -293,7 +293,7 @@ void Kernel::simulate(const dvec1& delta_time) {
 	START_TIMER("Particle Update");
 	int i = 0;
 	int i_size = ul_to_i(particles.size());
-	#pragma omp parallel for private(i) num_threads(12)
+	//#pragma omp parallel for private(i) num_threads(12)
 	for (i = 0;  i < i_size; i++) {
 		updateParticlePosition(particles[i]);
 		calculateParticle(particles[i]);

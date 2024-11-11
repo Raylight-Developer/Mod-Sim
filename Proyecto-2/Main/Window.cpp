@@ -47,11 +47,11 @@ Renderer::Renderer() {
 
 	gpu_time_aggregate = 0.0;
 
-	current_time = 0.0;
+	current_time = chrono::high_resolution_clock::now();
 	window_time = 0.0;
 	delta_time = FPS_60;
 	gpu_delta = FPS_60 / 2.0;
-	last_time = 0.0;
+	last_time = current_time;
 
 	run_sim = false;
 	next_frame = false;
@@ -64,6 +64,10 @@ Renderer::Renderer() {
 	INIT_TIMER("Scatter")
 	INIT_TIMER("Gather")
 	INIT_TIMER("GUI Loop")
+	INIT_TIMER("GPU")
+	INIT_TIMER("CPU")
+	INIT_TIMER("Delta")
+	INIT_TIMER("Transfer")
 }
 
 Renderer::~Renderer() {
@@ -82,7 +86,8 @@ void Renderer::init() {
 	//systemInfo();
 
 	f_pipeline();
-	current_time = 0.0;
+	current_time = chrono::high_resolution_clock::now();
+	start_time = chrono::high_resolution_clock::now();
 	f_displayLoop();
 }
 
@@ -195,6 +200,12 @@ void Renderer::f_pipeline() {
 }
 
 void Renderer::f_tickUpdate() {
+	TIMER("Probe BVH") = 0.0;
+	TIMER("Particle BVH") = 0.0;
+	TIMER("Scatter") = 0.0;
+	TIMER("Gather") = 0.0;
+	TIMER("Particle Update") = 0.0;
+	TIMER("Transfer") = 0.0;
 	if (run_sim or next_frame) {
 		if (next_frame) {
 			kernel.simulate(FPS_60);
@@ -206,10 +217,9 @@ void Renderer::f_tickUpdate() {
 		//kernel.buildProbes();
 		//kernel.buildParticles();
 
-		const dvec1 start = glfwGetTime();
 		pathtracer.f_updateProbes();
 		pathtracer.f_updateParticles();
-		gpu_delta += glfwGetTime() - start;
+
 		next_frame = false;
 	}
 }
@@ -445,14 +455,14 @@ void Renderer::f_guiLoop() {
 		ImGui::SeparatorText("Average Stats");
 		{
 			ImGui::PushItemWidth(thirdWidth);
-			const dvec1 percent = round((gpu_time_aggregate / current_time) * 100.0);
+			const dvec1 percent = round((gpu_time_aggregate / chrono::duration<double>(current_time - start_time).count()) * 100.0);
 			ImGui::Text(("~GPU[" + to_str(percent, 0) + "]%%").c_str());
 			ImGui::SameLine();
 			ImGui::SetCursorPosX(thirdPos);
 			ImGui::Text(("~CPU[" + to_str(100.0 - percent, 0) + "]%%").c_str());
 			ImGui::SameLine();
 			ImGui::SetCursorPosX(thirdPos * 2.0f);
-			ImGui::Text(("Fps: " + to_str(ul_to_d(runframe) / current_time, 0)).c_str());
+			ImGui::Text(("Fps: " + to_str(ul_to_d(runframe) / chrono::duration<double>(current_time - start_time).count(), 0)).c_str());
 			ImGui::PopItemWidth();
 		}
 		ImGui::SeparatorText("Stats");
@@ -471,23 +481,105 @@ void Renderer::f_guiLoop() {
 		ImGui::SeparatorText("Metrics");
 		END_TIMER("GUI Loop");
 		{
-			const dvec1 probe = TIMER("Probe BVH");
-			const dvec1 particle = TIMER("Particle BVH");
-			const dvec1 scatter = TIMER("Scatter");
-			const dvec1 gather = TIMER("Gather");
-			const dvec1 particle_update = TIMER("Particle Update");
-			const dvec1 gui = TIMER("GUI Loop");
-			const dvec1 cpu_time = delta_time - gpu_delta;
-			ImGui::Text(("Delta[" + to_str(d_to_f(delta_time * 1000.0), 2) + "]ms").c_str());
-			ImGui::Text(("CPU[" + to_str(d_to_f(cpu_time * 1000.0), 2) + "]ms").c_str());
-			ImGui::Text(("GPU[" + to_str(d_to_f(gpu_delta * 1000.0), 2) + "]ms").c_str());
-			ImGui::Text(("Probe BVH[" + to_str(d_to_f(probe * 1000.0), 2) + "]ms").c_str());
-			ImGui::Text(("Particle BVH[" + to_str(d_to_f(particle * 100.0), 2) + "]ms").c_str());
-			ImGui::Text(("Scatter[" + to_str(d_to_f(scatter * 1000.0), 2) + "]ms").c_str());
-			ImGui::Text(("Gather[" + to_str(d_to_f(gather * 1000.0), 2) + "]ms").c_str());
-			ImGui::Text(("Particle Update[" + to_str(d_to_f(particle_update * 1000.0), 2) + "]ms").c_str());
-			ImGui::Text(("GUI Loop[" + to_str(d_to_f(gui * 1000.0), 2) + "]ms").c_str());
-			ImGui::Text(("Other[" + to_str(d_to_f((cpu_time - (probe + particle + scatter + gather + particle_update + gui)) * 1000.0), 2) + "]ms").c_str());
+			const dvec1 probe = TIMER_MARK("Probe BVH");
+			const dvec1 particle = TIMER_MARK("Particle BVH");
+			const dvec1 scatter = TIMER_MARK("Scatter");
+			const dvec1 gather = TIMER_MARK("Gather");
+			const dvec1 particle_update = TIMER_MARK("Particle Update");
+			const dvec1 gui = TIMER_MARK("GUI Loop");
+			const dvec1 cpu_time = TIMER_MARK("CPU");
+			const dvec1 gpu_time = TIMER_MARK("GPU");
+			const dvec1 delta_time = TIMER_MARK("Delta");
+			const dvec1 transfer = TIMER_MARK("Transfer");
+			ImGui::PushItemWidth(thirdWidth);
+			ImGui::Text("Delta");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos);
+			ImGui::Text((to_str(d_to_f(delta_time * 1000.0), 2) + " ms").c_str());
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::Text((to_str(d_to_f(delta_time / frame_count * 1000.0), 2) + " ms").c_str());
+
+			ImGui::Text("CPU");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos);
+			ImGui::Text((to_str(d_to_f(cpu_time * 1000.0), 2) + " ms").c_str());
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::Text((to_str(d_to_f(cpu_time / frame_count * 1000.0), 2) + " ms").c_str());
+
+			ImGui::Text("GPU");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos);
+			ImGui::Text((to_str(d_to_f(gpu_time * 1000.0), 2) + " ms").c_str());
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::Text((to_str(d_to_f(gpu_time / frame_count * 1000.0), 2) + " ms").c_str());
+
+			ImGui::Text("CPU -> GPU");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos);
+			ImGui::Text((to_str(d_to_f(transfer * 1000.0), 2) + " ms").c_str());
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::Text((to_str(d_to_f(transfer / frame_count * 1000.0), 2) + " ms").c_str());
+
+			ImGui::Text("Probe BVH");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos);
+			ImGui::Text((to_str(d_to_f(probe * 1000.0), 2) + " ms").c_str());
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::Text((to_str(d_to_f(probe / frame_count * 1000.0), 2) + " ms").c_str());
+
+			ImGui::Text("Particle BVH");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos);
+			ImGui::Text((to_str(d_to_f(particle * 1000.0), 2) + " ms").c_str());
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::Text((to_str(d_to_f(particle / frame_count * 1000.0), 2) + " ms").c_str());
+
+			ImGui::Text("Scatter");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos);
+			ImGui::Text((to_str(d_to_f(scatter * 1000.0), 2) + " ms").c_str());
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::Text((to_str(d_to_f(scatter / frame_count * 1000.0), 2) + " ms").c_str());
+
+			ImGui::Text("Gather");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos);
+			ImGui::Text((to_str(d_to_f(gather * 1000.0), 2) + " ms").c_str());
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::Text((to_str(d_to_f(gather / frame_count * 1000.0), 2) + " ms").c_str());
+
+			ImGui::Text("Particle Update");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos);
+			ImGui::Text((to_str(d_to_f(particle_update * 1000.0), 2) + " ms").c_str());
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::Text((to_str(d_to_f(particle_update / frame_count * 1000.0), 2) + " ms").c_str());
+
+			ImGui::Text("GUI Loop");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos);
+			ImGui::Text((to_str(d_to_f(gui * 1000.0), 2) + " ms").c_str());
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::Text((to_str(d_to_f(gui / frame_count * 1000.0), 2) + " ms").c_str());
+
+			ImGui::Text("Other");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos);
+			ImGui::Text((to_str(d_to_f((cpu_time - (probe + particle + scatter + gather + particle_update + gui + transfer)) * 1000.0), 2) + " ms").c_str());
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::Text((to_str(d_to_f((cpu_time - (probe + particle + scatter + gather + particle_update + gui + transfer)) / frame_count * 1000.0), 2) + " ms").c_str());
+			ImGui::PopItemWidth();
 		}
 	}
 
@@ -502,8 +594,32 @@ void Renderer::f_frameUpdate() {
 	gpu_timer += gpu_delta;
 	frame_counter++;
 	runframe++;
+	TIMER("GPU") = gpu_delta;
+	TIMER("CPU") = abs(delta_time - gpu_delta);
+	TIMER("Delta") = gpu_delta + abs(delta_time - gpu_delta);
 
+	UPDATE_TIMER_MARK("Probe BVH");
+	UPDATE_TIMER_MARK("Particle BVH");
+	UPDATE_TIMER_MARK("Scatter");
+	UPDATE_TIMER_MARK("Gather");
+	UPDATE_TIMER_MARK("Particle Update");
+	UPDATE_TIMER_MARK("GUI Loop");
+	UPDATE_TIMER_MARK("GPU");
+	UPDATE_TIMER_MARK("CPU");
+	UPDATE_TIMER_MARK("Delta");
+	UPDATE_TIMER_MARK("Transfer");
 	if (window_time > 1.0) {
+		RESET_TIMER_MARK("Probe BVH");
+		RESET_TIMER_MARK("Particle BVH");
+		RESET_TIMER_MARK("Scatter");
+		RESET_TIMER_MARK("Gather");
+		RESET_TIMER_MARK("Particle Update");
+		RESET_TIMER_MARK("GUI Loop");
+		RESET_TIMER_MARK("GPU");
+		RESET_TIMER_MARK("CPU");
+		RESET_TIMER_MARK("Delta");
+		RESET_TIMER_MARK("Transfer");
+
 		frame_count = frame_counter;
 		frame_time = frame_timer;
 		gpu_time = gpu_timer;
@@ -560,8 +676,8 @@ void Renderer::f_inputLoop() {
 }
 
 void Renderer::f_timings() {
-	current_time = glfwGetTime();
-	delta_time = current_time - last_time;
+	current_time = chrono::high_resolution_clock::now();
+	delta_time = chrono::duration<double>(current_time - last_time).count();
 	last_time = current_time;
 	window_time += delta_time;
 }
@@ -571,11 +687,10 @@ void Renderer::f_displayLoop() {
 
 		f_timings();
 		f_inputLoop();
-		gpu_delta = 0.0;
 		f_tickUpdate();
-		const dvec1 start = glfwGetTime();
+		const auto start = chrono::high_resolution_clock::now();
 		pathtracer.f_render();
-		gpu_delta += glfwGetTime() - start;
+		gpu_delta = chrono::duration<double>(chrono::high_resolution_clock::now() - start).count();
 
 		f_frameUpdate();
 		f_guiLoop();

@@ -105,17 +105,21 @@ void PathTracer::f_initialize() {
 }
 
 void PathTracer::f_updateProbes() {
+	START_TIMER("Transfer");
 	glDeleteBuffers(1, &gl_data["ssbo 1"]);
 	glDeleteBuffers(1, &gl_data["ssbo 2"]);
 	gl_data["ssbo 1"] = ssboBinding(ul_to_u(renderer->kernel.gpu_probes.size() * sizeof(GPU_Probe)), renderer->kernel.gpu_probes.data());
 	gl_data["ssbo 2"] = ssboBinding(ul_to_u(renderer->kernel.probe_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.probe_nodes.data());
+	ADD_TIMER("Transfer");
 }
 
 void PathTracer::f_updateParticles() {
+	START_TIMER("Transfer");
 	glDeleteBuffers(1, &gl_data["ssbo 3"]);
 	glDeleteBuffers(1, &gl_data["ssbo 4"]);
 	gl_data["ssbo 3"] = ssboBinding(ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
 	gl_data["ssbo 4"] = ssboBinding(ul_to_u(renderer->kernel.particle_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.particle_nodes.data());
+	ADD_TIMER("Transfer");
 }
 
 void PathTracer::f_updateTextures(const bool& high_res) {
@@ -353,7 +357,7 @@ void PathTracer::f_render() {
 
 	glUniform1ui (glGetUniformLocation(compute_program, "frame_count"), ul_to_u(renderer->runframe));
 	glUniform1f  (glGetUniformLocation(compute_program, "aspect_ratio"), d_to_f(renderer->render_aspect_ratio));
-	glUniform1f  (glGetUniformLocation(compute_program, "current_time"), d_to_f(renderer->current_time));
+	glUniform1f  (glGetUniformLocation(compute_program, "current_time"), d_to_f(chrono::duration<double>(renderer->current_time - renderer->start_time).count()));
 	glUniform2ui (glGetUniformLocation(compute_program, "resolution"), renderer->render_resolution.x, renderer->render_resolution.y);
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_pos"), 1, value_ptr(camera_pos));
 	glUniform3fv (glGetUniformLocation(compute_program, "camera_p_uv"),1, value_ptr(projection_center));

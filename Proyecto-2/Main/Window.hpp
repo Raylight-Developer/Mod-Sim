@@ -48,11 +48,12 @@ struct Renderer {
 
 	dvec1 gpu_time_aggregate;
 
-	dvec1 current_time;
+	chrono::high_resolution_clock::time_point start_time;
+	chrono::high_resolution_clock::time_point current_time;
 	dvec1 window_time;
 	dvec1 delta_time;
 	dvec1 gpu_delta;
-	dvec1 last_time;
+	chrono::high_resolution_clock::time_point last_time;
 
 	bool  run_sim;
 	bool  next_frame;
