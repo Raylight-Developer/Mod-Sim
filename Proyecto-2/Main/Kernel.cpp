@@ -89,6 +89,8 @@ Kernel::Kernel() {
 	textures[Texture_Field::SOLAR_INSOLATION]              = Texture::fromFile("./Resources/Data/Solar Insolation LR.png", Texture_Format::MONO_FLOAT);
 	textures[Texture_Field::OUTGOING_LONGWAVE_RADIATION]   = Texture::fromFile("./Resources/Data/Outgoing Longwave Radiation LR.png", Texture_Format::MONO_FLOAT);
 	textures[Texture_Field::REFLECTED_SHORTWAVE_RADIATION] = Texture::fromFile("./Resources/Data/Reflected Shortwave Radiation LR.png", Texture_Format::MONO_FLOAT);
+
+	textures[Texture_Field::WIND_VECTOR] = Texture::fromFile("./Resources/Data/Wind.png", Texture_Format::RGBA_8);
 #endif
 }
 
@@ -98,7 +100,7 @@ void Kernel::updateGPUProbes() {
 	probe_nodes = bvh_build.nodes;
 
 	gpu_probes.clear();
-	for (const CPU_Probe& probe : bvh_build.probes) {
+	for (const CPU_Probe* probe : bvh_build.probes) {
 		gpu_probes.push_back(GPU_Probe(probe));
 	}
 	END_TIMER("Probe BVH");
@@ -109,9 +111,12 @@ void Kernel::buildProbes() {
 	const dvec1 radius = 6.371 + PROBE_RADIUS;
 	sun_dir = sunDir();
 
+	for (CPU_Probe* ptr : probes) {
+		delete ptr;
+	}
 	probes.clear();
 	for (uint i = 0; i < PROBE_COUNT; i++) {
-		CPU_Probe probe = CPU_Probe();
+		CPU_Probe* probe = new CPU_Probe();
 		const dvec1 normalized_i = i / (dvec1)(PROBE_COUNT - 1);
 		const dvec1 biased_i = (1.0 - PROBE_POLE_BIAS) * normalized_i + PROBE_POLE_BIAS * pow(normalized_i, PROBE_POLE_BIAS_POWER);
 
@@ -122,11 +127,10 @@ void Kernel::buildProbes() {
 		const dvec1 y = radius * cos(theta);
 		const dvec1 z = radius * sin(theta) * sin(phi);
 
-		probe.data.position = rotateGeoloc(dvec3(x, y, z), PROBE_POLE_GEOLOCATION);
-		updateProbePosition(&probe);
-
-		traceInitProperties(&probe);
-		probe.gen_index = i;
+		probe->data.position = rotateGeoloc(dvec3(x, y, z), PROBE_POLE_GEOLOCATION);
+		updateProbePosition(probe);
+		traceInitProperties(probe);
+		probe->gen_index = i;
 		probes.push_back(probe);
 	}
 }
@@ -137,7 +141,7 @@ void Kernel::updateGPUParticles() {
 	particle_nodes = bvh_build.nodes;
 
 	gpu_particles.clear();
-	for (const CPU_Particle& particle : bvh_build.particles) {
+	for (const CPU_Particle* particle : bvh_build.particles) {
 		gpu_particles.push_back(GPU_Particle(particle));
 	}
 	END_TIMER("Particle BVH");
@@ -148,9 +152,12 @@ void Kernel::buildParticles() {
 	const dvec1 radius = 6.371 + PROBE_RADIUS * 2.0 + PARTICLE_RADIUS;
 	sun_dir = sunDir();
 
+	for (CPU_Particle* ptr : particles) {
+		delete ptr;
+	}
 	particles.clear();
 	for (uint i = 0; i < PARTICLE_COUNT; i++) {
-		CPU_Particle particle = CPU_Particle();
+		CPU_Particle* particle = new CPU_Particle();
 		const dvec1 normalized_i = i / (dvec1)(PARTICLE_COUNT - 1);
 		const dvec1 biased_i = (1.0 - PARTICLE_POLE_BIAS) * normalized_i + PARTICLE_POLE_BIAS * pow(normalized_i, PARTICLE_POLE_BIAS_POWER);
 
@@ -161,8 +168,8 @@ void Kernel::buildParticles() {
 		const dvec1 y = radius * cos(theta);
 		const dvec1 z = radius * sin(theta) * sin(phi);
 
-		particle.position = rotateGeoloc(dvec3(x, y, z), PARTICLE_POLE_GEOLOCATION);
-		updateParticlePosition(&particle);
+		particle->position = rotateGeoloc(dvec3(x, y, z), PARTICLE_POLE_GEOLOCATION);
+		updateParticlePosition(particle);
 		particles.push_back(particle);
 	}
 }
@@ -180,14 +187,14 @@ void Kernel::lockProbes() {
 	int i_size = u_to_i(PROBE_COUNT);
 	#pragma omp parallel for private(i) num_threads(12)
 	for (i = 0; i < i_size; i++) {
-		CPU_Probe& probe = probes[i];
+		CPU_Probe* probe = probes[i];
 
 		vector<CPU_Neighbor> neighbors;
 
 		for (uint j = 0; j < PROBE_COUNT; j++) {
 			if (i != j) {
-				const dvec1 dist = glm::distance(probe.data.position, probes[j].data.position);
-				neighbors.push_back(CPU_Neighbor(dist, &probes[j]));
+				const dvec1 dist = glm::distance(probe->data.position, probes[j]->data.position);
+				neighbors.push_back(CPU_Neighbor(dist, probes[j]));
 			}
 		}
 
@@ -195,19 +202,19 @@ void Kernel::lockProbes() {
 			return a.distance < b.distance;
 		});
 
-		probe.smoothing_radius = neighbors[NUM_NEIGHBORS].distance * 1.25;
+		probe->smoothing_radius = neighbors[NUM_NEIGHBORS].distance * 1.25;
 		for (uint k = 0; k < NUM_NEIGHBORS; k++) {
-			probe.neighbors.push_back(neighbors[k]);
+			probe->neighbors.push_back(neighbors[k]);
 		}
 
-		for (CPU_Neighbor& neighbor : probe.neighbors) {
-			const dvec1 smoothing_kernel = pow(glm::max(0.0, probe.smoothing_radius - neighbor.distance), 3.0);
+		for (CPU_Neighbor& neighbor : probe->neighbors) {
+			const dvec1 smoothing_kernel = pow(glm::max(0.0, probe->smoothing_radius - neighbor.distance), 3.0);
 
-			const dvec3 direction = neighbor.probe->data.position - probe.data.position;
+			const dvec3 direction = neighbor.probe->data.position - probe->data.position;
 
 			const dvec3 unitDirection = direction / neighbor.distance;
-			const dvec1 pressureDifference = (probe.data.pressure - neighbor.probe->data.pressure) * 10.0;
-			probe.data.wind_vector += unitDirection * (pressureDifference) * smoothing_kernel * 10.0;
+			const dvec1 pressureDifference = (probe->data.pressure - neighbor.probe->data.pressure) * 10.0;
+			probe->data.wind_vector += unitDirection * (pressureDifference) * smoothing_kernel * 10.0;
 		}
 
 		//if ((i % (PROBE_COUNT / 5)) == 0) {
@@ -222,14 +229,14 @@ void Kernel::lockParticles() {
 	int i_size = u_to_i(PARTICLE_COUNT);
 	#pragma omp parallel for private(i) num_threads(12)
 	for (i = 0; i < i_size; i++) {
-		CPU_Particle& particle = particles[i];
+		CPU_Particle* particle = particles[i];
 
 		vector<CPU_Neighbor> neighbors;
 
 		for (uint j = 0; j < PROBE_COUNT; j++) {
 			if (i != j) {
-				const dvec1 dist = glm::distance(particle.transformed_position, probes[j].transformed_position);
-				neighbors.push_back(CPU_Neighbor(dist, &probes[j]));
+				const dvec1 dist = glm::distance(particle->transformed_position, probes[j]->transformed_position);
+				neighbors.push_back(CPU_Neighbor(dist, probes[j]));
 			}
 		}
 
@@ -237,7 +244,7 @@ void Kernel::lockParticles() {
 			return a.distance < b.distance;
 		});
 
-		particle.probe = neighbors[0].probe;
+		particle->probe = neighbors[0].probe;
 
 		//if ((i % (PROBE_COUNT / 5)) == 0) {
 		//	#pragma omp critical
@@ -259,26 +266,26 @@ void Kernel::simulate(const dvec1& delta_time) {
 	for (uint i = 0; i < SUB_SAMPLES; i++) {
 		updateTime();
 		sun_dir = sunDir();
-		for (CPU_Probe& probe : probes) {
-			probe.new_data = probe.data;
+		for (CPU_Probe* probe : probes) {
+			probe->new_data = probe->data;
 		}
 
 		// SCATTER
 		START_TIMER("Scatter");
-		for (CPU_Probe& probe : probes) {
-			updateProbePosition(&probe);
-			calculateSunlight(&probe);
-			scatterSPH(&probe);
+		for (CPU_Probe* probe : probes) {
+			updateProbePosition(probe);
+			calculateSunlight(probe);
+			scatterSPH(probe);
 		}
 		ADD_TIMER("Scatter");
 
 		// GATHER
 		START_TIMER("Gather");
-		for (CPU_Probe& probe : probes) {
-			gatherWind(&probe);
-			gatherThermodynamics(&probe);
+		for (CPU_Probe* probe : probes) {
+			gatherWind(probe);
+			gatherThermodynamics(probe);
 
-			probe.data = probe.new_data;
+			probe->data = probe->new_data;
 		}
 		ADD_TIMER("Gather");
 	}
@@ -288,9 +295,9 @@ void Kernel::simulate(const dvec1& delta_time) {
 	int i_size = ul_to_i(particles.size());
 	#pragma omp parallel for private(i) num_threads(12)
 	for (i = 0;  i < i_size; i++) {
-		updateParticlePosition(&particles[i]);
-		calculateParticle(&particles[i]);
-		updateParticlePosition(&particles[i]);
+		updateParticlePosition(particles[i]);
+		calculateParticle(particles[i]);
+		updateParticlePosition(particles[i]);
 	}
 	END_TIMER("Particle Update");
 

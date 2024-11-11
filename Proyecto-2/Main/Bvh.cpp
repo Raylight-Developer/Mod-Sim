@@ -45,8 +45,8 @@ GPU_Bvh::GPU_Bvh() :
 	end(0)
 {}
 
-void CPU_Bvh::growToInclude(const CPU_Probe& probe, const vec1& radius) {
-	growToInclude(d_to_f(probe.transformed_position) - radius, d_to_f(probe.transformed_position) + radius);
+void CPU_Bvh::growToInclude(const CPU_Probe* probe, const vec1& radius) {
+	growToInclude(d_to_f(probe->transformed_position) - radius, d_to_f(probe->transformed_position) + radius);
 }
 
 void CPU_Bvh::growToInclude(const vec3& min, const vec3& max) {
@@ -66,19 +66,19 @@ vec3 CPU_Bvh::getCenter() const {
 	return (p_min + p_max) / 2.0f;
 }
 
-bool CPU_Bvh::contains(const CPU_Probe& probe) {
-	const vec3 pos = probe.transformed_position;
+bool CPU_Bvh::contains(const CPU_Probe* probe) {
+	const vec3 pos = probe->transformed_position;
 	return (pos.x >= p_min.x && pos.x <= p_max.x) &&
 		(pos.y >= p_min.y && pos.y <= p_max.y) &&
 		(pos.z >= p_min.z && pos.z <= p_max.z);
 }
 
-void CPU_Bvh::growToInclude(const CPU_Particle& particle, const vec1& radius) {
-	growToInclude(d_to_f(particle.transformed_position) - radius, d_to_f(particle.transformed_position) + radius);
+void CPU_Bvh::growToInclude(const CPU_Particle* particle, const vec1& radius) {
+	growToInclude(d_to_f(particle->transformed_position) - radius, d_to_f(particle->transformed_position) + radius);
 }
 
-bool CPU_Bvh::contains(const CPU_Particle& particle) {
-	const vec3 pos = particle.transformed_position;
+bool CPU_Bvh::contains(const CPU_Particle* particle) {
+	const vec3 pos = particle->transformed_position;
 	return (pos.x >= p_min.x && pos.x <= p_max.x) &&
 		(pos.y >= p_min.y && pos.y <= p_max.y) &&
 		(pos.z >= p_min.z && pos.z <= p_max.z);
@@ -104,31 +104,24 @@ void CPU_Bvh::split() {
 }
 
 
-Builder::Builder(const vector<CPU_Probe>& probes, const vec1& probe_radius, const uint& max_depth) :
-	probes(probes),
+Builder::Builder(const vector<CPU_Probe*>& probes, const vec1& probe_radius, const uint& max_depth) :
+	source(probes),
 	particle_radius(probe_radius * 1.25f)
 {
 	if (probe_radius > 0.0f) {
-		for (uint i = 0; i < probes.size(); i++) {
-			const vec3 center = (probes[i].transformed_position);
-			const vec3 max = d_to_f(probes[i].transformed_position) + probe_radius;
-			const vec3 min = d_to_f(probes[i].transformed_position) - probe_radius;
-			root_node.growToInclude(min, max);
+		for (CPU_Probe* probe : source) {
+			root_node.growToInclude(probe, probe_radius);
 		}
 		root_node.discard = false;
 		depth_cutoff = max_depth;
 
 		splitBvh(&root_node, 0);
 
-		this->probes.clear();
 		convertBvh(&root_node);
 	}
 	else {
-		for (uint i = 0; i < probes.size(); i++) {
-			const vec3 center = (probes[i].transformed_position);
-			const vec3 max = d_to_f(probes[i].transformed_position + probes[i].smoothing_radius);
-			const vec3 min = d_to_f(probes[i].transformed_position - probes[i].smoothing_radius);
-			root_node.growToInclude(min, max);
+		for (CPU_Probe* probe : source) {
+			root_node.growToInclude(probe, d_to_f(probe->smoothing_radius));
 		}
 		root_node.discard = false;
 		depth_cutoff = max_depth;
@@ -136,7 +129,6 @@ Builder::Builder(const vector<CPU_Probe>& probes, const vec1& probe_radius, cons
 		splitBvh(&root_node, 0);
 		growBvhSPH(&root_node);
 
-		this->probes.clear();
 		convertBvhSPH(&root_node);
 	}
 }
@@ -150,9 +142,9 @@ void Builder::splitBvh(CPU_Bvh* node, const uint& depth) {
 #ifdef OPENMP
 		#pragma omp parallel for
 		int i = 0;
-		int i_size = ul_to_i(probes.size());
+		int i_size = ul_to_i(source.size());
 		for (i = 0; i < i_size; i++) {
-			if (child.contains(probes[i])) {
+			if (child.contains(source[i])) {
 				#pragma omp critical
 				{
 					child.item_count++;
@@ -163,7 +155,7 @@ void Builder::splitBvh(CPU_Bvh* node, const uint& depth) {
 			}
 		}
 #else
-		for (const CPU_Probe& probe : probes) {
+		for (const CPU_Probe* probe : source) {
 			if (child.contains(probe)) {
 				child.discard = false;
 				child.item_count++;
@@ -191,7 +183,7 @@ void Builder::splitBvh(CPU_Bvh* node, const uint& depth) {
 					}
 				}
 #else
-				for (const CPU_Probe& probe : probes) {
+				for (CPU_Probe* probe : source) {
 					if (child.contains(probe)) {
 						child.probes.push_back(probe);
 					}
@@ -243,8 +235,8 @@ uint Builder::convertBvh(CPU_Bvh* node) {
 void Builder::growBvhSPH(CPU_Bvh* node) {
 	if (!node->probes.empty()) {
 		dvec1 radius = 0.0f;
-		for (CPU_Probe& oribe : node->probes) {
-			radius = max(radius, oribe.smoothing_radius);
+		for (CPU_Probe* probe : node->probes) {
+			radius = max(radius, probe->smoothing_radius);
 		}
 		node->p_min -= d_to_f(radius);
 		node->p_max += d_to_f(radius);
@@ -283,7 +275,7 @@ uint Builder::convertBvhSPH(CPU_Bvh* node) {
 	else {
 		bvh.start =  ul_to_u(probes.size());
 		bvh.end =  ul_to_u(probes.size() + node->probes.size());
-		for (const auto& probe : node->probes) {
+		for (CPU_Probe* probe : node->probes) {
 			probes.push_back(probe);
 		}
 	}
@@ -307,22 +299,18 @@ bool CPU_Bvh::operator==(const CPU_Bvh & other) const {
 	return p_min == other.p_min && p_max == other.p_max && discard == other.discard;
 }
 
-Particle_Builder::Particle_Builder(const vector<CPU_Particle>& particles, const vec1& particle_radius, const uint& max_depth) :
-	particles(particles),
+Particle_Builder::Particle_Builder(const vector<CPU_Particle*>& particles, const vec1& particle_radius, const uint& max_depth) :
+	source(particles),
 	particle_radius(particle_radius * 1.25f)
 {
-	for (uint i = 0; i < particles.size(); i++) {
-		const vec3 center = (particles[i].transformed_position);
-		const vec3 max = d_to_f(particles[i].transformed_position) + particle_radius;
-		const vec3 min = d_to_f(particles[i].transformed_position) - particle_radius;
-		root_node.growToInclude(min, max);
+	for (CPU_Particle* particle : source) {
+		root_node.growToInclude(particle, particle_radius);
 	}
 	root_node.discard = false;
 	depth_cutoff = max_depth;
 
 	splitBvh(&root_node, 0);
 
-	this->particles.clear();
 	convertBvh(&root_node);
 }
 
@@ -335,9 +323,9 @@ void Particle_Builder::splitBvh(CPU_Bvh* node, const uint& depth) {
 #ifdef OPENMP
 		#pragma omp parallel for
 		int i = 0;
-		int i_size = ul_to_i(particles.size());
+		int i_size = ul_to_i(source.size());
 		for (i = 0; i < i_size; i++) {
-			if (child.contains(particles[i])) {
+			if (child.contains(source[i])) {
 				#pragma omp critical
 				{
 					child.item_count++;
@@ -348,7 +336,7 @@ void Particle_Builder::splitBvh(CPU_Bvh* node, const uint& depth) {
 			}
 		}
 #else
-		for (const CPU_Particle& particle : particles) {
+		for (const CPU_Particle* particle : source) {
 			if (child.contains(particle)) {
 				child.discard = false;
 				child.item_count++;
@@ -366,17 +354,17 @@ void Particle_Builder::splitBvh(CPU_Bvh* node, const uint& depth) {
 #ifdef OPENMP
 				#pragma omp parallel for
 				int i = 0;
-				int i_size = ul_to_i(particles.size());
+				int i_size = ul_to_i(source.size());
 				for (i = 0; i < i_size; i++) {
-					if (child.contains(particles[i])) {
+					if (child.contains(source[i])) {
 						#pragma omp critical
 						{
-							child.particles.push_back(particles[i]);
+							child.source.push_back(source[i]);
 						}
 					}
 				}
 #else
-				for (const CPU_Particle& particle : particles) {
+				for (CPU_Particle* particle : source) {
 					if (child.contains(particle)) {
 						child.particles.push_back(particle);
 					}
@@ -413,7 +401,7 @@ uint Particle_Builder::convertBvh(CPU_Bvh* node) {
 	else {
 		bvh.start =  ul_to_u(particles.size());
 		bvh.end =  ul_to_u(particles.size() + node->particles.size());
-		for (const auto& particle : node->particles) {
+		for (CPU_Particle* particle : node->particles) {
 			particles.push_back(particle);
 		}
 	}

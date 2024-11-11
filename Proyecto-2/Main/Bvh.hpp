@@ -9,8 +9,8 @@ struct CPU_Bvh {
 	vec3 p_min;
 	vec3 p_max;
 	CPU_Bvh* parent;
-	vector<CPU_Probe> probes;
-	vector<CPU_Particle> particles;
+	vector<CPU_Probe*> probes;
+	vector<CPU_Particle*> particles;
 	vector<CPU_Bvh> children;
 	uint item_count;
 	bool discard;
@@ -21,10 +21,10 @@ struct CPU_Bvh {
 	void growToInclude(const vec3& min, const vec3& max);
 	vec3 getSize() const;
 	vec3 getCenter() const;
-	void growToInclude(const CPU_Probe& probe, const vec1& radius);
-	bool contains(const CPU_Probe& probe);
-	void growToInclude(const CPU_Particle& particle, const vec1& radius);
-	bool contains(const CPU_Particle& particle);
+	void growToInclude(const CPU_Probe* probe, const vec1& radius);
+	bool contains(const CPU_Probe* probe);
+	void growToInclude(const CPU_Particle* particle, const vec1& radius);
+	bool contains(const CPU_Particle* particle);
 	void split();
 	bool operator==(const CPU_Bvh& other) const;
 };
@@ -50,7 +50,8 @@ struct Bvh_Particle {
 };
 
 struct Builder {
-	vector<CPU_Probe> probes;
+	vector<CPU_Probe*> source;
+	vector<CPU_Probe*> probes;
 	CPU_Bvh root_node;
 	uint depth_cutoff;
 	vec1 particle_radius;
@@ -59,7 +60,7 @@ struct Builder {
 	GPU_Bvh gpu_root_node;
 	vector<GPU_Bvh> nodes;
 
-	Builder(const vector<CPU_Probe>& probes, const vec1& probe_radius, const uint& max_depth);
+	Builder(const vector<CPU_Probe*>& probes, const vec1& probe_radius, const uint& max_depth);
 
 	void splitBvh(CPU_Bvh* node, const uint& depth);
 	uint convertBvh(CPU_Bvh* node);
@@ -68,7 +69,8 @@ struct Builder {
 };
 
 struct Particle_Builder {
-	vector<CPU_Particle> particles;
+	vector<CPU_Particle*> source;
+	vector<CPU_Particle*> particles;
 	CPU_Bvh root_node;
 	uint depth_cutoff;
 	vec1 particle_radius;
@@ -76,7 +78,7 @@ struct Particle_Builder {
 	GPU_Bvh gpu_root_node;
 	vector<GPU_Bvh> nodes;
 
-	Particle_Builder(const vector<CPU_Particle>& particles, const vec1& particle_radius, const uint& max_depth);
+	Particle_Builder(const vector<CPU_Particle*>& particles, const vec1& particle_radius, const uint& max_depth);
 
 	void splitBvh(CPU_Bvh* node, const uint& depth);
 	uint convertBvh(CPU_Bvh* node);

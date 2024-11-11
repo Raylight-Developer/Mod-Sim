@@ -80,7 +80,7 @@ struct CPU_Particle {
 struct alignas(16) GPU_Particle {
 	vec4 position;
 
-	GPU_Particle(const CPU_Particle& particle);
+	GPU_Particle(const CPU_Particle* particle);
 	GPU_Particle(const Compute_Particle& particle);
 };
 
@@ -125,7 +125,7 @@ struct alignas(16) GPU_Probe {
 	vec1 sph_temperature;
 
 	GPU_Probe();
-	GPU_Probe(const CPU_Probe& probe);
+	GPU_Probe(const CPU_Probe* probe);
 };
 
 struct alignas(16) Compute_Probe {

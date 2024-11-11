@@ -74,41 +74,41 @@ GPU_Probe::GPU_Probe() {
 	sph_temperature = 0;
 }
 
-GPU_Probe::GPU_Probe(const CPU_Probe& particle) {
-	gen_index = particle.gen_index;
-	smoothing_radius = d_to_f(particle.smoothing_radius);
+GPU_Probe::GPU_Probe(const CPU_Probe* particle) {
+	gen_index = particle->gen_index;
+	smoothing_radius = d_to_f(particle->smoothing_radius);
 
-	position      = d_to_f(particle.transformed_position);
-	wind_vector   = d_to_f(particle.data.wind_vector);
-	sun_intensity = d_to_f(particle.data.sun_intensity);
+	position      = d_to_f(particle->transformed_position);
+	wind_vector   = d_to_f(particle->data.wind_vector);
+	sun_intensity = d_to_f(particle->data.sun_intensity);
 
-	wind_u = d_to_f(particle.data.wind_u);
-	wind_v = d_to_f(particle.data.wind_v);
+	wind_u = d_to_f(particle->data.wind_u);
+	wind_v = d_to_f(particle->data.wind_v);
 
-	height            = d_to_f(particle.data.height);
-	pressure          = d_to_f(particle.data.pressure);
-	temperature       = d_to_f(particle.data.temperature);
-	day_temperature   = d_to_f(particle.data.day_temperature);
-	night_temperature = d_to_f(particle.data.night_temperature);
+	height            = d_to_f(particle->data.height);
+	pressure          = d_to_f(particle->data.pressure);
+	temperature       = d_to_f(particle->data.temperature);
+	day_temperature   = d_to_f(particle->data.day_temperature);
+	night_temperature = d_to_f(particle->data.night_temperature);
 
-	humidity                = d_to_f(particle.data.humidity);
-	water_vapor             = d_to_f(particle.data.water_vapor);
-	cloud_coverage          = d_to_f(particle.data.cloud_coverage);
-	cloud_water_content     = d_to_f(particle.data.cloud_water_content);
-	cloud_particle_radius   = d_to_f(particle.data.cloud_particle_radius);
-	cloud_optical_thickness = d_to_f(particle.data.cloud_optical_thickness);
+	humidity                = d_to_f(particle->data.humidity);
+	water_vapor             = d_to_f(particle->data.water_vapor);
+	cloud_coverage          = d_to_f(particle->data.cloud_coverage);
+	cloud_water_content     = d_to_f(particle->data.cloud_water_content);
+	cloud_particle_radius   = d_to_f(particle->data.cloud_particle_radius);
+	cloud_optical_thickness = d_to_f(particle->data.cloud_optical_thickness);
 
-	ozone                         = d_to_f(particle.data.ozone);
-	albedo                        = d_to_f(particle.data.albedo);
-	uv_index                      = d_to_f(particle.data.uv_index);
-	net_radiation                 = d_to_f(particle.data.net_radiation);
-	solar_insolation              = d_to_f(particle.data.solar_insolation);
-	outgoing_longwave_radiation   = d_to_f(particle.data.outgoing_longwave_radiation);
-	reflected_shortwave_radiation = d_to_f(particle.data.reflected_shortwave_radiation);
+	ozone                         = d_to_f(particle->data.ozone);
+	albedo                        = d_to_f(particle->data.albedo);
+	uv_index                      = d_to_f(particle->data.uv_index);
+	net_radiation                 = d_to_f(particle->data.net_radiation);
+	solar_insolation              = d_to_f(particle->data.solar_insolation);
+	outgoing_longwave_radiation   = d_to_f(particle->data.outgoing_longwave_radiation);
+	reflected_shortwave_radiation = d_to_f(particle->data.reflected_shortwave_radiation);
 
-	sph_pressure    = d_to_f(particle.sph.pressure);
-	sph_wind_vector = d_to_f(particle.sph.wind_vector);
-	sph_temperature = d_to_f(particle.sph.temperature);
+	sph_pressure    = d_to_f(particle->sph.pressure);
+	sph_wind_vector = d_to_f(particle->sph.wind_vector);
+	sph_temperature = d_to_f(particle->sph.temperature);
 }
 
 CPU_Neighbor::CPU_Neighbor(const dvec1& distance, CPU_Probe* neighbor) :
@@ -124,8 +124,8 @@ CPU_Particle::CPU_Particle() :
 	probe(nullptr)
 {}
 
-GPU_Particle::GPU_Particle(const CPU_Particle& particle) :
-	position(d_to_f(particle.transformed_position), 0.0f)
+GPU_Particle::GPU_Particle(const CPU_Particle* particle) :
+	position(d_to_f(particle->transformed_position), 0.0f)
 {}
 
 GPU_Particle::GPU_Particle(const Compute_Particle& particle) :

@@ -44,8 +44,8 @@ struct Kernel {
 
 	unordered_map<Texture_Field, Texture> textures;
 
-	vector<CPU_Probe>        probes;
-	vector<CPU_Particle>     particles;
+	vector<CPU_Probe*>       probes;
+	vector<CPU_Particle*>    particles;
 
 	vector<GPU_Probe>        gpu_probes;
 	vector<GPU_Particle>     gpu_particles;
