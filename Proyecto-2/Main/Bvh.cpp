@@ -2,6 +2,8 @@
 
 #include "Kernel.hpp"
 
+#define ITEM_COUNT 4
+
 CPU_Bvh::CPU_Bvh():
 	p_min(vec3(MAX_VEC1)),
 	p_max(vec3(MIN_VEC1)),
@@ -131,7 +133,7 @@ Builder::Builder(const vector<CPU_Probe>& probes, const vec1& probe_radius, cons
 		root_node.discard = false;
 		depth_cutoff = max_depth;
 
-		splitBvhSPH(&root_node, 0);
+		splitBvh(&root_node, 0);
 		growBvhSPH(&root_node);
 
 		this->probes.clear();
@@ -144,25 +146,57 @@ void Builder::splitBvh(CPU_Bvh* node, const uint& depth) {
 
 	for (auto it = node->children.begin(); it != node->children.end(); ) {
 		CPU_Bvh& child = *it;
+
+#ifdef OPENMP
+		#pragma omp parallel for
+		int i = 0;
+		int i_size = ul_to_i(probes.size());
+		for (i = 0; i < i_size; i++) {
+			if (child.contains(probes[i])) {
+				#pragma omp critical
+				{
+					child.item_count++;
+					if (child.item_count > ITEM_COUNT) {
+						break;
+					}
+				}
+			}
+		}
+#else
 		for (const CPU_Probe& probe : probes) {
 			if (child.contains(probe)) {
 				child.discard = false;
 				child.item_count++;
-				if (child.item_count > 16) {
+				if (child.item_count > ITEM_COUNT) {
 					break;
 				}
 			}
 		}
-		if (child.discard == false) {
-			if (depth < depth_cutoff and child.item_count > 16) {
+#endif
+		if (child.discard == false or child.item_count > 0) {
+			if (depth < depth_cutoff and child.item_count > ITEM_COUNT) {
 				splitBvh(&child, depth + 1);
 			}
 			else {
+#ifdef OPENMP
+				#pragma omp parallel for
+				int i = 0;
+				int i_size = ul_to_i(particles.size());
+				for (i = 0; i < i_size; i++) {
+					if (child.contains(particles[i])) {
+						#pragma omp critical
+						{
+							child.particles.push_back(particles[i]);
+						}
+					}
+				}
+#else
 				for (const CPU_Probe& probe : probes) {
 					if (child.contains(probe)) {
 						child.probes.push_back(probe);
 					}
 				}
+#endif
 			}
 			++it;
 		}
@@ -204,39 +238,6 @@ uint Builder::convertBvh(CPU_Bvh* node) {
 		gpu_root_node = bvh;
 	}
 	return index;
-}
-
-void Builder::splitBvhSPH(CPU_Bvh* node, const uint& depth) {
-	node->split();
-
-	for (auto it = node->children.begin(); it != node->children.end(); ) {
-		CPU_Bvh& child = *it;
-		for (const CPU_Probe& probe : probes) {
-			if (child.contains(probe)) {
-				child.discard = false;
-				child.item_count++;
-				if (child.item_count > 16) {
-					break;
-				}
-			}
-		}
-		if (child.discard == false) {
-			if (depth < depth_cutoff and child.item_count > 16) {
-				splitBvhSPH(&child, depth + 1);
-			}
-			else {
-				for (const CPU_Probe& probe : probes) {
-					if (child.contains(probe)) {
-						child.probes.push_back(probe);
-					}
-				}
-			}
-			++it;
-		}
-		else {
-			it = node->children.erase(it);
-		}
-	}
 }
 
 void Builder::growBvhSPH(CPU_Bvh* node) {
@@ -331,25 +332,56 @@ void Particle_Builder::splitBvh(CPU_Bvh* node, const uint& depth) {
 	for (auto it = node->children.begin(); it != node->children.end(); ) {
 		CPU_Bvh& child = *it;
 
+#ifdef OPENMP
+		#pragma omp parallel for
+		int i = 0;
+		int i_size = ul_to_i(particles.size());
+		for (i = 0; i < i_size; i++) {
+			if (child.contains(particles[i])) {
+				#pragma omp critical
+				{
+					child.item_count++;
+					if (child.item_count > ITEM_COUNT) {
+						break;
+					}
+				}
+			}
+		}
+#else
 		for (const CPU_Particle& particle : particles) {
 			if (child.contains(particle)) {
 				child.discard = false;
 				child.item_count++;
-				if (child.item_count > 16) {
+				if (child.item_count > ITEM_COUNT) {
 					break;
 				}
 			}
 		}
-		if (child.discard == false) {
-			if (depth < depth_cutoff and child.item_count > 16) {
+#endif
+		if (child.discard == false or child.item_count > 0) {
+			if (depth < depth_cutoff and child.item_count > ITEM_COUNT) {
 				splitBvh(&child, depth + 1);
 			}
 			else {
+#ifdef OPENMP
+				#pragma omp parallel for
+				int i = 0;
+				int i_size = ul_to_i(particles.size());
+				for (i = 0; i < i_size; i++) {
+					if (child.contains(particles[i])) {
+						#pragma omp critical
+						{
+							child.particles.push_back(particles[i]);
+						}
+					}
+				}
+#else
 				for (const CPU_Particle& particle : particles) {
 					if (child.contains(particle)) {
 						child.particles.push_back(particle);
 					}
 				}
+#endif
 			}
 			++it;
 		}

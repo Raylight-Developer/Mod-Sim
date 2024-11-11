@@ -63,7 +63,6 @@ struct Builder {
 
 	void splitBvh(CPU_Bvh* node, const uint& depth);
 	uint convertBvh(CPU_Bvh* node);
-	void splitBvhSPH(CPU_Bvh* node, const uint& depth);
 	void growBvhSPH(CPU_Bvh* node);
 	uint convertBvhSPH(CPU_Bvh* node);
 };

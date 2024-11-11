@@ -10,11 +10,11 @@
 #define CORIOLIS           vec3(15.0, 0, 0)
 
 Kernel::Kernel() {
-	PARTICLE_RADIUS           = 0.025f;
-	PARTICLE_COUNT            = 8192;
+	PARTICLE_RADIUS           = 0.01f;
+	PARTICLE_COUNT            = 16384;
 	PARTICLE_MAX_OCTREE_DEPTH = 1;
-	PARTICLE_POLE_BIAS        = 0.0;
-	PARTICLE_POLE_BIAS_POWER  = 1.0;
+	PARTICLE_POLE_BIAS        = 0.995;
+	PARTICLE_POLE_BIAS_POWER  = 7.5;
 	PARTICLE_POLE_GEOLOCATION = dvec2(25.0, 90.0);
 
 	PROBE_RADIUS           = 0.05f;
@@ -93,6 +93,7 @@ Kernel::Kernel() {
 }
 
 void Kernel::updateGPUProbes() {
+	START_TIMER("Probe BVH");
 	const Builder bvh_build = BVH_SPH ? Builder(probes, -1.0f, 1): Builder(probes, d_to_f(PROBE_RADIUS), PROBE_MAX_OCTREE_DEPTH);
 	probe_nodes = bvh_build.nodes;
 
@@ -100,6 +101,7 @@ void Kernel::updateGPUProbes() {
 	for (const CPU_Probe& probe : bvh_build.probes) {
 		gpu_probes.push_back(GPU_Probe(probe));
 	}
+	END_TIMER("Probe BVH");
 }
 
 void Kernel::buildProbes() {
@@ -130,6 +132,7 @@ void Kernel::buildProbes() {
 }
 
 void Kernel::updateGPUParticles() {
+	START_TIMER("Particle BVH");
 	const Particle_Builder bvh_build = Particle_Builder(particles, d_to_f(PARTICLE_RADIUS), PROBE_MAX_OCTREE_DEPTH);
 	particle_nodes = bvh_build.nodes;
 
@@ -137,6 +140,7 @@ void Kernel::updateGPUParticles() {
 	for (const CPU_Particle& particle : bvh_build.particles) {
 		gpu_particles.push_back(GPU_Particle(particle));
 	}
+	END_TIMER("Particle BVH");
 }
 
 void Kernel::buildParticles() {
@@ -246,6 +250,8 @@ void Kernel::lockParticles() {
 void Kernel::simulate(const dvec1& delta_time) {
 	DT = clamp(delta_time, 0.0, 0.25) * TIME_SCALE;
 	SDT = DT / u_to_d(SUB_SAMPLES);
+	RESET_TIMER("Scatter");
+	RESET_TIMER("Gather");
 
 	const dvec1 day_time = DAY_TIME * 24.0;
 	CALENDAR_HOUR = int(round(day_time - glm::fract(day_time)));
@@ -258,40 +264,35 @@ void Kernel::simulate(const dvec1& delta_time) {
 		}
 
 		// SCATTER
+		START_TIMER("Scatter");
 		for (CPU_Probe& probe : probes) {
 			updateProbePosition(&probe);
 			calculateSunlight(&probe);
 			scatterSPH(&probe);
 		}
+		ADD_TIMER("Scatter");
 
 		// GATHER
+		START_TIMER("Gather");
 		for (CPU_Probe& probe : probes) {
 			gatherWind(&probe);
 			gatherThermodynamics(&probe);
 
 			probe.data = probe.new_data;
 		}
-
+		ADD_TIMER("Gather");
 	}
 
-	//auto first = &probes[0];
-	//compute_particles.clear();
-	//compute_probes.clear();
-
+	START_TIMER("Particle Update");
 	int i = 0;
 	int i_size = ul_to_i(particles.size());
-	//#pragma omp parallel for private(i) num_threads(12)
+	#pragma omp parallel for private(i) num_threads(12)
 	for (i = 0;  i < i_size; i++) {
 		updateParticlePosition(&particles[i]);
 		calculateParticle(&particles[i]);
 		updateParticlePosition(&particles[i]);
-	//	compute_particles.push_back(Compute_Particle(particle, first));
 	}
-	//for (CPU_Probe& probe : probes) {
-	//	compute_probes.push_back(Compute_Probe(probe, first));
-	//}
-
-	//particleCompute();
+	END_TIMER("Particle Update");
 
 	updateGPUParticles();
 	updateGPUProbes();

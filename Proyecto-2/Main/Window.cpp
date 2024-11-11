@@ -57,6 +57,13 @@ Renderer::Renderer() {
 	next_frame = false;
 	lock_settings = false;
 	lock_view = false;
+	
+	INIT_TIMER("Probe BVH")
+	INIT_TIMER("Particle BVH")
+	INIT_TIMER("Particle Update")
+	INIT_TIMER("Scatter")
+	INIT_TIMER("Gather")
+	INIT_TIMER("GUI Loop")
 }
 
 Renderer::~Renderer() {
@@ -220,6 +227,7 @@ void Renderer::f_updateParticles() {
 }
 
 void Renderer::f_guiLoop() {
+	START_TIMER("GUI Loop");
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
 
@@ -414,6 +422,25 @@ void Renderer::f_guiLoop() {
 			ImGui::PopItemWidth();
 		}
 	}
+	if (ImGui::CollapsingHeader("Info")) {
+		ImGui::PushItemWidth(halfWidth);
+		ImGui::Text(("Month:  " + to_str(kernel.CALENDAR_MONTH, 0)).c_str());
+		ImGui::SameLine();
+		ImGui::SetCursorPosX(halfPos);
+		ImGui::Text(("Day:    " + to_str(kernel.CALENDAR_DAY, 0)).c_str());
+		ImGui::Text(("Hour:   " + to_str(kernel.CALENDAR_HOUR, 0)).c_str());
+		ImGui::SameLine();
+		ImGui::SetCursorPosX(halfPos);
+		ImGui::Text(("Minute: " + to_str(kernel.CALENDAR_MINUTE, 0)).c_str());
+		ImGui::Text(("Zoom:   " + to_str(camera_zoom_sensitivity, 1)).c_str());
+		ImGui::SameLine();
+		ImGui::SetCursorPosX(halfPos);
+		ImGui::Text(("Orbit:  " + to_str(camera_orbit_sensitivity, 1)).c_str());
+		ImGui::PopItemWidth();
+	}
+
+	pathtracer.f_guiUpdate(availableWidth, spacing, itemWidth, halfWidth, thirdWidth, halfPos);
+
 	if (ImGui::CollapsingHeader("Performance")) {
 		ImGui::SeparatorText("Average Stats");
 		{
@@ -441,25 +468,28 @@ void Renderer::f_guiLoop() {
 			ImGui::Text(("Fps: " + to_str(frame_count, 0)).c_str());
 			ImGui::PopItemWidth();
 		}
+		ImGui::SeparatorText("Metrics");
+		END_TIMER("GUI Loop");
+		{
+			const dvec1 probe = TIMER("Probe BVH");
+			const dvec1 particle = TIMER("Particle BVH");
+			const dvec1 scatter = TIMER("Scatter");
+			const dvec1 gather = TIMER("Gather");
+			const dvec1 particle_update = TIMER("Particle Update");
+			const dvec1 gui = TIMER("GUI Loop");
+			const dvec1 cpu_time = delta_time - gpu_delta;
+			ImGui::Text(("Delta[" + to_str(d_to_f(delta_time * 1000.0), 2) + "]ms").c_str());
+			ImGui::Text(("CPU[" + to_str(d_to_f(cpu_time * 1000.0), 2) + "]ms").c_str());
+			ImGui::Text(("GPU[" + to_str(d_to_f(gpu_delta * 1000.0), 2) + "]ms").c_str());
+			ImGui::Text(("Probe BVH[" + to_str(d_to_f(probe * 1000.0), 2) + "]ms").c_str());
+			ImGui::Text(("Particle BVH[" + to_str(d_to_f(particle * 100.0), 2) + "]ms").c_str());
+			ImGui::Text(("Scatter[" + to_str(d_to_f(scatter * 1000.0), 2) + "]ms").c_str());
+			ImGui::Text(("Gather[" + to_str(d_to_f(gather * 1000.0), 2) + "]ms").c_str());
+			ImGui::Text(("Particle Update[" + to_str(d_to_f(particle_update * 1000.0), 2) + "]ms").c_str());
+			ImGui::Text(("GUI Loop[" + to_str(d_to_f(gui * 1000.0), 2) + "]ms").c_str());
+			ImGui::Text(("Other[" + to_str(d_to_f((cpu_time - (probe + particle + scatter + gather + particle_update + gui)) * 1000.0), 2) + "]ms").c_str());
+		}
 	}
-	if (ImGui::CollapsingHeader("Info")) {
-		ImGui::PushItemWidth(halfWidth);
-		ImGui::Text(("Month:  " + to_str(kernel.CALENDAR_MONTH, 0)).c_str());
-		ImGui::SameLine();
-		ImGui::SetCursorPosX(halfPos);
-		ImGui::Text(("Day:    " + to_str(kernel.CALENDAR_DAY, 0)).c_str());
-		ImGui::Text(("Hour:   " + to_str(kernel.CALENDAR_HOUR, 0)).c_str());
-		ImGui::SameLine();
-		ImGui::SetCursorPosX(halfPos);
-		ImGui::Text(("Minute: " + to_str(kernel.CALENDAR_MINUTE, 0)).c_str());
-		ImGui::Text(("Zoom:   " + to_str(camera_zoom_sensitivity, 1)).c_str());
-		ImGui::SameLine();
-		ImGui::SetCursorPosX(halfPos);
-		ImGui::Text(("Orbit:  " + to_str(camera_orbit_sensitivity, 1)).c_str());
-		ImGui::PopItemWidth();
-	}
-
-	pathtracer.f_guiUpdate(availableWidth, spacing, itemWidth, halfWidth, thirdWidth, halfPos);
 
 	ImGui::End();
 	ImGui::Render();

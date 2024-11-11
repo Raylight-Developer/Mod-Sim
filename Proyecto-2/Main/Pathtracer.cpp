@@ -235,7 +235,8 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 			if (render_probe_color_mode < SPH) {
 				ImGui::Text("Probe Display Radius");
 				if (ImGui::SliderFloat("##PROBE_RADIUS", &renderer->kernel.PROBE_RADIUS, 0.005f, 0.25f, "%.4f")) {
-					renderer->f_updateProbes();
+					renderer->kernel.updateGPUProbes();
+					f_updateProbes();
 				}
 			}
 
@@ -248,7 +249,8 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 				else {
 					renderer->kernel.BVH_SPH = true;
 				}
-				renderer->f_updateProbes();
+				renderer->kernel.updateGPUProbes();
+				f_updateProbes();
 			}
 		}
 		ImGui::Checkbox("Render Particles", &render_particles);
@@ -256,7 +258,8 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 			ImGui::Checkbox("Render Particle Lighting", &render_particle_lighting);
 			ImGui::Text("Particle Display Radius");
 			if (ImGui::SliderFloat("##PARTICLE_RADIUS", &renderer->kernel.PARTICLE_RADIUS, 0.005f, 0.25f, "%.4f")) {
-				renderer->f_updateParticles();
+				renderer->kernel.updateGPUParticles();
+				f_updateParticles();
 			}
 		}
 	}
