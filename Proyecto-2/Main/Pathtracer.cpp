@@ -101,6 +101,7 @@ void PathTracer::f_initialize() {
 	#else
 		f_updateTextures(false);
 	#endif // DEBUG
+		renderer->f_resize();
 }
 
 void PathTracer::f_updateProbes() {
@@ -160,7 +161,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 
 	if (ImGui::CollapsingHeader("Pathtracing Optimization Settings")) {
 		ImGui::Text("Render Scale");
-		if (ImGui::SliderFloat("##render_scale", &renderer->render_scale, 0.1f, 1.0f, "%.3f")) {
+		if (ImGui::SliderFloat("##render_scale", &renderer->render_scale, 0.05f, 2.0f, "%.3f")) {
 			renderer->f_resize();
 		}
 		ImGui::Checkbox("Use Probe Octree", &use_probe_octree);
@@ -170,7 +171,8 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 			ImGui::Text("Max Probe Octree Depth");
 			if (ImGui::SliderInt("##PROBE_MAX_OCTREE_DEPTH", &MAX_OCTREE_DEPTH, 0, 6)) {
 				renderer->kernel.PROBE_MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
-				renderer->f_updateProbes();
+				renderer->kernel.updateGPUProbes();
+				f_updateProbes();
 			}
 		}
 		if (!renderer->run_sim and use_particle_octree) {
@@ -178,7 +180,8 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 			ImGui::Text("Max Particle Octree Depth");
 			if (ImGui::SliderInt("##PARTICLE_MAX_OCTREE_DEPTH", &MAX_OCTREE_DEPTH, 0, 6)) {
 				renderer->kernel.PARTICLE_MAX_OCTREE_DEPTH = i_to_u(MAX_OCTREE_DEPTH);
-				renderer->f_updateParticles();
+				renderer->kernel.updateGPUParticles();
+				f_updateParticles();
 			}
 		}
 	}
@@ -281,6 +284,12 @@ void PathTracer::f_recompile() {
 			gl_data["display_program"] = confirmation.data;
 		}
 	}
+	//{
+	//	auto confirmation = computeShaderProgram("Compute/Compute");
+	//	if (confirmation) {
+	//		renderer->kernel.compute_program = confirmation.data;
+	//	}
+	//}
 }
 
 void PathTracer::f_cleanup() {

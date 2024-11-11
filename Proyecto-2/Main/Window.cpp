@@ -18,6 +18,7 @@ Renderer::Renderer() {
 	}
 
 	camera_transform = Transform(dvec3(0, 0, 37.5), dvec3(0));
+	world_rot = dquat(1,0,0,0);
 	camera = dquat(1,0,0,0);
 	zoom = 37.5;
 
@@ -39,7 +40,7 @@ Renderer::Renderer() {
 	render_aspect_ratio = u_to_d(render_resolution.x) / u_to_d(render_resolution.y);
 
 	camera_zoom_sensitivity = 7.5;
-	camera_orbit_sensitivity = 2.0;
+	camera_orbit_sensitivity = 0.05;
 	input_lerp = 10.0;
 	inputs = vector(6, false);
 	input_lerps = vector(6, dvec3(0.0));
@@ -195,8 +196,8 @@ void Renderer::f_tickUpdate() {
 			kernel.simulate(delta_time);
 		}
 
-		kernel.buildProbes();
-		kernel.buildParticles();
+		//kernel.buildProbes();
+		//kernel.buildParticles();
 
 		const dvec1 start = glfwGetTime();
 		pathtracer.f_updateProbes();
@@ -485,18 +486,12 @@ void Renderer::f_frameUpdate() {
 }
 
 void Renderer::f_inputLoop() {
-	dvec3 tilt = dvec3(0, 1, 0);
-	dvec3 fwd = dvec3(1, 0, 0);
 	if (lock_view) {
 		const dmat4 rotmat = glm::rotate(dmat4(1.0), -glm::radians(kernel.EARTH_TILT), dvec3(0, 0, 1));
-		tilt = glm::normalize(dvec3(rotmat * dvec4(0,1,0,1)));
-		fwd = glm::normalize(dvec3(rotmat * dvec4(0,0,1,1)));
-		camera = glm::rotate(camera, glm::radians(delta_time * kernel.TIME_SCALE * 0.01 * 360.0), tilt);
-
-		//
-		//const dvec2 rotation = dvec2(sin(-glm::radians(kernel.DAY_TIME) * TWO_PI), 0);// glm::radians(delta_time * kernel.TIME_SCALE * 180.0));
-		//camera_transform.orbit(dvec3(0), rotation);
+		const dvec3 tilt = glm::normalize(dvec3(rotmat * dvec4(0,1,0,1)));
+		world_rot = glm::rotate(world_rot, glm::radians(delta_time * kernel.TIME_SCALE * 0.01 * 360.0), tilt);
 	}
+	camera = world_rot * dquat(camera_transform.euler_rotation);
 	for (uint i = 0; i < 6; i++) {
 		dvec3* input = &input_lerps[i];
 		if (input->y < 1.0) {
@@ -507,26 +502,20 @@ void Renderer::f_inputLoop() {
 		}
 		if (i == 0) {
 			camera_transform.orbit(dvec3(0), dvec2(-1, 0) * input->x * camera_orbit_sensitivity * 10.0 * delta_time);
-			camera = glm::rotate(camera, -1.0 * input->x * camera_orbit_sensitivity * delta_time, fwd);
 		}
 		if (i == 1) {
 			camera_transform.orbit(dvec3(0), dvec2(0, -1) * input->x * camera_orbit_sensitivity * 10.0 * delta_time);
-			camera = glm::rotate(camera, -1.0 * input->x * camera_orbit_sensitivity * delta_time, tilt);
 		}
 		if (i == 2) {
 			camera_transform.orbit(dvec3(0), dvec2(1, 0) * input->x * camera_orbit_sensitivity * 10.0 * delta_time);
-			camera = glm::rotate(camera, 1.0 * input->x * camera_orbit_sensitivity * delta_time, fwd);
 		}
 		if (i == 3) {
 			camera_transform.orbit(dvec3(0), dvec2(0, 1) * input->x * camera_orbit_sensitivity * 10.0 * delta_time);
-			camera = glm::rotate(camera, 1.0 * input->x * camera_orbit_sensitivity * delta_time, tilt);
 		}
 		if (i == 4) {
-			camera_transform.moveLocal(dvec3(0, 0, -1) * input->x * camera_zoom_sensitivity * delta_time);
 			zoom -= 1.0 * input->x * camera_zoom_sensitivity * delta_time;
 		}
 		if (i == 5) {
-			camera_transform.moveLocal(dvec3(0, 0, 1) * input->x * camera_zoom_sensitivity * delta_time);
 			zoom += 1.0 * input->x * camera_zoom_sensitivity * delta_time;
 		}
 	}

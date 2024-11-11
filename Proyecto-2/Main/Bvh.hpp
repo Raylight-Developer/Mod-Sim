@@ -12,7 +12,7 @@ struct CPU_Bvh {
 	vector<CPU_Probe> probes;
 	vector<CPU_Particle> particles;
 	vector<CPU_Bvh> children;
-	uint particle_count;
+	uint item_count;
 	bool discard;
 
 	CPU_Bvh();

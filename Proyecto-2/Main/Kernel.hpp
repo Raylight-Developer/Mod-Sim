@@ -50,12 +50,12 @@ struct Kernel {
 	vector<GPU_Probe>        gpu_probes;
 	vector<GPU_Particle>     gpu_particles;
 
-	vector<Compute_Probe>    compute_probes;
-	vector<Compute_Particle> compute_particles;
-
 	vector<GPU_Bvh>          probe_nodes;
 	vector<GPU_Bvh>          particle_nodes;
 
+	vector<Compute_Probe>    compute_probes;
+	vector<Compute_Particle> compute_particles;
+	GLuint compute_program;
 
 	Kernel();
 
@@ -81,6 +81,7 @@ struct Kernel {
 	void gatherWind(CPU_Probe* probe) const;
 	void gatherThermodynamics(CPU_Probe* probe) const;
 
+	void particleCompute();
 	void calculateParticle(CPU_Particle* particle) const;
 	void updateParticlePosition(CPU_Particle* particle) const;
 

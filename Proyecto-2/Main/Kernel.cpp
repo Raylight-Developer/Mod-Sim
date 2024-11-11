@@ -9,18 +9,17 @@
 
 #define CORIOLIS           vec3(15.0, 0, 0)
 
-#pragma optimize("O3", on)
 Kernel::Kernel() {
 	PARTICLE_RADIUS           = 0.025f;
 	PARTICLE_COUNT            = 8192;
-	PARTICLE_MAX_OCTREE_DEPTH = 2;
+	PARTICLE_MAX_OCTREE_DEPTH = 1;
 	PARTICLE_POLE_BIAS        = 0.0;
 	PARTICLE_POLE_BIAS_POWER  = 1.0;
 	PARTICLE_POLE_GEOLOCATION = dvec2(25.0, 90.0);
 
 	PROBE_RADIUS           = 0.05f;
 	PROBE_COUNT            = 8192;
-	PROBE_MAX_OCTREE_DEPTH = 3;
+	PROBE_MAX_OCTREE_DEPTH = 1;
 	PROBE_POLE_BIAS        = 0.0;//0.975;
 	PROBE_POLE_BIAS_POWER  = 1.0;// 5.0;
 	PROBE_POLE_GEOLOCATION = dvec2(25.0, 90.0);
@@ -92,7 +91,6 @@ Kernel::Kernel() {
 	textures[Texture_Field::REFLECTED_SHORTWAVE_RADIATION] = Texture::fromFile("./Resources/Data/Reflected Shortwave Radiation LR.png", Texture_Format::MONO_FLOAT);
 #endif
 }
-#pragma optimize("", on)
 
 void Kernel::updateGPUProbes() {
 	const Builder bvh_build = BVH_SPH ? Builder(probes, -1.0f, 1): Builder(probes, d_to_f(PROBE_RADIUS), PROBE_MAX_OCTREE_DEPTH);
@@ -276,14 +274,24 @@ void Kernel::simulate(const dvec1& delta_time) {
 
 	}
 
-	auto first = &probes[0];
-	compute_particles.clear();
-	for (CPU_Particle& particle : particles) {
-		updateParticlePosition(&particle);
-		calculateParticle(&particle);
-		updateParticlePosition(&particle);
-		compute_particles.push_back(Compute_Particle(particle, first));
+	//auto first = &probes[0];
+	//compute_particles.clear();
+	//compute_probes.clear();
+
+	int i = 0;
+	int i_size = ul_to_i(particles.size());
+	//#pragma omp parallel for private(i) num_threads(12)
+	for (i = 0;  i < i_size; i++) {
+		updateParticlePosition(&particles[i]);
+		calculateParticle(&particles[i]);
+		updateParticlePosition(&particles[i]);
+	//	compute_particles.push_back(Compute_Particle(particle, first));
 	}
+	//for (CPU_Probe& probe : probes) {
+	//	compute_probes.push_back(Compute_Probe(probe, first));
+	//}
+
+	//particleCompute();
 
 	updateGPUParticles();
 	updateGPUProbes();
@@ -507,6 +515,32 @@ void Kernel::gatherThermodynamics(CPU_Probe* probe) const {
 	}
 	probe->new_data.temperature += net_heat * SDT;
 	probe->new_data.pressure += net_heat * SDT;
+}
+
+void Kernel::particleCompute() {
+	GLuint ssbo_probes;
+	GLuint ssbo_particles;
+	glGenBuffers(1, &ssbo_probes);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_probes);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, ul_to_u(compute_probes.size() * sizeof(Compute_Probe)), compute_probes.data(), GL_DYNAMIC_COPY);
+	glGenBuffers(1, &ssbo_particles);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_particles);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, ul_to_u(compute_particles.size() * sizeof(Compute_Particle)), compute_particles.data(), GL_DYNAMIC_COPY);
+
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo_probes);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo_particles);
+
+	glUseProgram(compute_program);
+	glDispatchCompute(d_to_u(ceil(ul_to_d(compute_particles.size()) / 64.0)), 1, 1);
+
+	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_probes);
+	void* ptr = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+	if (ptr) {
+		std::memcpy(compute_probes.data(), ptr, compute_probes.size() * sizeof(Compute_Particle));
+		glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+	}
 }
 
 void Kernel::calculateParticle(CPU_Particle* particle) const {

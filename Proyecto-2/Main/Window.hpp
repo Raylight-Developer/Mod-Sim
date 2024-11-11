@@ -19,6 +19,7 @@ struct Renderer {
 	PathTracer pathtracer;
 
 	Transform camera_transform;
+	dquat world_rot;
 	dquat camera;
 	dvec1 zoom;
 

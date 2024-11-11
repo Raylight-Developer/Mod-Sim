@@ -6,7 +6,7 @@ CPU_Bvh::CPU_Bvh():
 	p_min(vec3(MAX_VEC1)),
 	p_max(vec3(MIN_VEC1)),
 	parent(nullptr),
-	particle_count(0),
+	item_count(0),
 	discard(true)
 {}
 
@@ -14,7 +14,7 @@ CPU_Bvh::CPU_Bvh(const vec3& pmin, const vec3& pmax) :
 	p_min(pmin),
 	p_max(pmax),
 	parent(nullptr),
-	particle_count(0)
+	item_count(0)
 {
 	if (p_min.x > p_max.x) {
 		auto temp = p_min.x;
@@ -147,14 +147,14 @@ void Builder::splitBvh(CPU_Bvh* node, const uint& depth) {
 		for (const CPU_Probe& probe : probes) {
 			if (child.contains(probe)) {
 				child.discard = false;
-				child.particle_count++;
-				if (child.particle_count > 16) {
+				child.item_count++;
+				if (child.item_count > 16) {
 					break;
 				}
 			}
 		}
 		if (child.discard == false) {
-			if (depth < depth_cutoff and child.particle_count > 16) {
+			if (depth < depth_cutoff and child.item_count > 16) {
 				splitBvh(&child, depth + 1);
 			}
 			else {
@@ -214,14 +214,14 @@ void Builder::splitBvhSPH(CPU_Bvh* node, const uint& depth) {
 		for (const CPU_Probe& probe : probes) {
 			if (child.contains(probe)) {
 				child.discard = false;
-				child.particle_count++;
-				if (child.particle_count > 16) {
+				child.item_count++;
+				if (child.item_count > 16) {
 					break;
 				}
 			}
 		}
 		if (child.discard == false) {
-			if (depth < depth_cutoff and child.particle_count > 16) {
+			if (depth < depth_cutoff and child.item_count > 16) {
 				splitBvhSPH(&child, depth + 1);
 			}
 			else {
@@ -330,17 +330,18 @@ void Particle_Builder::splitBvh(CPU_Bvh* node, const uint& depth) {
 
 	for (auto it = node->children.begin(); it != node->children.end(); ) {
 		CPU_Bvh& child = *it;
+
 		for (const CPU_Particle& particle : particles) {
 			if (child.contains(particle)) {
 				child.discard = false;
-				child.particle_count++;
-				if (child.particle_count > 16) {
+				child.item_count++;
+				if (child.item_count > 16) {
 					break;
 				}
 			}
 		}
 		if (child.discard == false) {
-			if (depth < depth_cutoff and child.particle_count > 16) {
+			if (depth < depth_cutoff and child.item_count > 16) {
 				splitBvh(&child, depth + 1);
 			}
 			else {
