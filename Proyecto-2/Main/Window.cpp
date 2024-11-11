@@ -83,7 +83,7 @@ Renderer::~Renderer() {
 void Renderer::init() {
 	initGlfw();
 	initImGui();
-	//systemInfo();
+	systemInfo();
 
 	f_pipeline();
 	current_time = chrono::high_resolution_clock::now();
@@ -508,14 +508,6 @@ void Renderer::f_guiLoop() {
 			ImGui::SetCursorPosX(thirdPos * 2.0f);
 			ImGui::Text((to_str(d_to_f(cpu_time / frame_count * 1000.0), 2) + " ms").c_str());
 
-			ImGui::Text("GPU");
-			ImGui::SameLine();
-			ImGui::SetCursorPosX(thirdPos);
-			ImGui::Text((to_str(d_to_f(gpu_time * 1000.0), 2) + " ms").c_str());
-			ImGui::SameLine();
-			ImGui::SetCursorPosX(thirdPos * 2.0f);
-			ImGui::Text((to_str(d_to_f(gpu_time / frame_count * 1000.0), 2) + " ms").c_str());
-
 			ImGui::Text("CPU -> GPU");
 			ImGui::SameLine();
 			ImGui::SetCursorPosX(thirdPos);
@@ -523,6 +515,14 @@ void Renderer::f_guiLoop() {
 			ImGui::SameLine();
 			ImGui::SetCursorPosX(thirdPos * 2.0f);
 			ImGui::Text((to_str(d_to_f(transfer / frame_count * 1000.0), 2) + " ms").c_str());
+
+			ImGui::Text("GPU");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos);
+			ImGui::Text((to_str(d_to_f(gpu_time * 1000.0), 2) + " ms").c_str());
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(thirdPos * 2.0f);
+			ImGui::Text((to_str(d_to_f(gpu_time / frame_count * 1000.0), 2) + " ms").c_str());
 
 			ImGui::Text("Probe BVH");
 			ImGui::SameLine();

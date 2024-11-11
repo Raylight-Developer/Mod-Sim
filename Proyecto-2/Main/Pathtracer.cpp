@@ -90,8 +90,8 @@ void PathTracer::f_initialize() {
 
 	f_recompile();
 
-	compute_layout.x = d_to_u(ceil(u_to_d(renderer->render_resolution.x) / 32.0));
-	compute_layout.y = d_to_u(ceil(u_to_d(renderer->render_resolution.y) / 32.0));
+	compute_layout.x = d_to_u(ceil(u_to_d(renderer->render_resolution.x) / 16.0));
+	compute_layout.y = d_to_u(ceil(u_to_d(renderer->render_resolution.y) / 16.0));
 
 	// Compute Output
 	gl_data["raw_render_layer"] = renderLayer(renderer->render_resolution);
@@ -108,17 +108,19 @@ void PathTracer::f_updateProbes() {
 	START_TIMER("Transfer");
 	glDeleteBuffers(1, &gl_data["ssbo 1"]);
 	glDeleteBuffers(1, &gl_data["ssbo 2"]);
-	gl_data["ssbo 1"] = ssboBinding(ul_to_u(renderer->kernel.gpu_probes.size() * sizeof(GPU_Probe)), renderer->kernel.gpu_probes.data());
-	gl_data["ssbo 2"] = ssboBinding(ul_to_u(renderer->kernel.probe_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.probe_nodes.data());
+	gl_data["ssbo 1"] = ssboBindingDynamic(ul_to_u(renderer->kernel.gpu_probes.size() * sizeof(GPU_Probe)), renderer->kernel.gpu_probes.data());
+	gl_data["ssbo 2"] = ssboBindingDynamic(ul_to_u(renderer->kernel.probe_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.probe_nodes.data());
 	ADD_TIMER("Transfer");
 }
+
+// TODO, persistent GPU_DATA to avoid expensive overwrites
 
 void PathTracer::f_updateParticles() {
 	START_TIMER("Transfer");
 	glDeleteBuffers(1, &gl_data["ssbo 3"]);
 	glDeleteBuffers(1, &gl_data["ssbo 4"]);
-	gl_data["ssbo 3"] = ssboBinding(ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
-	gl_data["ssbo 4"] = ssboBinding(ul_to_u(renderer->kernel.particle_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.particle_nodes.data());
+	gl_data["ssbo 3"] = ssboBindingDynamic(ul_to_u(renderer->kernel.gpu_particles.size() * sizeof(GPU_Particle)), renderer->kernel.gpu_particles.data());
+	gl_data["ssbo 4"] = ssboBindingDynamic(ul_to_u(renderer->kernel.particle_nodes.size() * sizeof(GPU_Bvh)), renderer->kernel.particle_nodes.data());
 	ADD_TIMER("Transfer");
 }
 
@@ -165,7 +167,7 @@ void PathTracer::f_guiUpdate(const vec1& availableWidth, const vec1& spacing, co
 
 	if (ImGui::CollapsingHeader("Pathtracing Optimization Settings")) {
 		ImGui::Text("Render Scale");
-		if (ImGui::SliderFloat("##render_scale", &renderer->render_scale, 0.05f, 2.0f, "%.3f")) {
+		if (ImGui::SliderFloat("##render_scale", &renderer->render_scale, 0.05f, 1.0f, "%.3f")) {
 			renderer->f_resize();
 		}
 		ImGui::Checkbox("Use Probe Octree", &use_probe_octree);
@@ -322,8 +324,8 @@ void PathTracer::f_cleanup() {
 }
 
 void PathTracer::f_resize() {
-	compute_layout.x = d_to_u(ceil(u_to_d(renderer->render_resolution.x) / 32.0));
-	compute_layout.y = d_to_u(ceil(u_to_d(renderer->render_resolution.y) / 32.0));
+	compute_layout.x = d_to_u(ceil(u_to_d(renderer->render_resolution.x) / 8.0));
+	compute_layout.y = d_to_u(ceil(u_to_d(renderer->render_resolution.y) / 8.0));
 
 	glDeleteTextures(1, &gl_data["raw_render_layer"]);
 	gl_data["raw_render_layer"] = renderLayer(renderer->render_resolution);

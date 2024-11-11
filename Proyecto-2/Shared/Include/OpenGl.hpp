@@ -55,3 +55,11 @@ GLuint ssboBinding(const GLuint& size, const T& data) {
 	glBufferData(GL_SHADER_STORAGE_BUFFER, size, data, GL_STATIC_DRAW);
 	return buffer;
 }
+template <typename T>
+GLuint ssboBindingDynamic(const GLuint& size, const T& data) {
+	GLuint buffer;
+	glGenBuffers(1, &buffer);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
+	glBufferStorage(GL_SHADER_STORAGE_BUFFER, size, data, GL_DYNAMIC_STORAGE_BIT);
+	return buffer;
+}
