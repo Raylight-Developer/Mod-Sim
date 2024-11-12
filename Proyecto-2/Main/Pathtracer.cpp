@@ -9,8 +9,8 @@ PathTracer::PathTracer(Renderer* renderer) :
 	compute_layout = uvec2(0);
 
 	render_planet            = true;
-	render_lighting          = false;
-	render_atmosphere        = false;
+	render_lighting          = true;
+	render_atmosphere        = true;
 
 	use_probe_octree         = true;
 	use_particle_octree      = true;
@@ -23,8 +23,8 @@ PathTracer::PathTracer(Renderer* renderer) :
 		render_octree_debug       = false;
 		render_octree_debug_index = 0;
 	}
-	render_particles = true;
-	render_probes    = true;
+	render_particles = false;
+	render_probes    = false;
 	{
 		render_probe_color_mode = 1;
 	}

@@ -105,7 +105,7 @@ void Renderer::initGlfw() {
 	display_resolution = uvec2(mode->width, mode->height);
 	display_aspect_ratio = u_to_d(display_resolution.x) / u_to_d(display_resolution.y);
 
-	window = glfwCreateWindow(display_resolution.x, display_resolution.y, "Screensaver", NULL, NULL);
+	window = glfwCreateWindow(display_resolution.x, display_resolution.y, "Terra", NULL, NULL);
 
 	if (window == NULL) {
 		cerr << "Failed to create GLFW window" << endl;
@@ -113,7 +113,7 @@ void Renderer::initGlfw() {
 	}
 
 	int width, height, channels;
-	unsigned char* image = stbi_load("Resources/Logo.png", &width, &height, &channels, 4);
+	unsigned char* image = stbi_load("Resources/Icon.png", &width, &height, &channels, 4);
 	if (!image) {
 		cerr << "Failed to load icon image" << std::endl;
 	} else {
@@ -290,147 +290,145 @@ void Renderer::f_guiLoop() {
 				next_frame = true;
 			}
 		}
-		else {
-			if (ImGui::Button("Lock n Load Settings", ImVec2(itemWidth, 0))) {
-				lock_settings = true;
-				kernel.lock();
-				next_frame = true;
-			}
+		if (ImGui::Button("Lock Settings", ImVec2(itemWidth, 0))) {
+			lock_settings = true;
+			kernel.lock();
+			kernel.simulate(0.00001);
+		}
 
-			if (ImGui::CollapsingHeader("Probe Settings")) {
-				ImGui::PushItemWidth(itemWidth);
-				int PROBE_COUNT = u_to_i(kernel.PROBE_COUNT);
-				ImGui::Text("Probe Count");
-				if (ImGui::SliderInt("##PROBE_COUNT", &PROBE_COUNT, 128, 8192 * 4)) {
-					kernel.PROBE_COUNT = i_to_u(PROBE_COUNT);
-					f_updateProbes();
-				}
-				ImGui::PopItemWidth();
-				ImGui::SeparatorText("Earth Settings");
-				ImGui::PushItemWidth(halfWidth);
-
-				ImGui::Text("Latitude");
-				ImGui::SameLine();
-				ImGui::SetCursorPosX(halfPos);
-				ImGui::Text("Longitude");
-				float lon = d_to_f(kernel.PROBE_POLE_GEOLOCATION.x);
-				if (ImGui::SliderFloat("##PROBE_POLE_GEOLOCATION_x", &lon, -90.0f, 90.0f, "%.4f")) {
-					kernel.PROBE_POLE_GEOLOCATION.x = f_to_d(lon);
-					f_updateProbes();
-				}
-				ImGui::SameLine();
-				float lat = d_to_f(kernel.PROBE_POLE_GEOLOCATION.y);
-				if (ImGui::SliderFloat("##PROBE_POLE_GEOLOCATION_y", &lat, -180.0f, 180.0f, "%.4f")) {
-					kernel.PROBE_POLE_GEOLOCATION.y = f_to_d(lat);
-					f_updateProbes();
-				}
-
-				ImGui::Text("Pole Bias");
-				ImGui::SameLine();
-				ImGui::SetCursorPosX(halfPos);
-				ImGui::Text("Pole Power");
-				float pole_bias = d_to_f(kernel.PROBE_POLE_BIAS);
-				if (ImGui::SliderFloat("##PROBE_POLE_BIAS", &pole_bias, 0.0f, 1.0f, "%.5f")) {
-					kernel.PROBE_POLE_BIAS = f_to_d(pole_bias);
-					f_updateProbes();
-				}
-				ImGui::SameLine();
-				float pole_power = d_to_f(kernel.PROBE_POLE_BIAS_POWER);
-				if (ImGui::SliderFloat("##PROBE_POLE_BIAS_POWER", &pole_power, 1.0f, 10.0f)) {
-					kernel.PROBE_POLE_BIAS_POWER = f_to_d(pole_power);
-					f_updateProbes();
-				}
-			}
-			if (ImGui::CollapsingHeader("Particle Settings")) {
-				ImGui::PushItemWidth(itemWidth);
-				int PARTICLE_COUNT = u_to_i(kernel.PARTICLE_COUNT);
-				ImGui::Text("Particle Count");
-				if (ImGui::SliderInt("##PARTICLE_COUNT", &PARTICLE_COUNT, 128, 8192 * 4)) {
-					kernel.PARTICLE_COUNT = i_to_u(PARTICLE_COUNT);
-					f_updateParticles();
-				}
-				ImGui::PopItemWidth();
-				ImGui::SeparatorText("Earth Settings");
-				ImGui::PushItemWidth(halfWidth);
-
-				ImGui::Text("Latitude");
-				ImGui::SameLine();
-				ImGui::SetCursorPosX(halfPos);
-				ImGui::Text("Longitude");
-				float lon = d_to_f(kernel.PARTICLE_POLE_GEOLOCATION.x);
-				if (ImGui::SliderFloat("##PARTICLE_POLE_GEOLOCATION_x", &lon, -90.0f, 90.0f, "%.4f")) {
-					kernel.PARTICLE_POLE_GEOLOCATION.x = f_to_d(lon);
-					f_updateParticles();
-				}
-				ImGui::SameLine();
-				float lat = d_to_f(kernel.PARTICLE_POLE_GEOLOCATION.y);
-				if (ImGui::SliderFloat("##PARTICLE_POLE_GEOLOCATION_y", &lat, -180.0f, 180.0f, "%.4f")) {
-					kernel.PARTICLE_POLE_GEOLOCATION.y = f_to_d(lat);
-					f_updateParticles();
-				}
-
-				ImGui::Text("Pole Bias");
-				ImGui::SameLine();
-				ImGui::SetCursorPosX(halfPos);
-				ImGui::Text("Pole Power");
-				float pole_bias = d_to_f(kernel.PARTICLE_POLE_BIAS);
-				if (ImGui::SliderFloat("##PARTICLE_POLE_BIAS", &pole_bias, 0.0f, 1.0f, "%.5f")) {
-					kernel.PARTICLE_POLE_BIAS = f_to_d(pole_bias);
-					f_updateParticles();
-				}
-				ImGui::SameLine();
-				float pole_power = d_to_f(kernel.PARTICLE_POLE_BIAS_POWER);
-				if (ImGui::SliderFloat("##PARTICLE_POLE_BIAS_POWER", &pole_power, 1.0f, 10.0f)) {
-					kernel.PARTICLE_POLE_BIAS_POWER = f_to_d(pole_power);
-					f_updateParticles();
-				}
-			}
-
-			ImGui::PopItemWidth();
+		if (ImGui::CollapsingHeader("Probe Settings")) {
 			ImGui::PushItemWidth(itemWidth);
-			ImGui::Text("Earth Tilt");
-			float tilt = d_to_f(kernel.EARTH_TILT);
-			if (ImGui::SliderFloat("##EARTH_TILT", &tilt, -180.0f, 180.0f, "%.2f")) {
-				kernel.EARTH_TILT = f_to_d(tilt);
+			int PROBE_COUNT = u_to_i(kernel.PROBE_COUNT);
+			ImGui::Text("Probe Count");
+			if (ImGui::SliderInt("##PROBE_COUNT", &PROBE_COUNT, 128, 8192 * 4)) {
+				kernel.PROBE_COUNT = i_to_u(PROBE_COUNT);
 				f_updateProbes();
-				f_updateParticles();
 			}
 			ImGui::PopItemWidth();
+			ImGui::SeparatorText("Earth Settings");
 			ImGui::PushItemWidth(halfWidth);
 
-			ImGui::Text("Month");
-			ImGui::SameLine();
-			ImGui::Text("Day");
-			if (ImGui::SliderInt("##CALENDAR_MONTH", &kernel.CALENDAR_MONTH, 0, 12)) {
-				kernel.calculateDateTime();
-				f_updateProbes();
-				f_updateParticles();
-			}
-			ImGui::SameLine();
-			if (ImGui::SliderInt("##CALENDAR_DAY", &kernel.CALENDAR_DAY, 0, 31)) {
-				kernel.calculateDateTime();
-				f_updateProbes();
-				f_updateParticles();
-			}
-
-			ImGui::Text("Hour");
+			ImGui::Text("Latitude");
 			ImGui::SameLine();
 			ImGui::SetCursorPosX(halfPos);
-			ImGui::Text("Minute");
-			if (ImGui::SliderInt("##CALENDAR_HOUR", &kernel.CALENDAR_HOUR, 0, 24)) {
-				kernel.calculateDateTime();
+			ImGui::Text("Longitude");
+			float lon = d_to_f(kernel.PROBE_POLE_GEOLOCATION.x);
+			if (ImGui::SliderFloat("##PROBE_POLE_GEOLOCATION_x", &lon, -90.0f, 90.0f, "%.4f")) {
+				kernel.PROBE_POLE_GEOLOCATION.x = f_to_d(lon);
 				f_updateProbes();
+			}
+			ImGui::SameLine();
+			float lat = d_to_f(kernel.PROBE_POLE_GEOLOCATION.y);
+			if (ImGui::SliderFloat("##PROBE_POLE_GEOLOCATION_y", &lat, -180.0f, 180.0f, "%.4f")) {
+				kernel.PROBE_POLE_GEOLOCATION.y = f_to_d(lat);
+				f_updateProbes();
+			}
+
+			ImGui::Text("Pole Bias");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(halfPos);
+			ImGui::Text("Pole Power");
+			float pole_bias = d_to_f(kernel.PROBE_POLE_BIAS);
+			if (ImGui::SliderFloat("##PROBE_POLE_BIAS", &pole_bias, 0.0f, 1.0f, "%.5f")) {
+				kernel.PROBE_POLE_BIAS = f_to_d(pole_bias);
+				f_updateProbes();
+			}
+			ImGui::SameLine();
+			float pole_power = d_to_f(kernel.PROBE_POLE_BIAS_POWER);
+			if (ImGui::SliderFloat("##PROBE_POLE_BIAS_POWER", &pole_power, 1.0f, 10.0f)) {
+				kernel.PROBE_POLE_BIAS_POWER = f_to_d(pole_power);
+				f_updateProbes();
+			}
+		}
+		if (ImGui::CollapsingHeader("Particle Settings")) {
+			ImGui::PushItemWidth(itemWidth);
+			int PARTICLE_COUNT = u_to_i(kernel.PARTICLE_COUNT);
+			ImGui::Text("Particle Count");
+			if (ImGui::SliderInt("##PARTICLE_COUNT", &PARTICLE_COUNT, 128, 8192 * 4)) {
+				kernel.PARTICLE_COUNT = i_to_u(PARTICLE_COUNT);
+				f_updateParticles();
+			}
+			ImGui::PopItemWidth();
+			ImGui::SeparatorText("Earth Settings");
+			ImGui::PushItemWidth(halfWidth);
+
+			ImGui::Text("Latitude");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(halfPos);
+			ImGui::Text("Longitude");
+			float lon = d_to_f(kernel.PARTICLE_POLE_GEOLOCATION.x);
+			if (ImGui::SliderFloat("##PARTICLE_POLE_GEOLOCATION_x", &lon, -90.0f, 90.0f, "%.4f")) {
+				kernel.PARTICLE_POLE_GEOLOCATION.x = f_to_d(lon);
 				f_updateParticles();
 			}
 			ImGui::SameLine();
-			if (ImGui::SliderInt("##CALENDAR_MINUTE", &kernel.CALENDAR_MINUTE, 0, 60)) {
-				kernel.calculateDateTime();
-				f_updateProbes();
+			float lat = d_to_f(kernel.PARTICLE_POLE_GEOLOCATION.y);
+			if (ImGui::SliderFloat("##PARTICLE_POLE_GEOLOCATION_y", &lat, -180.0f, 180.0f, "%.4f")) {
+				kernel.PARTICLE_POLE_GEOLOCATION.y = f_to_d(lat);
 				f_updateParticles();
 			}
 
-			ImGui::PopItemWidth();
+			ImGui::Text("Pole Bias");
+			ImGui::SameLine();
+			ImGui::SetCursorPosX(halfPos);
+			ImGui::Text("Pole Power");
+			float pole_bias = d_to_f(kernel.PARTICLE_POLE_BIAS);
+			if (ImGui::SliderFloat("##PARTICLE_POLE_BIAS", &pole_bias, 0.0f, 1.0f, "%.5f")) {
+				kernel.PARTICLE_POLE_BIAS = f_to_d(pole_bias);
+				f_updateParticles();
+			}
+			ImGui::SameLine();
+			float pole_power = d_to_f(kernel.PARTICLE_POLE_BIAS_POWER);
+			if (ImGui::SliderFloat("##PARTICLE_POLE_BIAS_POWER", &pole_power, 1.0f, 10.0f)) {
+				kernel.PARTICLE_POLE_BIAS_POWER = f_to_d(pole_power);
+				f_updateParticles();
+			}
 		}
+
+		ImGui::PopItemWidth();
+		ImGui::PushItemWidth(itemWidth);
+		ImGui::Text("Earth Tilt");
+		float tilt = d_to_f(kernel.EARTH_TILT);
+		if (ImGui::SliderFloat("##EARTH_TILT", &tilt, -89.0f, 89.0f, "%.2f")) {
+			kernel.EARTH_TILT = f_to_d(tilt);
+			f_updateProbes();
+			f_updateParticles();
+		}
+		ImGui::PopItemWidth();
+		ImGui::PushItemWidth(halfWidth);
+
+		ImGui::Text("Month");
+		ImGui::SameLine();
+		ImGui::Text("Day");
+		if (ImGui::SliderInt("##CALENDAR_MONTH", &kernel.CALENDAR_MONTH, 0, 12)) {
+			kernel.calculateDateTime();
+			f_updateProbes();
+			f_updateParticles();
+		}
+		ImGui::SameLine();
+		if (ImGui::SliderInt("##CALENDAR_DAY", &kernel.CALENDAR_DAY, 0, 31)) {
+			kernel.calculateDateTime();
+			f_updateProbes();
+			f_updateParticles();
+		}
+
+		ImGui::Text("Hour");
+		ImGui::SameLine();
+		ImGui::SetCursorPosX(halfPos);
+		ImGui::Text("Minute");
+		if (ImGui::SliderInt("##CALENDAR_HOUR", &kernel.CALENDAR_HOUR, 0, 24)) {
+			kernel.calculateDateTime();
+			f_updateProbes();
+			f_updateParticles();
+		}
+		ImGui::SameLine();
+		if (ImGui::SliderInt("##CALENDAR_MINUTE", &kernel.CALENDAR_MINUTE, 0, 60)) {
+			kernel.calculateDateTime();
+			f_updateProbes();
+			f_updateParticles();
+		}
+
+		ImGui::PopItemWidth();
 	}
 	if (ImGui::CollapsingHeader("Info")) {
 		ImGui::PushItemWidth(halfWidth);

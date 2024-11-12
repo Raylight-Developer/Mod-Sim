@@ -175,7 +175,7 @@ void Kernel::buildParticles() {
 }
 
 void Kernel::lock() {
-	textures.clear();
+	//textures.clear();
 	lockProbes();
 	lockParticles();
 }
