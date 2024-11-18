@@ -47,6 +47,15 @@
     <ClCompile Include="Kernel.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="Bvh.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Particle.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Pathtracer.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Shared\Include\Glm.hpp">
@@ -82,10 +91,19 @@
     <ClInclude Include="Window.hpp">
       <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Shared\Include\External\stb_image.h">
-      <Filter>Shared\External</Filter>
-    </ClInclude>
     <ClInclude Include="Kernel.hpp">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Lut.hpp">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Bvh.hpp">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Particle.hpp">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Pathtracer.hpp">
       <Filter>Include</Filter>
     </ClInclude>
   </ItemGroup>

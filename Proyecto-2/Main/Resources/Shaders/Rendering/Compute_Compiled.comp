@@ -1,0 +1,869 @@
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+#version 460
+//#extension GL_ARB_gpu_shader_fp64 : enable
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+struct Probe {
+	vec3  position;
+	float height;
+
+	vec3  wind_vector;
+	float sun_intensity;
+
+	float wind_u;
+	float wind_v;
+	vec2 padding;
+
+	float pressure;
+	float temperature;
+	float day_temperature;
+	float night_temperature;
+
+	float humidity;
+	float water_vapor;
+	float cloud_coverage;
+	float cloud_water_content;
+
+	float cloud_particle_radius;
+	float cloud_optical_thickness;
+	float ozone;
+	float albedo;
+
+	float uv_index;
+	float net_radiation;
+	float solar_insolation;
+	float outgoing_longwave_radiation;
+
+	float reflected_shortwave_radiation;
+	uint  gen_index;
+	float smoothing_radius;
+
+	float sph_pressure;
+
+	vec3  sph_wind_vector;
+	float sph_temperature;
+};
+
+struct Particle {
+	vec4 position;
+};
+
+struct Texture {
+	uint start;
+	uint width;
+	uint height;
+	uint format;
+};
+
+struct Bvh {
+	vec3  p_min;
+	uint  id_start;
+	vec3  p_max;
+	uint  id_end;
+	ivec4 pointers_a;
+	ivec4 pointers_b;
+};
+// INTERNAL ---------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+
+struct Ray {
+	vec3  origin;
+	vec3  direction;
+};
+// DEFINITIONS ------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+
+const float EARTH_RADIUS = 6.371;
+const float ATMOSPHERE_RADIUS = EARTH_RADIUS + 0.5;
+const float EARTH_RADIUS_SQ = 40.589641;
+const float SUN_RADIUS_SQ = 484889.3956;
+
+const float TWO_PI   = 6.28318530718;
+const float PI       = 3.14159265359;
+const float HALF_PI  = 1.57079632679;
+const float INV_PI   = 0.31830988618;
+const float DEG_RAD  = 0.01745329252;
+const float RAD_DEG  = 0.01745329252;
+
+const float MAX_DIST = 1000.0;
+const float EPSILON  = 0.00001;
+
+const uint MAX_UINT = 4294967295;
+const int  SPH = 20;
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+layout(rgba8, binding = 0) writeonly uniform image2D raw_render_layer;
+
+layout(std430, binding = 1) buffer ProbeBuffer {
+	Probe probes[];
+};
+
+layout(std430, binding = 2) buffer BvhProbeBuffer {
+	Bvh probe_nodes[];
+};
+
+layout(std430, binding = 3) buffer ParticleBuffer {
+	Particle particles[];
+};
+
+layout(std430, binding = 4) buffer BvhParticleBuffer {
+	Bvh particle_nodes[];
+};
+
+layout(std430, binding = 5) buffer TextureBuffer {
+	Texture textures[];
+};
+
+layout(std430, binding = 6) buffer TextureDataBuffer {
+	uint texture_data[];
+};
+
+uniform uint  frame_count;
+uniform float aspect_ratio;
+uniform float current_time;
+uniform uvec2 resolution;
+
+uniform vec3  camera_pos;
+uniform vec3  camera_p_uv;
+uniform vec3  camera_p_u;
+uniform vec3  camera_p_v;
+
+uniform float earth_tilt;
+uniform float year_time;
+uniform float day_time;
+
+uniform uint  use_probe_octree;
+uniform uint  use_particle_octree;
+
+uniform uint  render_atmosphere;
+uniform uint  render_lighting;
+uniform uint  render_probe_lighting;
+uniform uint  render_particle_lighting;
+
+uniform uint  render_probe_octree;
+uniform uint  render_particle_octree;
+uniform uint  render_octree_hue;
+uniform uint  render_octree_debug;
+uniform int   render_octree_debug_index;
+
+uniform uint  render_probes;
+uniform float render_probe_radius;
+uniform int   render_probe_color_mode;
+
+uniform uint  render_particles;
+uniform float render_particle_radius;
+
+uniform uint  render_planet;
+uniform int   render_planet_texture;
+vec4 sampleTextureRgba8u(in Texture tex, in vec2 uv) {
+	uint x = uint(uv.x * float(tex.width));
+	uint y = uint(uv.y * float(tex.height));
+
+	x = clamp(x, 0, tex.width - 1);
+	y = clamp(y, 0, tex.height - 1);
+
+	uint index = tex.start + y * tex.width + x;
+	uint color = texture_data[index];
+
+	return vec4(
+		float((color >> 24) & 0xFF) / 255.0,
+		float((color >> 16) & 0xFF) / 255.0,
+		float((color >> 8) & 0xFF) / 255.0,
+		float(color & 0xFF) / 255.0
+	);
+}
+bool f_rayBvhIntersection(in Ray ray, in Bvh box, inout float ray_length) {
+	vec3 f = (box.p_min - ray.origin) * ray.direction;
+	vec3 n = (box.p_max - ray.origin) * ray.direction;
+
+	vec3 tmax = max(f, n);
+	vec3 tmin = min(f, n);
+
+	float t1 = min(tmax.x, min(tmax.y, tmax.z));
+	float t0 = max(tmin.x, max(tmin.y, tmin.z));
+
+	if (t1 >= t0) {
+		if (t0 > 0.0f) {
+			ray_length = t0;
+		}
+		else {
+			ray_length = t1;
+		}
+		return true;
+	}
+	return false;
+}
+
+bool f_rayBvhIntersection(in Ray ray, in Bvh box) {
+	vec3 f = (box.p_min - ray.origin) * ray.direction;
+	vec3 n = (box.p_max - ray.origin) * ray.direction;
+
+	vec3 tmax = max(f, n);
+	vec3 tmin = min(f, n);
+
+	float t1 = min(tmax.x, min(tmax.y, tmax.z));
+	float t0 = max(tmin.x, max(tmin.y, tmin.z));
+
+	if (t1 >= t0) {
+		return true;
+	}
+	return false;
+}
+
+bool f_rayDiskIntersection(in Ray ray, in vec3 position, in float radius, out float t) {
+	vec3 diskNormal = normalize(position);
+	float denom = dot(ray.direction, diskNormal);
+	if (abs(denom) < 1e-6) {
+		return false;
+	}
+
+	float dist = dot(position - ray.origin, diskNormal) / denom;
+	if (dist < 0.0) {
+		return false;
+	}
+
+	vec3 hitPoint = ray.origin + dist * ray.direction;
+	float distToCenter = length(hitPoint - position);
+	if (distToCenter <= radius) {
+		t = dist;
+		return true;
+	}
+}
+
+bool f_raySphereIntersection(in Ray ray, in vec3 position, in float radius, out float t) {
+	vec3 CO = ray.origin - position;
+	float a = dot(ray.direction, ray.direction);
+	float b = 2.0*dot(ray.direction, CO);
+	float c = dot(CO, CO) - radius * radius;
+
+	float delta = b*b - 4.0*a*c;
+	if(delta < 0.0) {
+		return false;
+	}
+	t = (-b-sqrt(delta)) / (2.0*a);
+	return true;
+}
+
+vec2 f_AtmosphereIntersection(in Ray ray, in float radius) {
+	float b = dot( ray.origin, ray.direction );
+	float c = dot( ray.origin, ray.origin ) - radius * radius;
+	
+	float d = b * b - c;
+	if ( d < 0.0 ) {
+		return vec2( MAX_DIST, -MAX_DIST );
+	}
+	d = sqrt( d );
+	
+	return vec2( -b - d, -b + d );
+}
+
+bool f_EarthIntersection(in Ray ray, out float t, out vec2 uv) {
+	float a = dot(ray.direction, ray.direction);
+	float b = 2.0*dot(ray.direction, ray.origin);
+	float c = dot(ray.origin, ray.origin) - EARTH_RADIUS_SQ;
+	float delta = b*b - 4.0*a*c;
+	if (delta < 0.0) {
+		return false;
+	}
+	t = (-b-sqrt(delta)) / (2.0 * a);
+
+	vec3 intersectionPoint = ray.origin + t * ray.direction;
+	vec3 normal = normalize(intersectionPoint);
+	
+	float axialTilt = -radians(earth_tilt);
+	mat3 tiltRotation = mat3(
+		vec3(cos(axialTilt), -sin(axialTilt), 0),
+		vec3(sin(axialTilt), cos(axialTilt), 0),
+		vec3(0, 0, 1));
+	normal = tiltRotation * normal;
+	
+	float theta = acos(normal.y);
+	float phi = atan(normal.z, normal.x);
+
+	uv.x = 1.0 - ((phi + PI) / TWO_PI ) - day_time;
+	uv.x = uv.x - floor(uv.x);
+	uv.y = (theta) / PI;
+	return true;
+}
+
+int f_visitProbeBvh(in Ray ray, inout float result_raylength) {
+	int closest_probe = -1;
+	if (use_probe_octree == 1) {
+		Ray bvh_ray = Ray(ray.origin, normalize(1.0 / ray.direction));
+
+		float t_length = MAX_DIST;
+		float t_dist = MAX_DIST;
+
+		int stack[100];
+		int stack_index = 0;
+		stack[stack_index++] = 0;
+
+		// TODO implement closest BVH First
+		while (stack_index > 0) {
+			--stack_index;
+
+			int currentNode = stack[stack_index];
+			Bvh node = probe_nodes[currentNode];
+
+			if (!f_rayBvhIntersection(bvh_ray, node)) {
+				continue;
+			}
+			if (node.id_end > 0) { // Leaf
+				for (uint i = node.id_start; i < node.id_end; ++i) {
+					float radius = render_probe_radius;
+					if (render_probe_color_mode >= SPH) {
+						radius = probes[i].smoothing_radius;
+					}
+					if (f_raySphereIntersection(ray, probes[i].position, radius, t_dist)) {
+						if (t_dist < t_length) {
+							t_length = t_dist;
+							result_raylength = t_dist;
+							closest_probe = int(i);
+						}
+					}
+				}
+			}
+			else {
+				for (int i = 0; i < 8; ++i) {
+					if (i < 4) {
+						int childIndex = node.pointers_a[i];
+						if (childIndex >= 0) {
+							stack[stack_index++] = childIndex;
+						}
+					}
+					else {
+						int childIndex = node.pointers_b[i - 4];
+						if (childIndex >= 0) {
+							stack[stack_index++] = childIndex;
+						}
+					}
+				}
+			}
+		}
+	}
+	else {
+		float t_length = MAX_DIST;
+		float t_dist = MAX_DIST;
+		for (uint i = 0; i < probes.length(); i ++) {
+			//if (i % 16 == 0) {
+				float radius = render_probe_radius;
+				if (render_probe_color_mode >= SPH) {
+					radius = probes[i].smoothing_radius;
+				}
+				if (f_raySphereIntersection(ray, probes[i].position, radius, t_dist)) {
+					if (t_dist < t_length) {
+						t_length = t_dist;
+						result_raylength = t_dist;
+						closest_probe = int(i);
+					}
+				}
+			//}
+		}
+	}
+	return closest_probe;
+}
+
+int f_visitParticleBvh(in Ray ray, inout float result_raylength) {
+	int closest_particle = -1;
+	if (use_particle_octree == 1) {
+		Ray bvh_ray = Ray(ray.origin, normalize(1.0 / ray.direction));
+
+		float t_length = MAX_DIST;
+		float t_dist = MAX_DIST;
+
+		int stack[100];
+		int stack_index = 0;
+		stack[stack_index++] = 0;
+
+		// TODO implement closest BVH First
+		while (stack_index > 0) {
+			--stack_index;
+
+			int currentNode = stack[stack_index];
+			Bvh node = particle_nodes[currentNode];
+
+			if (!f_rayBvhIntersection(bvh_ray, node)) {
+				continue;
+			}
+			if (node.id_end > 0) { // Leaf
+				for (uint i = node.id_start; i < node.id_end; ++i) {
+					if (f_raySphereIntersection(ray, particles[i].position.xyz, render_particle_radius, t_dist)) {
+						if (t_dist < t_length) {
+							t_length = t_dist;
+							result_raylength = t_dist;
+							closest_particle = int(i);
+						}
+					}
+				}
+			}
+			else {
+				for (int i = 0; i < 8; ++i) {
+					if (i < 4) {
+						int childIndex = node.pointers_a[i];
+						if (childIndex >= 0) {
+							stack[stack_index++] = childIndex;
+						}
+					}
+					else {
+						int childIndex = node.pointers_b[i - 4];
+						if (childIndex >= 0) {
+							stack[stack_index++] = childIndex;
+						}
+					}
+				}
+			}
+		}
+	}
+	else {
+		float t_length = MAX_DIST;
+		float t_dist = MAX_DIST;
+		for (uint i = 0; i < particles.length(); i ++) {
+			//if (i % 16 == 0) {
+				if (f_raySphereIntersection(ray, particles[i].position.xyz, render_particle_radius, t_dist)) {
+					if (t_dist < t_length) {
+						t_length = t_dist;
+						result_raylength = t_dist;
+						closest_particle = int(i);
+					}
+				}
+			//}
+		}
+	}
+	return closest_particle;
+}
+// Written by GLtracy
+
+// math const
+const float MAX = 10000.0;
+
+// ray intersects sphere
+// e = -b +/- sqrt( b^2 - c )
+vec2 ray_vs_sphere( vec3 p, vec3 dir, float r ) {
+	float b = dot( p, dir );
+	float c = dot( p, p ) - r * r;
+	
+	float d = b * b - c;
+	if ( d < 0.0 ) {
+		return vec2( MAX, -MAX );
+	}
+	d = sqrt( d );
+	
+	return vec2( -b - d, -b + d );
+}
+
+// Mie
+// g : ( -0.75, -0.999 )
+//      3 * ( 1 - g^2 )               1 + c^2
+// F = ----------------- * -------------------------------
+//      8pi * ( 2 + g^2 )     ( 1 + g^2 - 2 * g * c )^(3/2)
+float phase_mie( float g, float c, float cc ) {
+	float gg = g * g;
+	
+	float a = ( 1.0 - gg ) * ( 1.0 + cc );
+
+	float b = 1.0 + gg - 2.0 * g * c;
+	b *= sqrt( b );
+	b *= 2.0 + gg;	
+	
+	return ( 3.0 / 8.0 / PI ) * a / b;
+}
+
+// Rayleigh
+// g : 0
+// F = 3/16PI * ( 1 + c^2 )
+float phase_ray( float cc ) {
+	return ( 3.0 / 16.0 / PI ) * ( 1.0 + cc );
+}
+
+// scatter const
+
+const int NUM_OUT_SCATTER = 8;
+const int NUM_IN_SCATTER = 80;
+
+float density( vec3 p, float ph ) {
+	return exp( -max( length( p ) - EARTH_RADIUS, 0.0 ) / ph );
+}
+
+float optic( vec3 p, vec3 q, float ph ) {
+	vec3 s = ( q - p ) / float( NUM_OUT_SCATTER );
+	vec3 v = p + s * 0.5;
+	
+	float sum = 0.0;
+	for ( int i = 0; i < NUM_OUT_SCATTER; i++ ) {
+		sum += density( v, ph );
+		v += s;
+	}
+	sum *= length( s );
+	
+	return sum;
+}
+
+vec3 in_scatter( vec3 o, vec3 dir, vec2 e, vec3 l ) {
+	const float ph_ray = 0.075;
+	const float ph_mie = 0.02;
+	
+	const vec3 k_ray = vec3( 3.8, 13.5, 33.1 );
+	const vec3 k_mie = vec3( 21.0 );
+	const float k_mie_ex = 1.1;
+	
+	vec3 sum_ray = vec3( 0.0 );
+	vec3 sum_mie = vec3( 0.0 );
+	
+	float n_ray0 = 0.0;
+	float n_mie0 = 0.0;
+	
+	float len = ( e.y - e.x ) / float( NUM_IN_SCATTER );
+	vec3 s = dir * len;
+	vec3 v = o + dir * ( e.x + len * 0.5 );
+	
+	for ( int i = 0; i < NUM_IN_SCATTER; i++, v += s ) {
+		float d_ray = density( v, ph_ray ) * len;
+		float d_mie = density( v, ph_mie ) * len;
+		
+		n_ray0 += d_ray;
+		n_mie0 += d_mie;
+		
+#if 0
+		vec2 e = ray_vs_sphere( v, l, EARTH_RADIUS );
+		e.x = max( e.x, 0.0 );
+		if ( e.x < e.y ) {
+			continue;
+		}
+#endif
+		
+		vec2 f = ray_vs_sphere( v, l, ATMOSPHERE_RADIUS );
+		vec3 u = v + l * f.y;
+		
+		float n_ray1 = optic( v, u, ph_ray );
+		float n_mie1 = optic( v, u, ph_mie );
+		
+		vec3 att = exp( - ( n_ray0 + n_ray1 ) * k_ray - ( n_mie0 + n_mie1 ) * k_mie * k_mie_ex );
+		
+		sum_ray += d_ray * att;
+		sum_mie += d_mie * att;
+	}
+
+	float c  = dot( dir, -l );
+	float cc = c * c;
+	vec3 scatter = sum_ray * k_ray * phase_ray( cc ) + sum_mie * k_mie * phase_mie( -0.78, c, cc );
+	return vec3(10.0 * scatter);
+}
+
+mat3 rot3xy( vec2 angle ) {
+	vec2 c = cos( angle );
+	vec2 s = sin( angle );
+	
+	return mat3(
+		c.y, 0.0, -s.y,
+		s.y * s.x, c.x, c.y * s.x,
+		s.y * c.x,-s.x, c.y * c.x
+	);
+}
+float f_mapfloat(float from_min, float from_max, float to_min, float to_max, float value) {
+	return (to_min + ((to_max - to_min) / (from_max - from_min)) * (value - from_min));
+}
+
+vec3 hsv2rgb(vec3 c) {
+	vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+	vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+	return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+vec4 floatToColor(float f) {
+	vec3 color = hsv2rgb(vec3(f, 1.0, 1.0));
+	return vec4(color, 1.0);
+}	
+
+vec4 blendColors(vec4 bottomLayer, vec4 topLayer) {
+	vec3 topColor = topLayer.rgb;
+	vec3 bottomColor = bottomLayer.rgb;
+	float topAlpha = topLayer.a;
+	float bottomAlpha = bottomLayer.a;
+	float outAlpha = topAlpha + bottomAlpha * (1.0 - topAlpha);
+	vec3 outColor = (topColor * topAlpha + bottomColor * bottomAlpha * (1.0 - topAlpha)) / outAlpha;
+	return vec4(outColor, outAlpha);
+}
+
+vec3 f_windToColor(vec3 wind) {
+	vec3 color;
+	float speed = length(wind);
+	float normalizedSpeed = f_mapfloat(0.0, 40.0, 0.0, 1.0, speed);
+
+	if (normalizedSpeed <= 0.5) {
+		float t = normalizedSpeed * 2.0;
+		color = mix(vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 0.0), t);
+	}
+	else {
+		float t = (normalizedSpeed - 0.5) * 2.0;
+		color = mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), t);
+	}
+	return color;
+}
+
+vec3 f_temperatureToColor(float temp) {
+	vec3 color;
+	float t = clamp(temp, 0.0, 1.0);
+
+	if (t < 0.25) {
+		// Interpolate from Red to Yellow
+		float f = t / 0.25;
+		color = mix(vec3(1.0, 0.0, 0.0), vec3(1.0, 1.0, 0.0), f);  // Red to Yellow
+	} else if (t < 0.5) {
+		// Interpolate from Yellow to Green
+		float f = (t - 0.25) / 0.25;
+		color = mix(vec3(1.0, 1.0, 0.0), vec3(0.0, 1.0, 0.0), f);  // Yellow to Green
+	} else if (t < 0.75) {
+		// Interpolate from Green to Blue
+		float f = (t - 0.5) / 0.25;
+		color = mix(vec3(0.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0), f);  // Green to Blue
+	} else {
+		// Interpolate from Blue to Purple
+		float f = (t - 0.75) / 0.25;
+		color = mix(vec3(0.0, 0.0, 1.0), vec3(0.5, 0.0, 0.5), f);  // Blue to Purple
+	}
+	return color;
+}
+
+vec3 f_probeColor(in Probe probe, in float dist) {
+	float distance_factor = clamp(f_mapfloat(39.0, 32.0, 0.0, 1.0, dist), 0, 1);
+	switch (render_probe_color_mode) {
+		case 0:  return vec3(probe.sun_intensity);
+		//case 1:  return f_windToColor(probe.wind_vector);
+		case 1:  return vec3(probe.wind_u, probe.wind_v, 0);
+		case 2:  return vec3(f_mapfloat(-8000.0, 6400.0, 0.0, 1.0, probe.height));
+		case 3:  return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0,probe.pressure));
+		case 4:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 1.0, 0.0, probe.temperature - 273.15));
+		case 5:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 1.0, 0.0, probe.day_temperature - 273.15));
+		case 6:  return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 1.0, 0.0, probe.night_temperature - 273.15));
+		case 7:  return vec3(f_mapfloat(0.1, 0.9, 0.0, 1.0, probe.humidity));
+		case 8:  return vec3(f_mapfloat(0.0, 6.0, 0.0, 1.0, probe.water_vapor));
+		case 9:  return vec3(probe.cloud_coverage);
+		case 10: return vec3(f_mapfloat(0.0, 1000.0, 0.0, 1.0, probe.cloud_water_content));
+		case 11: return vec3(f_mapfloat(4.0, 40.0, 0.0, 1.0, probe.cloud_particle_radius));
+		case 12: return vec3(f_mapfloat(0.0, 0.5, 0.0, 1.0, probe.cloud_optical_thickness));
+		case 13: return vec3(f_mapfloat(100.0, 500.0, 0.0, 1.0, probe.ozone));
+		case 14: return vec3(f_mapfloat(0.0, 0.9, 0.0, 1.0, probe.albedo));
+		case 15: return vec3(f_mapfloat(0.0, 16.0, 0.0, 1.0, probe.uv_index));
+		case 16: return vec3(f_mapfloat(-280.0, 280.0, 0.0, 1.0, probe.net_radiation));
+		case 17: return vec3(f_mapfloat(0.0, 550.0, 0.0, 1.0, probe.solar_insolation));
+		case 18: return vec3(f_mapfloat(85.0, 350.0, 0.0, 1.0, probe.outgoing_longwave_radiation));
+		case 19: return vec3(f_mapfloat(0.0, 425.0, 0.0, 1.0, probe.reflected_shortwave_radiation));
+// SPH
+		case 20: return f_windToColor(probe.sph_wind_vector);
+		case 21: return vec3(f_mapfloat(800.0, 1020.0, 0.0, 1.0, probe.sph_pressure));
+		case 22: return f_temperatureToColor(f_mapfloat(-25.0, 45.0, 1.0, 0.0, probe.sph_temperature - 273.15));
+	}
+	return vec3(1,0,1);
+}
+
+vec3 f_particleColor(in Particle particle, in float dist) {
+	return vec3(1);
+}
+
+vec4 f_earthColor(in vec2 uv, in vec3 normal, in vec3 sun_dir) {
+	vec4 color = vec4(1,0,1,1);
+	float diffuse = clamp(f_mapfloat(-1.0, 1.0, -0.2, 1.0, dot(normal, sun_dir)), 0, 1);
+	const int tex_index = render_planet_texture - 1;
+	if (tex_index >= 0) {
+		color = sampleTextureRgba8u(textures[tex_index], uv);
+	}
+	switch (render_planet_texture) {
+		case 0: {
+			vec4 blue_marble = sampleTextureRgba8u(textures[0], uv);
+			vec4 black_marble = sampleTextureRgba8u(textures[1], uv);
+			black_marble.x = pow(black_marble.x, 1.8) * 0.9;
+			black_marble.y = pow(black_marble.y, 1.8) * 0.9;
+			black_marble.z = pow(black_marble.z, 1.8) * 0.9;
+			color = mix(black_marble, blue_marble, diffuse);
+			if (render_lighting == 0) {
+				color = blue_marble;
+			}
+			break;
+		}
+		case 6:
+		case 7: {
+			float mappedValue1 = f_mapfloat(-25.0, 45.0, 0.0, 1.0, -2.0);
+			float mappedValue2 = f_mapfloat(-25.0, 45.0, 0.0, 1.0, 35.0);
+			color = vec4(f_temperatureToColor(f_mapfloat(0.0, 1.0, mappedValue1, mappedValue2, color.x)), 1.0);
+			break;
+		}
+		case 8:
+		case 9: {
+			color = vec4(f_temperatureToColor(color.x), 1.0);
+			break;
+		}
+	}
+	
+	if (render_lighting == 1 && render_planet_texture != 0) {
+		color.xyz *= diffuse;
+	}
+	return color;
+}
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+
+Ray f_cameraRay(vec2 uv) {
+	return Ray(camera_pos, normalize(camera_p_uv + (camera_p_u * uv.x) + (camera_p_v * uv.y) - camera_pos));
+}
+
+void main() {
+	ivec2 pixel_id = ivec2(gl_GlobalInvocationID.xy);
+	vec2 uv = (pixel_id - 1 - vec2(resolution) / 2.0) / float(max(resolution.x, resolution.y));
+
+	Ray ray = f_cameraRay(uv);
+
+	mat3 rot = rot3xy(vec2( 0.0, year_time * TWO_PI ));
+	vec3 sun_dir = normalize(vec3(-1,0,0) * rot);
+
+	vec4 color = vec4(0,0,0,1);
+	uint octree_view_depth = 0;
+	vec4 octree_color = vec4(1);
+	float bvh_t_length = MAX_DIST;
+	Ray bvh_ray = Ray(ray.origin, 1.0 / ray.direction);
+
+	if (render_probes == 1) {
+		float t_length = MAX_DIST;
+		float t_dist = MAX_DIST;
+		vec2 earth_uv = vec2(0.5);
+		vec4 bg_color = vec4(0,0,0,1);
+		if (render_planet == 1) {
+			if (f_EarthIntersection(ray, t_dist, earth_uv)) {
+				if (t_dist < t_length && t_dist > EPSILON) {
+					t_length = t_dist;
+					vec3 intersection = ray.origin + ray.direction * t_dist;
+					vec3 normal = normalize(intersection);
+					color = f_earthColor(earth_uv, normal, sun_dir);
+					bg_color = color;
+				}
+			}
+		}
+		int closest_probe_index = f_visitProbeBvh(ray, t_dist);
+		if (closest_probe_index != -1) {
+			if (t_dist < t_length && t_dist > EPSILON) {
+				color = vec4(f_probeColor(probes[closest_probe_index], t_dist), 1.0);
+				if (render_probe_lighting == 1) {
+					vec3 normal = normalize(probes[closest_probe_index].position.xyz);
+					float diffuse = clamp(f_mapfloat(-1.0, 1.0, -0.2, 1.0, dot(normal, sun_dir)), 0, 1);
+						color.xyz *= (diffuse * 0.9 + 0.1);
+				}
+			}
+		}
+		if (render_particles == 1) {
+			int closest_particle_index = f_visitParticleBvh(ray, t_dist);
+			if (closest_particle_index != -1) {
+				if (t_dist < t_length && t_dist > EPSILON) {
+					color = vec4(f_particleColor(particles[closest_particle_index], t_dist), 1.0);
+					if (render_particle_lighting == 1) {
+						vec3 normal = normalize(particles[closest_particle_index].position.xyz);
+						float diffuse = clamp(f_mapfloat(-1.0, 1.0, -0.2, 1.0, dot(normal, sun_dir)), 0, 1);
+						color.xyz *= (diffuse * 0.9 + 0.1);
+					}
+				}
+			}
+		}
+	}
+	else if (render_particles == 1) {
+		float t_length = MAX_DIST;
+		float t_dist = MAX_DIST;
+		vec2 earth_uv = vec2(0.5);
+		if (render_planet == 1) {
+			if (f_EarthIntersection(ray, t_dist, earth_uv)) {
+				if (t_dist < t_length && t_dist > EPSILON) {
+					t_length = t_dist;
+					vec3 intersection = ray.origin + ray.direction * t_dist;
+					vec3 normal = normalize(intersection);
+					color = f_earthColor(earth_uv, normal, sun_dir);
+				}
+			}
+		}
+		int closest_particle_index = f_visitParticleBvh(ray, t_dist);
+		if (closest_particle_index != -1) {
+			if (t_dist < t_length && t_dist > EPSILON) {
+				color = vec4(f_particleColor(particles[closest_particle_index], t_dist), 1.0);
+				if (render_particle_lighting == 1) {
+					vec3 normal = normalize(particles[closest_particle_index].position.xyz);
+					float diffuse = clamp(f_mapfloat(-1.0, 1.0, -0.2, 1.0, dot(normal, sun_dir)), 0, 1);
+					color.xyz *= (diffuse * 0.9 + 0.1);
+				}
+			}
+		}
+	}
+	else if (render_planet == 1) {
+		float earth_dist = MAX_DIST;
+		vec2 earth_uv = vec2(0.5);
+		if (f_EarthIntersection(ray, earth_dist, earth_uv)) {
+			vec3 intersection = ray.origin + ray.direction * earth_dist;
+			vec3 normal = normalize(intersection);
+			color = f_earthColor(earth_uv, normal, sun_dir);
+		}
+	}
+
+	float octree_alpha = 1.0;
+	if (render_probe_octree == 1) {
+		if (render_octree_debug == 1) {
+			if (f_rayBvhIntersection(bvh_ray, probe_nodes[render_octree_debug_index])) {
+				octree_alpha = 0.5f;
+				if (render_octree_hue == 1) {
+					octree_color = floatToColor(float(render_octree_debug_index) / float(probe_nodes.length()));
+				}
+			}
+		}
+		else {
+			for (int i = 0; i < probe_nodes.length(); i++) {
+				Bvh node = probe_nodes[i];
+				node.p_min += 0.05;
+				node.p_max -= 0.05;
+				if (f_rayBvhIntersection(bvh_ray, node)) {
+					octree_view_depth++;
+					if (render_octree_hue == 1) {
+						octree_color = floatToColor(float(i) / float(probe_nodes.length()));
+					}
+				}
+			}
+		}
+	}
+	else if (render_particle_octree == 1) {
+		if (render_octree_debug == 1) {
+			if (f_rayBvhIntersection(bvh_ray, particle_nodes[render_octree_debug_index])) {
+				octree_alpha = 0.5f;
+				if (render_octree_hue == 1) {
+					octree_color = floatToColor(float(render_octree_debug_index) / float(particle_nodes.length()));
+				}
+			}
+		}
+		else {
+			for (int i = 0; i < particle_nodes.length(); i++) {
+				Bvh node = particle_nodes[i];
+				node.p_min += 0.05;
+				node.p_max -= 0.05;
+				if (f_rayBvhIntersection(bvh_ray, node)) {
+					octree_view_depth++;
+					if (render_octree_hue == 1) {
+						octree_color = floatToColor(float(i) / float(particle_nodes.length()));
+					}
+				}
+			}
+		}
+	}
+	for (int i = 0; i < octree_view_depth; i++) {
+		octree_alpha *= 0.95;
+	}
+
+	if (render_lighting == 1 && render_atmosphere == 1 && render_probe_color_mode < SPH) {
+		vec2 e = ray_vs_sphere( ray.origin, ray.direction, ATMOSPHERE_RADIUS );
+		if ( e.x <= e.y ) {
+			vec2 f = ray_vs_sphere( ray.origin, ray.direction, EARTH_RADIUS );
+			e.y = min( e.y, f.x );
+			vec3 I = in_scatter( ray.origin, ray.direction, e, sun_dir );
+			color.rgb += I;
+		}
+	}
+
+	color = mix(octree_color, color, octree_alpha);
+	color = clamp(color, 0.0, 1.0);
+	imageStore(raw_render_layer, pixel_id, color);
+}

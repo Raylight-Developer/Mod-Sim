@@ -31,6 +31,7 @@ dvec1 randD(const dvec1& min, const dvec1& max);
 vec1  randF(const vec1& min, const vec1& max);
 vec1  randF(const dvec1& min, const dvec1& max);
 bool  insideAABB(const vec3& point, vec3& p_min, const vec3& p_max);
+dvec1 easeInOut(const dvec1& t);
 
 uvec3 u_to_u3(const uint& index, const uvec3& size);
 ulvec3 u_to_u3(const uint64& index, const ulvec3& size);
@@ -329,4 +330,27 @@ template<typename From, typename To>
 To bits(From from) {
 	To to = *reinterpret_cast<To*>(&from);
 	return to;
+}
+
+template <typename T>
+struct Confirm {
+	bool confirmed;
+	T data;
+
+	Confirm() {
+		data = T();
+		confirmed = false;
+	}
+	Confirm(const T& data) {
+		confirmed = true;
+		this->data = data;
+	}
+	explicit operator bool() const {
+		return confirmed;
+	}
+};
+
+template <typename T>
+T f_expLerp(const T& current, const T& target, const uint& decay = 16, const dvec1& delta_time = FPS_60) { // from 1 - 25
+	return target + (current - target) * exp(-static_cast<int>(decay) * delta_time);
 }

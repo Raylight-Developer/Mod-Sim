@@ -22,6 +22,11 @@ struct Session {
 
 	Lace log = Lace();
 	unordered_map<string, uint64> params = {};
+	unordered_map<string, chrono::high_resolution_clock::time_point> start_times = {};
+	unordered_map<string, dvec1> total_times = {};
+	unordered_map<string, dvec1> update_times = {};
+	unordered_map<string, dvec1> aggregate_times = {};
+	unordered_map<string, dvec1> delta_times = {};
 };
 
 #undef LOG
@@ -47,5 +52,15 @@ struct Session {
 
 #define LOG Session::getInstance().log
 #define FLUSH Session::getInstance().flushLog()
+#define TIMER(key) Session::getInstance().delta_times[key]
+#define INIT_TIMER(key) Session::getInstance().start_times[key] = chrono::high_resolution_clock::now(); Session::getInstance().total_times[key] = 0.0; Session::getInstance().delta_times[key] = 0.0; Session::getInstance().update_times[key] = 0.0; Session::getInstance().aggregate_times[key] = 0.0;
+#define START_TIMER(key) Session::getInstance().start_times[key] = chrono::high_resolution_clock::now()
+#define END_TIMER(key) Session::getInstance().delta_times[key] = chrono::duration<double>(chrono::high_resolution_clock::now() - Session::getInstance().start_times[key]).count()
+#define ADD_TIMER(key) Session::getInstance().delta_times[key] += chrono::duration<double>(chrono::high_resolution_clock::now() - Session::getInstance().start_times[key]).count()
+#define RESET_TIMER(key) Session::getInstance().start_times[key] = chrono::high_resolution_clock::now(); Session::getInstance().delta_times[key] = 0.0;
+#define UPDATE_TIMER_MARK(key) Session::getInstance().aggregate_times[key] += Session::getInstance().delta_times[key]
+#define RESET_TIMER_MARK(key) Session::getInstance().update_times[key] = Session::getInstance().aggregate_times[key]; Session::getInstance().aggregate_times[key] = 0.0
+#define TIMER_MARK(key) Session::getInstance().update_times[key]
+
 #define SESSION_SET(key, val, type) Session::getInstance().params[key] = bits<type, uint64>(val)
 #define SESSION_GET(key, type) bits<uint64, type>(Session::getInstance().params[key])

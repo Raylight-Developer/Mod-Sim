@@ -147,7 +147,7 @@ string f_strip(const string& str) {
 
 string loadFromFile(const string& file_path) {
 	ifstream in(file_path, ios::binary);
-	if (in) {
+	if (in.is_open()) {
 		string contents;
 		in.seekg(0, ios::end);
 		contents.resize(in.tellg());
@@ -199,6 +199,7 @@ string processSubShader(const string& file_path) {
 		}
 		return output.str();
 	}
+	cerr << file_path << endl;
 	throw runtime_error(to_string(errno));
 }
 
@@ -228,6 +229,7 @@ string preprocessShader(const string& file_path) {
 		}
 		return output.str().substr(0, output.str().size() - 1);
 	}
+	cerr << file_path << endl;
 	throw runtime_error(to_string(errno));
 }
 
@@ -270,6 +272,10 @@ bool insideAABB(const vec3& point, vec3& p_min, const vec3& p_max) {
 	return (point.x >= p_min.x && point.x <= p_max.x) &&
 		(point.y >= p_min.y && point.y <= p_max.y) &&
 		(point.z >= p_min.z && point.z <= p_max.z);
+}
+
+dvec1 easeInOut(const dvec1& t) {
+	return t < 0.5f ? 4.0 * t * t * t : 1 - pow(-2.0 * t + 2.0, 3.0) / 2.0;
 }
 
 uvec3 u_to_u3(const uint& index, const uvec3& size) {
@@ -394,6 +400,7 @@ void Transform::rotate(const dvec3& value) {
 
 			quat_rotation = yaw * pitch * roll * quat_rotation;
 			quat_rotation = glm::normalize(quat_rotation);
+			euler_rotation = glm::eulerAngles(quat_rotation);
 			break;
 		}
 		case Rotation_Type::XYZ: {
@@ -401,6 +408,7 @@ void Transform::rotate(const dvec3& value) {
 
 			if (euler_rotation.x > 89.0)  euler_rotation.x = 89.0;
 			if (euler_rotation.x < -89.0) euler_rotation.x = -89.0;
+			break;
 		}
 	}
 }
@@ -408,25 +416,22 @@ void Transform::rotate(const dvec3& value) {
 void Transform::orbit(const dvec3& pivot, const dvec2& py_rotation) {
 	switch (rotation_type) {
 		case Rotation_Type::QUATERNION: {
-			rotate(glm::vec3(py_rotation.x, py_rotation.y, 0.0));
+			rotate(dvec3(py_rotation.x, py_rotation.y, 0.0));
 
-			const dvec3 forward   = glm::normalize(glm::inverse(quat_rotation) * dvec3(0, 0, -1));
-			const dvec3 direction = glm::normalize(position - pivot);
-			const dvec1 z_distance  = glm::length(position - pivot);
+			const dvec3 z_vector = glm::mat4_cast(quat_rotation)[2];
+			const dvec1 z_distance = glm::length(position - pivot);
 
-			position = pivot - forward * z_distance;
+			position = pivot + z_vector * z_distance;
 			break;
 		}
 		case Rotation_Type::XYZ: {
 			rotate(dvec3(py_rotation.x, py_rotation.y, 0.0));
 
 			const dmat4 matrix = glm::yawPitchRoll(glm::radians(euler_rotation.y), glm::radians(euler_rotation.x), glm::radians(euler_rotation.z));
-			const dvec3 z_vector = -matrix[2];
+			const dvec3 z_vector = matrix[2];
 
 			const dvec1 z_distance = glm::length(pivot - position);
-			const dvec3 camera_position = position - z_vector * z_distance;
-
-			position = pivot - z_vector * z_distance;
+			position = pivot + z_vector * z_distance;
 			break;
 		}
 	}

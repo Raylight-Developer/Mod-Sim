@@ -1,0 +1,35 @@
+#version 460
+
+#include "Compute/Globals.comp"
+#include "Compute/Inputs.comp"
+
+void main() {
+	Particle particle = particles[gl_GlobalInvocationID.x];
+	float current_distance = distance(particle.position, probes[particle.closest].position);
+
+	bool foundClosest = false;
+	while (!foundClosest) {
+		foundClosest = true;
+		for (uint i = 0; i < 3; i++) {
+			float dist = distance(particle.position, probes[particle.neighbor[i]].position);
+			if (dist < current_distance) {
+				particle.closest = particle.neighbor[i];
+				current_distance = dist;
+				foundClosest = false;  // A closer probe was found, so keep searching
+			}
+		}
+	}
+
+	dquat wind_vector = dquat(1.0, 0.0, 0.0, 0.0);
+	for (const CPU_Neighbor& neighbor : particle->probe->neighbors) {
+		const dvec1 dist = distance(particle->transformed_position, neighbor.probe->transformed_position);
+		const dvec1 smoothing_kernel = pow(max(0.0, 0.25 - dist), 3.0);
+		wind_vector += neighbor.probe->data.wind_quaternion * smoothing_kernel;
+	}
+
+	// Add wind to velocity
+	// Quaternion multiplication combines rotations
+	particle->wind_speed = normalize(normalize((wind_vector * DT)) * particle->wind_speed);
+
+	particles[gl_GlobalInvocationID.x] = particle;
+}

@@ -1,131 +1,95 @@
 #pragma once
 
 #include "Shared.hpp"
-struct CPU_Cell;
 
-struct CPU_Particle {
-	vec1 mass;
-	vec1 density;
-	vec1 humidity;
-	vec1 pressure;
-	vec1 temperature;
+#include "OpenGl.hpp"
 
-	vec3 position;
-	vec3 velocity;
-	vec3 acceleration;
+#include "Particle.hpp"
+#include "Bvh.hpp"
 
-	bool  colliding;
+enum struct Texture_Field;
 
-	uvec3 cell_id;
-	CPU_Cell* cell;
+struct Kernel {
+	vec1  PROBE_RADIUS;
+	uint  PROBE_COUNT;
+	uint  PROBE_MAX_OCTREE_DEPTH;
+	dvec1 PROBE_POLE_BIAS;
+	dvec1 PROBE_POLE_BIAS_POWER;
+	dvec2 PROBE_POLE_GEOLOCATION;
 
-	CPU_Particle();
-};
-
-struct alignas(16) GPU_Particle {
-	vec3 position;
-	vec1 temperature;
-	vec4 velocity;
-
-	GPU_Particle();
-	GPU_Particle(const CPU_Particle* particle);
-};
-
-struct CPU_Cell {
-	vec1 density;
-	vec1 humidity;
-	vec1 pressure;
-	vec1 temperature;
-
-	vector<CPU_Particle*> particles;
-	uint  particle_count;
-
-	vec3 pmin;
-	vec3 pmax;
-
-	vec3 velocity_field;
-	vec3 acceleration_field;
-
-	CPU_Cell();
-};
-
-struct GPU_Cell {
-	vec1 density;
-	vec1 humidity;
-	vec1 pressure;
-	vec1 temperature;
-
-	vec3 pmin;
-	uint a;
-	vec3 pmax;
-	uint b;
-
-	GPU_Cell();
-	GPU_Cell(const CPU_Cell* cell);
-};
-
-struct GPU_Octree {
-	uvec4 pointers_a;
-	uvec4 pointers_b;
-	vec3 pmin;
-	uint leaf;
-	vec3 pmax;
-	uint pad;
-};
-
-struct Flip {
 	vec1  PARTICLE_RADIUS;
 	uint  PARTICLE_COUNT;
-	uvec3 GRID_CELLS;
-	uint  GRID_COUNT;
-	vec1  CELL_SIZE;
-	vec1  INV_CELL_SIZE;
-	vec3  GRID_SIZE;
-	vec3  HALF_SIZE;
-	vec1  REST_DENSITY;
-	vec1  DT;
-	uint  SAMPLES;
-	vec1  SDT;
+	uint  PARTICLE_MAX_OCTREE_DEPTH;
+	dvec1 PARTICLE_POLE_BIAS;
+	dvec1 PARTICLE_POLE_BIAS_POWER;
+	dvec2 PARTICLE_POLE_GEOLOCATION;
 
-	vector<CPU_Cell*> grid;
-	vector<CPU_Particle*> particles;
+	dvec1 EARTH_TILT;
+	dvec1 YEAR_TIME;
+	dvec1 DAY_TIME;
+	dvec1 TIME_SCALE;
+	int   CALENDAR_MONTH;
+	int   CALENDAR_DAY;
+	int   CALENDAR_HOUR;
+	int   CALENDAR_MINUTE;
+	uint  DAY;
+	bool  BVH_SPH;
 
-	Flip();
+	dvec1 DT;
+	dvec1 SDT;
+	uint  RUNFRAME;
+	uint  SUB_SAMPLES;
 
-	void init(const vec1& PARTICLE_RADIUS, const uint& PARTICLE_COUNT, const uvec3& GRID_CELLS);
-	void initGrid();
-	void initParticles();
+	dvec3 sun_dir;
+
+	unordered_map<Texture_Field, Texture> textures;
+
+	vector<CPU_Probe*>       probes;
+	vector<CPU_Particle*>    particles;
+
+	vector<GPU_Probe>        gpu_probes;
+	vector<GPU_Particle>     gpu_particles;
+
+	vector<GPU_Bvh>          probe_nodes;
+	vector<GPU_Bvh>          particle_nodes;
+
+	vector<Compute_Probe>    compute_probes;
+	vector<Compute_Particle> compute_particles;
+	GLuint compute_program;
+
+	Kernel();
+
+	void traceInitProperties(CPU_Probe* probe) const;
+
+	void updateGPUProbes();
+	void buildProbes();
+
+	void updateGPUParticles();
+	void buildParticles();
+
+	void lock();
+	void lockProbes();
+	void lockParticles();
 
 	void simulate(const dvec1& delta_time);
+	void updateTime();
+	void updateProbePosition(CPU_Probe* probe) const;
+	void calculateSunlight(CPU_Probe* probe) const;
 
-	void integrate();
+	void scatterSPH(CPU_Probe* probe) const;
+	void scatterWind(CPU_Probe* probe) const;
+	void gatherWind(CPU_Probe* probe) const;
+	void gatherThermodynamics(CPU_Probe* probe) const;
 
-	void thermodynamics(CPU_Particle* particle);
-	void seaThermalTransfer(CPU_Particle* particle);
-	void atmosphereThermalTransfer(CPU_Particle* particle);
+	void particleCompute();
+	void calculateParticle(CPU_Particle* particle) const;
+	void updateParticlePosition(CPU_Particle* particle) const;
 
-	void scatter();
-	void gather();
-
-	void computeGrid();
-
-	void navierStokes();
-	void computeCoriolis();
-	void computePressure();
-	void computeTemperature();
-
-	CPU_Cell* getGrid(const uint64& x, const uint64& y, const uint64& z);
-
-	vector<GPU_Particle> gpuParticles() const;
-	vector<GPU_Cell> gpuGrid() const;
-
-	void particleCollisions();
-	void particleCollisionsUnoptimized();
-	void boundingCollisions(CPU_Particle* particle);
-
-	bool resolveOverlap(CPU_Particle* particle_a, CPU_Particle* particle_b);
-	void resolveCollision(CPU_Particle* particle_a, CPU_Particle* particle_b);
+	dvec3 sunDir() const;
+	void calculateDate();
+	void calculateDateTime();
+	void calculateYearTime();
+	void calculateDayTime();
+	dvec3 rotateGeoloc(const dvec3& point, const dvec2& geoloc) const;
+	dquat rotateGeoloc(const dvec2& geoloc) const;
 };
-
-vec1 calculateAirDensity(const vec1& pressure, const vec1& temperature);
-vec1 calculateInterpolationWeight(const CPU_Particle* particle, const CPU_Cell* cell);

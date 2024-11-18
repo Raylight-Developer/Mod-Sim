@@ -8,5 +8,5 @@ int main(int argc, char* argv[]) {
 	Renderer renderer = Renderer();
 	renderer.init();
 
-	return 1;
+	return 0;
 }
