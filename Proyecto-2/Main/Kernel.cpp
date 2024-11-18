@@ -514,10 +514,10 @@ void Kernel::gatherThermodynamics(CPU_Probe* probe) const {
 
 	// = (convective_heat_transfer_coefficient) * (temperature - surrounding_temperature) * area
 	const dvec1 wind_speed = glm::length(vec2(probe->data.wind_u, probe->data.wind_v));
-	const dvec1 coeff = pow((1.0 + wind_speed), 0.4);
+	const dvec1 coeff = pow((1.0 + wind_speed), 0.35);
 	const dvec1 convective_transfer = coeff * (probe->data.temperature - probe->sph.temperature) * probe->data.surface_area;
 
-	const dvec1 net_heat = solar_heat_absorption * 0.001 - radiative_loss * 0.004 - convective_transfer * 0.001;
+	const dvec1 net_heat = solar_heat_absorption * 0.001 - radiative_loss * 0.005 - convective_transfer * 0.001;
 	if (abs(net_heat) > 1.0) {
 		cout << "Temp Changing Too Quickly: Net  " << net_heat << "  | Solar  " << solar_heat_absorption << "  | Rad  -" << radiative_loss << "  | Convection  " << convective_transfer << endl;
 	}

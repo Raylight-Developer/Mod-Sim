@@ -97,7 +97,7 @@ void Renderer::initGlfw() {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+	//glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
 
 	GLFWmonitor* monitor = glfwGetPrimaryMonitor();
 	const GLFWvidmode* mode = glfwGetVideoMode(monitor);
@@ -277,12 +277,14 @@ void Renderer::f_guiLoop() {
 	if (run_sim) {
 		if (ImGui::Button("Pause", ImVec2(itemWidth, 0))) {
 			run_sim = false;
+			lock_view = false;
 		}
 	}
 	else {
 		if (lock_settings) {
 			if (ImGui::Button("Play", ImVec2(halfWidth, 0))) {
 				run_sim = true;
+				lock_view = true;
 			}
 			ImGui::SameLine();
 			ImGui::SetCursorPosX(halfPos);
@@ -292,6 +294,8 @@ void Renderer::f_guiLoop() {
 		}
 		if (ImGui::Button("Lock Settings", ImVec2(itemWidth, 0))) {
 			lock_settings = true;
+			f_updateProbes();
+			f_updateParticles();
 			kernel.lock();
 			kernel.simulate(0.00001);
 		}
